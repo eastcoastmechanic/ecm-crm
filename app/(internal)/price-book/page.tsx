@@ -1,8 +1,15 @@
 import { supabase } from "@/lib/supabase";
 import { addPriceBookItem } from "./actions";
-
-const inputClass =
-  "rounded border border-black/10 px-3 py-2 text-sm dark:border-white/10 dark:bg-transparent";
+import {
+  buttonClass,
+  cardClass,
+  errorClass,
+  headingClass,
+  inputClass,
+  itemSubClass,
+  itemTitleClass,
+  subTextClass,
+} from "../ui";
 
 function formatPrice(value: number | null) {
   if (value === null) return null;
@@ -11,6 +18,12 @@ function formatPrice(value: number | null) {
     currency: "USD",
   }).format(value);
 }
+
+const tierClass: Record<string, string> = {
+  good: "bg-white/8 text-g300",
+  better: "bg-blue/40 text-white",
+  best: "bg-accent/20 text-accent",
+};
 
 export default async function PriceBookPage() {
   const { data: items, error } = await supabase
@@ -22,17 +35,14 @@ export default async function PriceBookPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-semibold">Price Book</h1>
-        <p className="text-sm text-black/60 dark:text-white/60">
+        <h1 className={headingClass}>Price Book</h1>
+        <p className={subTextClass}>
           Standard line items used when generating estimates, invoices, and
           proposals.
         </p>
       </div>
 
-      <form
-        action={addPriceBookItem}
-        className="grid gap-3 rounded-lg border border-black/10 p-4 dark:border-white/10 sm:grid-cols-2"
-      >
+      <form action={addPriceBookItem} className={cardClass}>
         <input name="category" placeholder="Category" className={inputClass} />
         <select name="tier" className={inputClass} defaultValue="">
           <option value="">Tier</option>
@@ -67,46 +77,44 @@ export default async function PriceBookPage() {
           placeholder="Labor hours"
           className={inputClass}
         />
-        <button
-          type="submit"
-          className="rounded bg-foreground px-4 py-2 text-sm text-background sm:col-span-2 sm:w-fit"
-        >
+        <button type="submit" className={`${buttonClass} sm:col-span-2 sm:w-fit`}>
           Add Price Book Item
         </button>
       </form>
 
       {error && (
-        <p className="text-sm text-red-600">
-          Error loading price book: {error.message}
-        </p>
+        <p className={errorClass}>Error loading price book: {error.message}</p>
       )}
 
-      <div className="flex flex-col divide-y divide-black/10 dark:divide-white/10">
-        {items?.length === 0 && (
-          <p className="text-sm text-black/60 dark:text-white/60">
-            No price book items yet.
-          </p>
-        )}
+      <div className="flex flex-col divide-y divide-white/8">
+        {items?.length === 0 && <p className={subTextClass}>No price book items yet.</p>}
         {items?.map((item) => (
-          <div key={item.id} className="py-3">
-            <div className="font-medium">
-              {item.name}
-              {item.tier ? ` — ${item.tier}` : ""}
-            </div>
-            <div className="text-sm text-black/60 dark:text-white/60">
-              {[
-                item.category,
-                formatPrice(item.unit_price),
-                item.labor_hours ? `${item.labor_hours} hrs labor` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </div>
-            {item.description && (
-              <div className="text-sm text-black/60 dark:text-white/60">
-                {item.description}
+          <div key={item.id} className="flex items-start justify-between gap-3 py-3">
+            <div>
+              <div className={itemTitleClass}>{item.name}</div>
+              <div className={itemSubClass}>
+                {[item.category, item.labor_hours ? `${item.labor_hours} hrs labor` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
               </div>
-            )}
+              {item.description && (
+                <div className={itemSubClass}>{item.description}</div>
+              )}
+            </div>
+            <div className="flex flex-shrink-0 flex-col items-end gap-1">
+              <span className="font-mono text-sm font-medium text-white">
+                {formatPrice(item.unit_price)}
+              </span>
+              {item.tier && (
+                <span
+                  className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    tierClass[item.tier] ?? "bg-white/8 text-g300"
+                  }`}
+                >
+                  {item.tier}
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </div>

@@ -1,26 +1,46 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --navy: #0a1628;
+  --navy-2: #0e1f3a;
+  --blue: #1e3a5f;
+  --accent: #e8502a;
+  --accent-2: #c43d20;
+  --gold: #f5a623;
+  --off: #f4f6fa;
+  --g100: #e2e8f0;
+  --g300: #94a3b8;
+  --g500: #64748b;
+  --g700: #334155;
+  --green: #16a34a;
+  --green-l: #dcfce7;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-blue: var(--blue);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-gold: var(--gold);
+  --color-off: var(--off);
+  --color-g100: var(--g100);
+  --color-g300: var(--g300);
+  --color-g500: var(--g500);
+  --color-g700: var(--g700);
+  --color-green: var(--green);
+  --color-green-l: var(--green-l);
+  --font-sans: var(--font-dm-sans);
+  --font-mono: var(--font-dm-mono);
+  --font-display: var(--font-syne);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--navy);
+  color: #ffffff;
+}
+
+select option {
+  background: var(--navy-2);
+  color: #ffffff;
 }

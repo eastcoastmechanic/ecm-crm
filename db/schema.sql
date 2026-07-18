@@ -66,6 +66,7 @@ create table price_book_items (
 
 create table documents (
   id uuid primary key default gen_random_uuid(),
+  doc_number text,             -- e.g. EST-1001, INV-1001, PROP-1001
   type text not null check (type in ('estimate','invoice','proposal')),
   customer_id uuid references customers(id),
   property_id uuid references properties(id),
