@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ECM Platform — "Better than Jobber"
 
-## Getting Started
+Full CRM + billing + AI diagnostics + client portal, purpose-built for East Coast Mechanical, structured to eventually be sellable to other contractors.
 
-First, run the development server:
+## Vision
+One system that replaces Jobber, Square invoicing, and manual quoting — with Claude as the engine behind every estimate, invoice, proposal, and diagnostic call, and a client portal that gets ECM paid faster.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Tech Stack
+| Layer | Choice | Why |
+|---|---|---|
+| Frontend | Next.js 14 (App Router) + Tailwind + shadcn/ui | Fast solo dev, one codebase for internal app + client portal |
+| Database | Postgres (via Supabase) | Deeply relational data (customer→property→equipment→job→invoice) |
+| Auth | Supabase Auth | Built-in, multi-tenant ready via row-level security |
+| AI | Claude API (structured JSON outputs) | Powers estimate/invoice generation + diagnostic tool |
+| Payments | Stripe (or Stripe Connect if ever multi-tenant) | Client portal payments |
+| Email | Resend + webhook inbound parsing | Automated follow-ups, contract renewals |
+| Mobile | PWA first, React Native later if needed | One codebase, offline-capable |
+| Hosting | Vercel (app) + Supabase (db/auth/storage) | Zero-ops for a solo dev |
+
+## Repo Structure
+```
+ecm-crm/
+  app/                 # Next.js routes
+    (internal)/        # Tech-facing app: estimates, invoices, proposals, diagnostics
+    (portal)/           # Customer-facing portal
+    api/                 # API routes incl. Claude calls, Stripe webhooks, email webhooks
+  lib/
+    claude/              # Prompt templates + structured output schemas
+    pricebook/            # Price book lookup logic
+  db/
+    schema.sql            # Core Postgres schema
+  docs/
+    ROADMAP.md            # Phased build plan
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Build Order (see docs/ROADMAP.md for detail)
+1. Data backbone: Customers, Properties, Equipment, Price Book
+2. AI-generated Estimates/Invoices/Proposals
+3. Diagnostic tool (equipment specs + readings → Claude analysis)
+4. Client portal + Stripe payments
+5. Email automation
+6. Scheduling/dispatch
