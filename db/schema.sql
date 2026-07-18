@@ -100,3 +100,14 @@ create table jobs (
   document_id uuid references documents(id),
   created_at timestamptz default now()
 );
+
+-- Wholesale distributor cost by brand/model. Internal/ECM-facing only —
+-- never expose this table to the future customer portal (Phase 4).
+create table equipment_costs (
+  id uuid primary key default gen_random_uuid(),
+  brand text not null,
+  model_number text not null,
+  cost numeric(10,2) not null,
+  created_at timestamptz default now(),
+  unique (brand, model_number)
+);
