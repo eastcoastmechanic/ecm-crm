@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { updateDocument } from "./actions";
-import { headingClass, subTextClass, buttonClass, inputClass } from "../../ui";
+import { updateDocument, sendDocumentEmail } from "./actions";
+import { headingClass, subTextClass, buttonClass, buttonSecondaryClass, inputClass } from "../../ui";
 
 type LineItem = {
   category: string;
@@ -65,7 +65,32 @@ export default async function DocumentPage({
             {new Date(doc.created_at).toLocaleDateString()}
           </p>
         </div>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <a
+            href={`/documents/${doc.id}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonSecondaryClass}
+          >
+            Download PDF
+          </a>
+          {doc.customers?.email ? (
+            <form action={sendDocumentEmail}>
+              <input type="hidden" name="id" value={doc.id} />
+              <button type="submit" className={buttonClass}>
+                Send to Customer
+              </button>
+            </form>
+          ) : (
+            <span className={subTextClass} title="Add an email to this customer to send documents">
+              No customer email on file
+            </span>
+          )}
+        </div>
       </div>
+      {doc.status === "sent" && doc.sent_at && (
+        <p className={subTextClass}>Sent {new Date(doc.sent_at).toLocaleString()}</p>
+      )}
 
       {lineData.mass_save_eligible && (
         <div className="rounded-xl border border-green/30 bg-green-l/10 p-4">

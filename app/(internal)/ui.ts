@@ -7,6 +7,9 @@ export const cardClass =
 export const buttonClass =
   "rounded-lg bg-gradient-to-br from-accent to-accent-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90";
 
+export const buttonSecondaryClass =
+  "rounded-lg border border-white/8 bg-white/4 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-white/8";
+
 export const headingClass = "font-display text-2xl font-extrabold tracking-wide";
 
 export const subTextClass = "text-sm text-g300";

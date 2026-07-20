@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
+import { getDocumentForPdf } from "@/lib/documents";
+import { renderDocumentPdf } from "@/lib/pdf";
+import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 
 type LineItem = {
   category: string;
@@ -87,6 +90,54 @@ export async function updateDocument(formData: FormData) {
     .eq("id", id);
 
   if (error) throw new Error(error.message);
+
+  revalidatePath(`/documents/${id}`);
+  revalidatePath("/documents");
+}
+
+const typeLabel: Record<string, string> = {
+  estimate: "Estimate",
+  invoice: "Invoice",
+  proposal: "Proposal",
+};
+
+function formatPrice(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+}
+
+export async function sendDocumentEmail(formData: FormData) {
+  const id = formData.get("id") as string;
+
+  const { data, customerEmail, error } = await getDocumentForPdf(id);
+  if (error || !data) throw new Error(error ?? "Document not found");
+  if (!customerEmail) throw new Error("Customer has no email on file");
+
+  const pdfBuffer = await renderDocumentPdf(data);
+  const label = typeLabel[data.type] ?? "Document";
+
+  const { error: sendError } = await resend.emails.send({
+    from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+    to: customerEmail,
+    subject: `${label} ${data.doc_number ?? ""} from East Coast Mechanical`,
+    text: `Hi ${data.customer_name},\n\nAttached is your ${label.toLowerCase()} ${data.doc_number ?? ""} (Better tier total: ${formatPrice(
+      data.totals.better
+    )}).\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
+    attachments: [
+      {
+        filename: `${data.doc_number ?? label}.pdf`,
+        content: pdfBuffer,
+      },
+    ],
+  });
+
+  if (sendError) throw new Error(sendError.message);
+
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (updateError) throw new Error(updateError.message);
 
   revalidatePath(`/documents/${id}`);
   revalidatePath("/documents");
