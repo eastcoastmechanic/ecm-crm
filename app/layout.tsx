@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, DM_Mono, Anton } from "next/font/google";
+import { DM_Sans, DM_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -13,9 +13,9 @@ const dmMono = DM_Mono({
   subsets: ["latin"],
 });
 
-const anton = Anton({
+const orbitron = Orbitron({
   variable: "--font-syne",
-  weight: ["400"],
+  weight: ["700", "800", "900"],
   subsets: ["latin"],
 });
 
@@ -32,7 +32,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmSans.variable} ${dmMono.variable} ${anton.variable} h-full antialiased`}
+      className={`${dmSans.variable} ${dmMono.variable} ${orbitron.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-navy text-white font-sans">
         {children}

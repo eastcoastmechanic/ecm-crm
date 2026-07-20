@@ -11,7 +11,7 @@ export default function PortalLayout({
         <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-6 py-2.5">
           <Image src="/logo.png" alt="ECM logo" width={52} height={52} className="shrink-0" />
           <div className="leading-tight">
-            <div className="whitespace-nowrap font-display text-base tracking-wide">
+            <div className="whitespace-nowrap font-display text-base font-bold tracking-wide">
               East Coast Mechanical
             </div>
             <div className="font-mono text-[9px] tracking-widest text-g300 uppercase">

@@ -12,7 +12,7 @@ export default function InternalLayout({
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-6 py-2.5">
           <div className="flex shrink-0 items-center gap-2.5">
             <Image src="/logo.png" alt="ECM logo" width={52} height={52} className="shrink-0" />
-            <div className="whitespace-nowrap font-display text-base tracking-wide">
+            <div className="whitespace-nowrap font-display text-base font-bold tracking-wide">
               East Coast Mechanical
             </div>
           </div>
