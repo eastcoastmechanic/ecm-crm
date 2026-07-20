@@ -4,6 +4,7 @@ import type { PdfDocumentData } from "@/lib/pdf";
 export async function getDocumentForPdf(id: string): Promise<{
   data: PdfDocumentData | null;
   customerEmail: string | null;
+  dueDate: string | null;
   error: string | null;
 }> {
   const { data: doc, error } = await supabase
@@ -13,7 +14,12 @@ export async function getDocumentForPdf(id: string): Promise<{
     .single();
 
   if (error || !doc) {
-    return { data: null, customerEmail: null, error: error?.message ?? "Document not found" };
+    return {
+      data: null,
+      customerEmail: null,
+      dueDate: null,
+      error: error?.message ?? "Document not found",
+    };
   }
 
   const lineData = doc.line_items as {
@@ -38,6 +44,15 @@ export async function getDocumentForPdf(id: string): Promise<{
       totals: lineData.totals,
     },
     customerEmail: doc.customers?.email ?? null,
+    dueDate: doc.due_date,
     error: null,
   };
+}
+
+/** Invoices default to net-30 the first time they're marked sent. */
+export function dueDateForSend(type: string, existingDueDate: string | null): string | undefined {
+  if (type !== "invoice" || existingDueDate) return undefined;
+  const due = new Date();
+  due.setDate(due.getDate() + 30);
+  return due.toISOString().slice(0, 10);
 }

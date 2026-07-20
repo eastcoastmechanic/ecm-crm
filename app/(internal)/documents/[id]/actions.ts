@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
-import { getDocumentForPdf } from "@/lib/documents";
+import { getDocumentForPdf, dueDateForSend } from "@/lib/documents";
 import { renderDocumentPdf } from "@/lib/pdf";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 
@@ -39,7 +39,7 @@ export async function updateDocument(formData: FormData) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("documents")
-    .select("line_items")
+    .select("line_items, type, due_date")
     .eq("id", id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
@@ -86,6 +86,7 @@ export async function updateDocument(formData: FormData) {
       total: totals.better,
       sent_at: status === "sent" ? new Date().toISOString() : undefined,
       paid_at: status === "paid" ? new Date().toISOString() : undefined,
+      due_date: status === "sent" ? dueDateForSend(existing.type, existing.due_date) : undefined,
     })
     .eq("id", id);
 
@@ -108,7 +109,7 @@ function formatPrice(value: number) {
 export async function sendDocumentEmail(formData: FormData) {
   const id = formData.get("id") as string;
 
-  const { data, customerEmail, error } = await getDocumentForPdf(id);
+  const { data, customerEmail, dueDate, error } = await getDocumentForPdf(id);
   if (error || !data) throw new Error(error ?? "Document not found");
   if (!customerEmail) throw new Error("Customer has no email on file");
 
@@ -134,7 +135,11 @@ export async function sendDocumentEmail(formData: FormData) {
 
   const { error: updateError } = await supabase
     .from("documents")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .update({
+      status: "sent",
+      sent_at: new Date().toISOString(),
+      due_date: dueDateForSend(data.type, dueDate),
+    })
     .eq("id", id);
 
   if (updateError) throw new Error(updateError.message);
