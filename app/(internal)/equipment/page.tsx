@@ -1,15 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { addEquipment } from "./actions";
-import {
-  buttonClass,
-  cardClass,
-  errorClass,
-  headingClass,
-  inputClass,
-  itemSubClass,
-  itemTitleClass,
-  subTextClass,
-} from "../ui";
+import EquipmentList from "./EquipmentList";
+import { buttonClass, cardClass, errorClass, headingClass, inputClass, subTextClass } from "../ui";
 
 export default async function EquipmentPage() {
   const [{ data: equipment, error }, { data: properties }] = await Promise.all([
@@ -79,37 +71,7 @@ export default async function EquipmentPage() {
         </p>
       )}
 
-      <div className="flex flex-col divide-y divide-white/8">
-        {equipment?.length === 0 && (
-          <p className={subTextClass}>No equipment yet.</p>
-        )}
-        {equipment?.map((item) => (
-          <div key={item.id} className="py-3">
-            <div className={itemTitleClass}>
-              {item.type}
-              {item.brand ? ` — ${item.brand}` : ""}
-              {item.model ? ` ${item.model}` : ""}
-            </div>
-            <div className={itemSubClass}>
-              {item.properties?.address}
-              {item.properties?.customers?.name
-                ? ` — ${item.properties.customers.name}`
-                : ""}
-            </div>
-            <div className={itemSubClass}>
-              {[
-                item.serial_number ? `SN ${item.serial_number}` : null,
-                item.install_date ? `Installed ${item.install_date}` : null,
-                item.warranty_expiration
-                  ? `Warranty until ${item.warranty_expiration}`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </div>
-          </div>
-        ))}
-      </div>
+      <EquipmentList equipment={equipment ?? []} properties={properties ?? []} />
     </div>
   );
 }

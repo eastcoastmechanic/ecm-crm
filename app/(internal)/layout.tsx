@@ -1,3 +1,4 @@
+import Image from "next/image";
 import NavLinks from "./NavLinks";
 
 export default function InternalLayout({
@@ -7,22 +8,15 @@ export default function InternalLayout({
 }) {
   return (
     <div className="min-h-screen">
-      <header className="relative h-14 border-b border-white/6 bg-navy after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-gradient-to-r after:from-accent after:via-gold after:to-transparent">
-        <div className="mx-auto flex h-full max-w-6xl items-center gap-5 px-6">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-gold font-display text-[11px] font-extrabold tracking-wide">
-              ECM
-            </div>
-            <div className="leading-tight">
-              <div className="font-display text-sm font-extrabold tracking-wide">
-                ECM Platform
-              </div>
-              <div className="font-mono text-[9px] tracking-widest text-g300 uppercase">
-                East Coast Mechanical
-              </div>
+      <header className="relative border-b border-white/6 bg-navy after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-gradient-to-r after:from-accent after:via-gold after:to-transparent">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-6 py-2.5">
+          <div className="flex shrink-0 items-center gap-2.5">
+            <Image src="/logo.png" alt="ECM logo" width={36} height={36} className="shrink-0" />
+            <div className="whitespace-nowrap font-display text-sm font-extrabold tracking-wide">
+              East Coast Mechanical Platform
             </div>
           </div>
-          <div className="h-6 w-px bg-white/8" />
+          <div className="hidden h-6 w-px bg-white/8 sm:block" />
           <NavLinks />
         </div>
       </header>

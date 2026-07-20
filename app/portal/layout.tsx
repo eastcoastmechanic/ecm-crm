@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function PortalLayout({
   children,
 }: {
@@ -5,14 +7,12 @@ export default function PortalLayout({
 }) {
   return (
     <div className="min-h-screen">
-      <header className="relative h-14 border-b border-white/6 bg-navy after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-gradient-to-r after:from-accent after:via-gold after:to-transparent">
-        <div className="mx-auto flex h-full max-w-3xl items-center gap-2.5 px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-gold font-display text-[11px] font-extrabold tracking-wide">
-            ECM
-          </div>
+      <header className="relative border-b border-white/6 bg-navy after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-gradient-to-r after:from-accent after:via-gold after:to-transparent">
+        <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-6 py-2.5">
+          <Image src="/logo.png" alt="ECM logo" width={36} height={36} className="shrink-0" />
           <div className="leading-tight">
-            <div className="font-display text-sm font-extrabold tracking-wide">
-              East Coast Mechanical
+            <div className="whitespace-nowrap font-display text-sm font-extrabold tracking-wide">
+              East Coast Mechanical Platform
             </div>
             <div className="font-mono text-[9px] tracking-widest text-g300 uppercase">
               Customer Portal

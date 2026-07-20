@@ -1,21 +1,13 @@
 import { supabase } from "@/lib/supabase";
 import { addCustomer } from "./actions";
-import {
-  buttonClass,
-  cardClass,
-  errorClass,
-  headingClass,
-  inputClass,
-  itemSubClass,
-  itemTitleClass,
-  subTextClass,
-} from "../ui";
+import CustomerList from "./CustomerList";
+import { buttonClass, cardClass, errorClass, headingClass, inputClass, subTextClass } from "../ui";
 
 export default async function CustomersPage() {
-  const { data: customers, error } = await supabase
-    .from("customers")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const [{ data: customers, error }, { data: properties }] = await Promise.all([
+    supabase.from("customers").select("*").order("created_at", { ascending: false }),
+    supabase.from("properties").select("id, address, customer_id").order("address"),
+  ]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -47,22 +39,7 @@ export default async function CustomersPage() {
         <p className={errorClass}>Error loading customers: {error.message}</p>
       )}
 
-      <div className="flex flex-col divide-y divide-white/8">
-        {customers?.length === 0 && (
-          <p className={subTextClass}>No customers yet.</p>
-        )}
-        {customers?.map((customer) => (
-          <div key={customer.id} className="py-3">
-            <div className={itemTitleClass}>{customer.name}</div>
-            <div className={itemSubClass}>
-              {[customer.email, customer.phone].filter(Boolean).join(" · ")}
-            </div>
-            {customer.billing_address && (
-              <div className={itemSubClass}>{customer.billing_address}</div>
-            )}
-          </div>
-        ))}
-      </div>
+      <CustomerList customers={customers ?? []} properties={properties ?? []} />
     </div>
   );
 }

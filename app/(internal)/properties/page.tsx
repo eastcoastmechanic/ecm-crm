@@ -1,15 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { addProperty } from "./actions";
-import {
-  buttonClass,
-  cardClass,
-  errorClass,
-  headingClass,
-  inputClass,
-  itemSubClass,
-  itemTitleClass,
-  subTextClass,
-} from "../ui";
+import PropertyList from "./PropertyList";
+import { buttonClass, cardClass, errorClass, headingClass, inputClass, subTextClass } from "../ui";
 
 export default async function PropertiesPage() {
   const [{ data: properties, error }, { data: customers }] = await Promise.all([
@@ -63,20 +55,7 @@ export default async function PropertiesPage() {
         </p>
       )}
 
-      <div className="flex flex-col divide-y divide-white/8">
-        {properties?.length === 0 && (
-          <p className={subTextClass}>No properties yet.</p>
-        )}
-        {properties?.map((property) => (
-          <div key={property.id} className="py-3">
-            <div className={itemTitleClass}>{property.address}</div>
-            <div className={itemSubClass}>
-              {property.customers?.name}
-              {property.property_type ? ` · ${property.property_type}` : ""}
-            </div>
-          </div>
-        ))}
-      </div>
+      <PropertyList properties={properties ?? []} customers={customers ?? []} />
     </div>
   );
 }
