@@ -9,6 +9,7 @@ const navItems = [
   { href: "/equipment", label: "Equipment" },
   { href: "/price-book", label: "Price Book" },
   { href: "/documents", label: "Documents" },
+  { href: "/diagnostics", label: "Diagnostics" },
 ];
 
 export default function NavLinks() {
