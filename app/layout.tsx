@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans, DM_Mono, Orbitron } from "next/font/google";
+import ServiceWorkerRegister from "./service-worker-register";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -24,6 +25,10 @@ export const metadata: Metadata = {
   description: "CRM, billing, and diagnostics for East Coast Mechanical",
 };
 
+export const viewport: Viewport = {
+  themeColor: "#0a1628",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,6 +40,7 @@ export default function RootLayout({
       className={`${dmSans.variable} ${dmMono.variable} ${orbitron.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-navy text-white font-sans">
+        <ServiceWorkerRegister />
         {children}
       </body>
     </html>

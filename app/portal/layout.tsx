@@ -1,4 +1,11 @@
 import Image from "next/image";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "East Coast Mechanical",
+  description: "Customer portal for East Coast Mechanical",
+  manifest: "/api/portal-manifest",
+};
 
 export default function PortalLayout({
   children,

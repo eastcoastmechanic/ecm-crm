@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { rescheduleJob, updateJobStatus } from "./actions";
-import { buttonClass, buttonSecondaryClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import Link from "next/link";
+import { addJobPhotos, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
+import SubmitButton from "../SubmitButton";
+import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 
 const statusOptions = ["requested", "scheduled", "in_progress", "complete", "cancelled"];
 
@@ -20,8 +22,13 @@ type Job = {
   scheduled_at: string | null;
   status: string;
   notes: string | null;
+  on_way_at: string | null;
+  tracked_hours: number | null;
+  created_via: string | null;
   customers: { name: string | null } | null;
   properties: { address: string | null } | null;
+  diagnostics: { id: string }[] | null;
+  photos: { url: string; caption: string | null }[] | null;
 };
 
 function sameDate(a: Date, b: Date) {
@@ -48,29 +55,93 @@ function monthGrid(cursor: Date) {
   });
 }
 
-export default function JobsView({ jobs }: { jobs: Job[] }) {
+export default function JobsView({ jobs, hourlyRate }: { jobs: Job[]; hourlyRate: number | null }) {
   const router = useRouter();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [dragError, setDragError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [onWayPendingId, setOnWayPendingId] = useState<string | null>(null);
+  const [optimizeDate, setOptimizeDate] = useState(() => toDateKey(new Date()));
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizeMessage, setOptimizeMessage] = useState<string | null>(null);
 
   const days = useMemo(() => monthGrid(monthCursor), [monthCursor]);
   const today = new Date();
 
+  const filteredJobs = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return jobs;
+    return jobs.filter((j) =>
+      [j.customers?.name, j.properties?.address, j.status, j.notes]
+        .filter(Boolean)
+        .some((field) => field!.toLowerCase().includes(query))
+    );
+  }, [jobs, search]);
+
   function jobsOn(day: Date) {
-    return jobs.filter((j) => j.scheduled_at && sameDate(new Date(j.scheduled_at), day));
+    return filteredJobs.filter((j) => j.scheduled_at && sameDate(new Date(j.scheduled_at), day));
   }
 
   async function handleDrop(day: Date, jobId: string) {
-    setDragError(null);
+    setActionError(null);
     try {
       await rescheduleJob(jobId, toDateKey(day));
       router.refresh();
     } catch (err) {
-      setDragError(err instanceof Error ? err.message : "Failed to reschedule job");
+      setActionError(err instanceof Error ? err.message : "Failed to reschedule job");
+    }
+  }
+
+  async function handleRescheduleInput(jobId: string, newDate: string) {
+    if (!newDate) return;
+    setActionError(null);
+    try {
+      await rescheduleJob(jobId, newDate);
+      router.refresh();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to reschedule job");
+    }
+  }
+
+  async function handleOnWay(jobId: string) {
+    setActionError(null);
+    setOnWayPendingId(jobId);
+    try {
+      await markOnWay(jobId);
+      router.refresh();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to notify customer");
+    } finally {
+      setOnWayPendingId(null);
+    }
+  }
+
+  async function handleOptimize() {
+    setOptimizing(true);
+    setOptimizeMessage(null);
+    try {
+      const res = await fetch("/api/dispatch/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: optimizeDate }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setOptimizeMessage(data.error ?? "Failed to optimize route");
+      } else if (!data.optimized) {
+        setOptimizeMessage(data.reason ?? "Nothing to optimize.");
+      } else {
+        setOptimizeMessage(`Route optimized for ${optimizeDate} — ${data.order.length} stops reordered.`);
+        router.refresh();
+      }
+    } catch {
+      setOptimizeMessage("Failed to reach the optimization service.");
+    } finally {
+      setOptimizing(false);
     }
   }
 
@@ -89,9 +160,35 @@ export default function JobsView({ jobs }: { jobs: Job[] }) {
         >
           List
         </button>
+        <div className="ml-auto flex items-center gap-2">
+          <input
+            type="date"
+            aria-label="Date to optimize"
+            value={optimizeDate}
+            onChange={(e) => setOptimizeDate(e.target.value)}
+            className={inputClass}
+          />
+          <button
+            onClick={handleOptimize}
+            disabled={optimizing}
+            className={`${buttonSecondaryClass} disabled:opacity-50`}
+          >
+            {optimizing ? "Optimizing…" : "Optimize Route"}
+          </button>
+        </div>
       </div>
+      {optimizeMessage && <p className={subTextClass}>{optimizeMessage}</p>}
 
-      {dragError && <p className="text-sm text-accent">{dragError}</p>}
+      <input
+        type="text"
+        placeholder="Search jobs…"
+        aria-label="Search jobs"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className={inputClass}
+      />
+
+      {actionError && <p className={errorClass}>{actionError}</p>}
 
       {view === "calendar" ? (
         <div className="flex flex-col gap-3">
@@ -156,37 +253,112 @@ export default function JobsView({ jobs }: { jobs: Job[] }) {
         </div>
       ) : (
         <div className="flex flex-col divide-y divide-white/8">
-          {jobs.length === 0 && <p className={subTextClass}>No jobs yet.</p>}
-          {jobs.map((job) => (
+          {filteredJobs.length === 0 && <p className={subTextClass}>No jobs match.</p>}
+          {filteredJobs.map((job) => (
+            <div key={job.id} className="flex flex-col gap-2 py-3">
             <form
-              key={job.id}
               action={updateJobStatus}
-              className="flex flex-wrap items-center justify-between gap-3 py-3"
+              className="flex flex-wrap items-center justify-between gap-3"
             >
               <input type="hidden" name="id" value={job.id} />
               <div>
                 <div className={itemTitleClass}>
                   {job.customers?.name ?? "Unknown customer"}
                   {job.properties?.address ? ` — ${job.properties.address}` : ""}
+                  {job.created_via === "ai_sms" && (
+                    <span className="ml-2 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                      via AI text
+                    </span>
+                  )}
+                  {job.created_via === "ai_voice" && (
+                    <span className="ml-2 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                      via AI call
+                    </span>
+                  )}
                 </div>
                 <div className={itemSubClass}>
                   {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "No date"}
                   {job.notes ? ` · ${job.notes}` : ""}
+                  {job.on_way_at ? ` · On the way at ${new Date(job.on_way_at).toLocaleTimeString()}` : ""}
+                  {job.tracked_hours
+                    ? ` · Tracked: ${job.tracked_hours} hrs${
+                        hourlyRate
+                          ? ` ($${(Math.max(job.tracked_hours, 2) * hourlyRate).toFixed(2)}${
+                              job.tracked_hours < 2 ? ", 2 hr min" : ""
+                            })`
+                          : ""
+                      }`
+                    : ""}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <select name="status" defaultValue={job.status} className={inputClass}>
+                {job.diagnostics && job.diagnostics.length > 0 ? (
+                  <Link href={`/diagnostics/${job.diagnostics[0].id}`} className={buttonSecondaryClass}>
+                    View Report
+                  </Link>
+                ) : (
+                  <Link href={`/diagnostics/new?job_id=${job.id}`} className={buttonSecondaryClass}>
+                    + Report
+                  </Link>
+                )}
+                {!job.on_way_at && (job.status === "scheduled" || job.status === "in_progress") && (
+                  <button
+                    type="button"
+                    onClick={() => handleOnWay(job.id)}
+                    disabled={onWayPendingId === job.id}
+                    className={`${buttonSecondaryClass} disabled:opacity-50`}
+                  >
+                    {onWayPendingId === job.id ? "Sending…" : "On My Way"}
+                  </button>
+                )}
+                <label className="flex flex-col gap-0.5 text-[10px] text-g300">
+                  Date
+                  <input
+                    type="date"
+                    defaultValue={job.scheduled_at ? toDateKey(new Date(job.scheduled_at)) : ""}
+                    onChange={(e) => handleRescheduleInput(job.id, e.target.value)}
+                    className={inputClass}
+                  />
+                </label>
+                <select name="status" defaultValue={job.status} className={inputClass} aria-label="Job status">
                   {statusOptions.map((s) => (
                     <option key={s} value={s}>
                       {s.replace("_", " ")}
                     </option>
                   ))}
                 </select>
-                <button type="submit" className={buttonClass}>
-                  Save
-                </button>
+                <SubmitButton className={buttonClass}>Save</SubmitButton>
               </div>
             </form>
+
+              {job.photos && job.photos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {job.photos.map((photo, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={i}
+                      src={photo.url}
+                      alt={photo.caption ?? "Job photo"}
+                      className="h-16 w-16 rounded-lg object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+              <form action={addJobPhotos} className="flex items-center gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input
+                  type="file"
+                  name="photos"
+                  accept="image/*"
+                  multiple
+                  aria-label="Add before/after photos"
+                  className="text-xs text-g300 file:mr-2 file:rounded file:border-0 file:bg-white/8 file:px-2 file:py-1 file:text-xs file:text-white"
+                />
+                <SubmitButton className={buttonSecondaryClass} pendingText="Uploading…">
+                  Add Photos
+                </SubmitButton>
+              </form>
+            </div>
           ))}
         </div>
       )}

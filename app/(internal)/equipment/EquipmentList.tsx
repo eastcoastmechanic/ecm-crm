@@ -48,6 +48,7 @@ export default function EquipmentList({
         <input
           type="text"
           placeholder="Search equipment…"
+          aria-label="Search equipment"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={inputClass}

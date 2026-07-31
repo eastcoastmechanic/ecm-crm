@@ -2,7 +2,21 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { createCheckoutSession } from "./actions";
+import SignaturePad from "./SignaturePad";
+import SubmitButton from "../../../(internal)/SubmitButton";
 import { buttonClass, headingClass, subTextClass } from "../../../(internal)/ui";
+
+// Illustrative only — no real lender is wired up yet (see Phase 1 plan notes).
+// Standard amortizing-loan formula at a representative APR.
+const ILLUSTRATIVE_APR = 9.99;
+const FINANCING_TERMS_MONTHS = [12, 24, 36];
+
+function estimateMonthlyPayment(principal: number, termMonths: number) {
+  const monthlyRate = ILLUSTRATIVE_APR / 100 / 12;
+  const payment =
+    (principal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths));
+  return Math.round(payment);
+}
 
 type LineItem = {
   category: string;
@@ -71,7 +85,7 @@ export default async function PortalDocumentPage({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {(["good", "better", "best"] as const).map((tier) => (
           <div
             key={tier}
@@ -93,6 +107,28 @@ export default async function PortalDocumentPage({
           </div>
         ))}
       </div>
+
+      {(doc.type === "estimate" || doc.type === "proposal") && lineData.totals.better > 0 && (
+        <div className="rounded-xl border border-white/8 bg-white/3 p-4">
+          <div className="text-xs font-bold uppercase tracking-wide text-g300">
+            Financing options
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-3 text-center">
+            {FINANCING_TERMS_MONTHS.map((term) => (
+              <div key={term}>
+                <div className="font-display text-lg font-extrabold text-white">
+                  {formatPrice(estimateMonthlyPayment(lineData.totals.better, term))}/mo
+                </div>
+                <div className="text-xs text-g300">{term} months</div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-g500">
+            Estimate only, based on the Better tier price at {ILLUSTRATIVE_APR}% illustrative
+            APR — not a credit offer or pre-qualification.
+          </p>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-xl border border-white/8">
         <table className="w-full text-sm">
@@ -126,14 +162,24 @@ export default async function PortalDocumentPage({
           <p className={subTextClass}>
             Amount due: <span className="text-white">{formatPrice(doc.total)}</span>
           </p>
-          <button type="submit" className={`${buttonClass} mt-3 w-fit`}>
+          <SubmitButton className={`${buttonClass} mt-3 w-fit`} pendingText="Redirecting…">
             Pay Now
-          </button>
+          </SubmitButton>
         </form>
       )}
       {doc.status === "paid" && (
         <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">
           Paid{doc.paid_at ? ` on ${new Date(doc.paid_at).toLocaleDateString()}` : ""}.
+        </div>
+      )}
+
+      {doc.type === "estimate" && doc.status === "sent" && (
+        <SignaturePad documentId={doc.id} />
+      )}
+      {doc.type === "estimate" && doc.status === "approved" && (
+        <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">
+          Approved{doc.signed_at ? ` on ${new Date(doc.signed_at).toLocaleDateString()}` : ""}.
+          We&apos;ll be in touch to schedule the work.
         </div>
       )}
 

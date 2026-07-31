@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
-import { addProperty } from "./actions";
+import AddPropertyForm from "./AddPropertyForm";
 import PropertyList from "./PropertyList";
-import { buttonClass, cardClass, errorClass, headingClass, inputClass, subTextClass } from "../ui";
+import { errorClass, headingClass, subTextClass } from "../ui";
 
 export default async function PropertiesPage() {
   const [{ data: properties, error }, { data: customers }] = await Promise.all([
@@ -19,32 +19,7 @@ export default async function PropertiesPage() {
         <p className={subTextClass}>Service locations tied to each customer.</p>
       </div>
 
-      <form action={addProperty} className={cardClass}>
-        <select name="customer_id" required className={inputClass} defaultValue="">
-          <option value="" disabled>
-            Select customer
-          </option>
-          {customers?.map((customer) => (
-            <option key={customer.id} value={customer.id}>
-              {customer.name}
-            </option>
-          ))}
-        </select>
-        <select name="property_type" className={inputClass} defaultValue="">
-          <option value="">Property type</option>
-          <option value="residential">Residential</option>
-          <option value="commercial">Commercial</option>
-        </select>
-        <input
-          name="address"
-          placeholder="Address"
-          required
-          className={`${inputClass} sm:col-span-2`}
-        />
-        <button type="submit" className={`${buttonClass} sm:col-span-2 sm:w-fit`}>
-          Add Property
-        </button>
-      </form>
+      <AddPropertyForm customers={customers ?? []} />
 
       {error && (
         <p className={errorClass}>Error loading properties: {error.message}</p>

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { updateDocument, sendDocumentEmail } from "./actions";
+import AssessmentDetail from "./AssessmentDetail";
+import SubmitButton from "../../SubmitButton";
 import { headingClass, subTextClass, buttonClass, buttonSecondaryClass, inputClass } from "../../ui";
 
 type LineItem = {
@@ -43,12 +45,17 @@ export default async function DocumentPage({
 
   if (error || !doc) notFound();
 
+  if (doc.type === "assessment") {
+    return <AssessmentDetail doc={doc} hasEmail={!!doc.customers?.email} />;
+  }
+
   const lineData = doc.line_items as {
     items: LineItem[];
     brand: { good: string | null; better: string | null; best: string | null };
     mass_save_eligible: boolean;
     mass_save_note: string | null;
     totals: { good: number; better: number; best: number };
+    option_label?: string | null;
   };
 
   return (
@@ -58,6 +65,11 @@ export default async function DocumentPage({
           <h1 className={headingClass}>
             {doc.doc_number} — {typeLabel[doc.type]}
           </h1>
+          {lineData.option_label && (
+            <span className="mt-1 inline-block rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+              {lineData.option_label}
+            </span>
+          )}
           <p className={subTextClass}>
             {doc.customers?.name}
             {doc.properties?.address ? ` · ${doc.properties.address}` : ""}
@@ -77,9 +89,9 @@ export default async function DocumentPage({
           {doc.customers?.email ? (
             <form action={sendDocumentEmail}>
               <input type="hidden" name="id" value={doc.id} />
-              <button type="submit" className={buttonClass}>
+              <SubmitButton className={buttonClass} pendingText="Sending…">
                 Send to Customer
-              </button>
+              </SubmitButton>
             </form>
           ) : (
             <span className={subTextClass} title="Add an email to this customer to send documents">
@@ -101,7 +113,7 @@ export default async function DocumentPage({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {(["good", "better", "best"] as const).map((tier) => (
           <div
             key={tier}
@@ -203,18 +215,18 @@ export default async function DocumentPage({
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="text-xs font-bold uppercase tracking-wide text-g300">
+          <label className="flex flex-col gap-1 text-xs font-bold uppercase tracking-wide text-g300">
             Status
+            <select name="status" defaultValue={doc.status} className={inputClass}>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="approved">Approved</option>
+              <option value="paid">Paid</option>
+            </select>
           </label>
-          <select name="status" defaultValue={doc.status} className={inputClass}>
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="approved">Approved</option>
-            <option value="paid">Paid</option>
-          </select>
-          <button type="submit" className={buttonClass}>
+          <SubmitButton className={buttonClass} pendingText="Saving…">
             Save Changes
-          </button>
+          </SubmitButton>
         </div>
       </form>
 

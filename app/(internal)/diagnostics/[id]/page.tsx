@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { headingClass, subTextClass, itemSubClass } from "../../ui";
+import { sendServiceReportEmail } from "./actions";
+import AssignCustomerForm from "./AssignCustomerForm";
+import SubmitButton from "../../SubmitButton";
+import { headingClass, subTextClass, itemSubClass, buttonClass, buttonSecondaryClass } from "../../ui";
 
 type SuggestedLineItem = {
   price_book_item_name: string | null;
@@ -45,7 +48,9 @@ export default async function DiagnosticPage({
 
   const { data: diagnostic, error } = await supabase
     .from("diagnostics")
-    .select("*, equipment(type, brand, model, serial_number, properties(address, customers(name)))")
+    .select(
+      "*, equipment(type, brand, model, serial_number, properties(address, customers(name, email))), jobs(id, scheduled_at, status, customers(name, email), properties(address))"
+    )
     .eq("id", id)
     .single();
 
@@ -53,24 +58,108 @@ export default async function DiagnosticPage({
 
   const readings = diagnostic.readings as Readings;
   const lineItems = (diagnostic.suggested_line_items ?? []) as SuggestedLineItem[];
+  const photos = (diagnostic.photos ?? []) as { url: string; caption: string | null }[];
+
+  const displayCustomerName = diagnostic.equipment?.properties?.customers?.name ?? diagnostic.jobs?.customers?.name;
+  const displayAddress = diagnostic.equipment?.properties?.address ?? diagnostic.jobs?.properties?.address;
+  const displayEmail = diagnostic.equipment?.properties?.customers?.email ?? diagnostic.jobs?.customers?.email;
+  const hasCustomer = !!displayCustomerName;
+  const hasEmail = !!displayEmail;
+
+  let assignFormData: {
+    customers: { id: string; name: string }[];
+    properties: { id: string; address: string; customer_id: string | null }[];
+    equipment: { id: string; type: string; brand: string | null; model: string | null; property_id: string | null }[];
+  } | null = null;
+
+  if (!hasCustomer) {
+    const [{ data: customers }, { data: properties }, { data: equipmentRows }] = await Promise.all([
+      supabase.from("customers").select("id, name").order("name"),
+      supabase.from("properties").select("id, address, customer_id"),
+      supabase.from("equipment").select("id, type, brand, model, property_id"),
+    ]);
+    assignFormData = {
+      customers: customers ?? [],
+      properties: properties ?? [],
+      equipment: equipmentRows ?? [],
+    };
+  }
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className={headingClass}>
-          {diagnostic.equipment?.type}
-          {diagnostic.equipment?.brand ? ` — ${diagnostic.equipment.brand}` : ""}
-          {diagnostic.equipment?.model ? ` ${diagnostic.equipment.model}` : ""}
-        </h1>
-        <p className={subTextClass}>
-          {diagnostic.equipment?.properties?.customers?.name}
-          {diagnostic.equipment?.properties?.address
-            ? ` · ${diagnostic.equipment.properties.address}`
-            : ""}
-          {" · "}
-          {new Date(diagnostic.created_at).toLocaleString()}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className={headingClass}>
+            {diagnostic.doc_number ? `${diagnostic.doc_number} — ` : ""}
+            {diagnostic.equipment?.type}
+            {diagnostic.equipment?.brand ? ` — ${diagnostic.equipment.brand}` : ""}
+            {diagnostic.equipment?.model ? ` ${diagnostic.equipment.model}` : ""}
+          </h1>
+          <p className={subTextClass}>
+            {displayCustomerName ?? "No customer assigned yet"}
+            {displayAddress ? ` · ${displayAddress}` : ""}
+            {" · "}
+            {new Date(diagnostic.created_at).toLocaleString()}
+          </p>
+          {diagnostic.jobs && (
+            <p className={subTextClass}>
+              From job:{" "}
+              <Link href="/jobs" className="underline">
+                {new Date(diagnostic.jobs.scheduled_at).toLocaleDateString()} ({diagnostic.jobs.status})
+              </Link>
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href={`/diagnostics/${id}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonSecondaryClass}
+          >
+            Download PDF
+          </a>
+          {diagnostic.report_sent_at ? (
+            <span className={subTextClass}>
+              Report sent {new Date(diagnostic.report_sent_at).toLocaleDateString()}
+            </span>
+          ) : (
+            <form action={sendServiceReportEmail}>
+              <input type="hidden" name="id" value={id} />
+              <SubmitButton className={buttonClass} disabled={!hasEmail} pendingText="Sending…">
+                Email to Customer
+              </SubmitButton>
+            </form>
+          )}
+        </div>
       </div>
+
+      {!hasCustomer && assignFormData && (
+        <AssignCustomerForm
+          diagnosticId={id}
+          customers={assignFormData.customers}
+          properties={assignFormData.properties}
+          equipment={assignFormData.equipment}
+        />
+      )}
+
+      {photos.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Photos</h2>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {photos.map((photo, i) => (
+              <a key={i} href={photo.url} target="_blank" rel="noopener noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photo.url}
+                  alt={photo.caption ?? "Service photo"}
+                  className="aspect-video w-full rounded-lg border border-white/8 object-cover"
+                />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="rounded-xl border border-white/8 bg-white/3 p-4">
         <div className="text-xs font-bold uppercase tracking-wide text-g300">Symptoms</div>

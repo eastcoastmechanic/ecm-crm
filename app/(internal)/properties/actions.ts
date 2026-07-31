@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
+import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
+import { NEW_CUSTOMER_VALUE } from "../intake-constants";
 
 export async function addProperty(formData: FormData) {
-  const customer_id = formData.get("customer_id") as string;
+  let customer_id = formData.get("customer_id") as string;
   const address = (formData.get("address") as string)?.trim();
   const property_type = formData.get("property_type") as string;
 
@@ -13,6 +15,18 @@ export async function addProperty(formData: FormData) {
   }
   if (!address) {
     throw new Error("Address is required");
+  }
+
+  if (customer_id === NEW_CUSTOMER_VALUE) {
+    const newCustomerName = (formData.get("new_customer_name") as string)?.trim();
+    if (!newCustomerName) throw new Error("New customer name is required");
+    const resolved = await resolveCustomerPropertyEquipment({
+      customerName: newCustomerName,
+      phone: (formData.get("new_customer_phone") as string)?.trim() || null,
+      email: (formData.get("new_customer_email") as string)?.trim() || null,
+      smsConsent: formData.get("new_customer_sms_consent") === "on",
+    });
+    customer_id = resolved.customerId!;
   }
 
   const { error } = await supabase.from("properties").insert({
@@ -26,4 +40,5 @@ export async function addProperty(formData: FormData) {
   }
 
   revalidatePath("/properties");
+  revalidatePath("/customers");
 }

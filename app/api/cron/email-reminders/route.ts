@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { stripe } from "@/lib/stripe";
 
 function todayISODate() {
   return new Date().toISOString().slice(0, 10);
@@ -105,6 +106,8 @@ async function sendContractRenewalNotices() {
   return { sent, errors };
 }
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app";
+
 async function sendJobFollowUps() {
   const { data: jobs, error } = await supabase
     .from("jobs")
@@ -131,7 +134,7 @@ async function sendJobFollowUps() {
       subject: `How did we do?`,
       text: `Hi ${customer?.name ?? ""},\n\nThanks for choosing East Coast Mechanical for your recent service${
         property?.address ? ` at ${property.address}` : ""
-      }. Let us know if everything's working as expected, or if there's anything else we can help with.\n\nEast Coast Mechanical`,
+      }. Mind taking 30 seconds to tell us how it went?\n\n${APP_URL}/survey/${job.id}\n\nEast Coast Mechanical`,
     });
 
     if (sendError) {
@@ -149,17 +152,197 @@ async function sendJobFollowUps() {
   return { sent, errors };
 }
 
+async function sendStaleEstimateFollowUps() {
+  const { data: estimates, error } = await supabase
+    .from("documents")
+    .select("id, doc_number, total, customers(name, email)")
+    .eq("type", "estimate")
+    .eq("status", "sent")
+    .lte("created_at", daysAgoISO(5))
+    .or(`last_reminder_sent_at.is.null,last_reminder_sent_at.lte.${daysAgoISO(7)}`);
+
+  if (error) return { sent: 0, errors: [error.message] };
+
+  const errors: string[] = [];
+  let sent = 0;
+
+  for (const estimate of estimates ?? []) {
+    const customer = estimate.customers as unknown as CustomerContact;
+    const email = customer?.email;
+    if (!email) continue;
+
+    const { error: sendError } = await resend.emails.send({
+      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      to: email,
+      subject: `Following up on estimate ${estimate.doc_number ?? ""}`,
+      text: `Hi ${customer?.name ?? ""},\n\nJust checking in on estimate ${estimate.doc_number ?? ""} for ${formatPrice(
+        estimate.total ?? 0
+      )}. Let us know if you have any questions or would like to move forward — happy to help either way.\n\nEast Coast Mechanical`,
+    });
+
+    if (sendError) {
+      errors.push(`estimate ${estimate.id}: ${sendError.message}`);
+      continue;
+    }
+
+    await supabase
+      .from("documents")
+      .update({ last_reminder_sent_at: new Date().toISOString() })
+      .eq("id", estimate.id);
+    sent++;
+  }
+
+  return { sent, errors };
+}
+
+async function sendWarrantyAlerts() {
+  const in60Days = new Date();
+  in60Days.setDate(in60Days.getDate() + 60);
+
+  const { data: items, error } = await supabase
+    .from("equipment")
+    .select("id, type, brand, model, warranty_expiration, properties(address, customers(name, email))")
+    .not("warranty_expiration", "is", null)
+    .gte("warranty_expiration", todayISODate())
+    .lte("warranty_expiration", in60Days.toISOString().slice(0, 10))
+    .is("warranty_alert_sent_at", null);
+
+  if (error) return { sent: 0, errors: [error.message] };
+
+  const errors: string[] = [];
+  let sent = 0;
+
+  for (const item of items ?? []) {
+    const property = item.properties as unknown as {
+      address: string | null;
+      customers: { name: string | null; email: string | null }[] | null;
+    } | null;
+    const customer = property?.customers?.[0];
+    const email = customer?.email;
+    if (!email) continue;
+
+    const label = [item.brand, item.model, item.type].filter(Boolean).join(" ") || "your equipment";
+
+    const { error: sendError } = await resend.emails.send({
+      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      to: email,
+      subject: `Your warranty is expiring soon`,
+      text: `Hi ${customer?.name ?? ""},\n\nThe manufacturer warranty on ${label}${
+        property?.address ? ` at ${property.address}` : ""
+      } expires on ${item.warranty_expiration}. If anything's been off with it, now's a good time to have us take a look before coverage runs out.\n\nEast Coast Mechanical`,
+    });
+
+    if (sendError) {
+      errors.push(`equipment ${item.id}: ${sendError.message}`);
+      continue;
+    }
+
+    await supabase
+      .from("equipment")
+      .update({ warranty_alert_sent_at: new Date().toISOString() })
+      .eq("id", item.id);
+    sent++;
+  }
+
+  return { sent, errors };
+}
+
+async function sendMaintenancePlanCharges() {
+  const in7Days = new Date();
+  in7Days.setDate(in7Days.getDate() + 7);
+
+  const { data: contracts, error } = await supabase
+    .from("service_contracts")
+    .select("id, plan_name, end_date, customers(id, name, email, stripe_customer_id)")
+    .eq("status", "active")
+    .gte("end_date", todayISODate())
+    .lte("end_date", in7Days.toISOString().slice(0, 10))
+    .is("auto_billed_at", null);
+
+  if (error) return { charged: 0, skipped: 0, errors: [error.message] };
+
+  const errors: string[] = [];
+  let charged = 0;
+  let skipped = 0;
+
+  for (const contract of contracts ?? []) {
+    const customer = (contract.customers as unknown as
+      | { id: string; name: string | null; email: string | null; stripe_customer_id: string | null }[]
+      | null)?.[0];
+
+    if (!customer?.stripe_customer_id) {
+      skipped++;
+      continue;
+    }
+
+    try {
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: customer.stripe_customer_id,
+        type: "card",
+      });
+      const paymentMethodId = paymentMethods.data[0]?.id;
+      if (!paymentMethodId) {
+        skipped++;
+        continue;
+      }
+
+      // Renewal price isn't tracked per-contract yet — this charges a
+      // placeholder amount matching the flat HVAC Basic Plan price in the
+      // price book. Revisit once contracts carry their own renewal price.
+      await stripe.paymentIntents.create({
+        amount: 29900,
+        currency: "usd",
+        customer: customer.stripe_customer_id,
+        payment_method: paymentMethodId,
+        off_session: true,
+        confirm: true,
+        description: `Service plan renewal${contract.plan_name ? ` — ${contract.plan_name}` : ""}`,
+      });
+
+      await supabase
+        .from("service_contracts")
+        .update({
+          auto_billed_at: new Date().toISOString(),
+          stripe_payment_method_id: paymentMethodId,
+        })
+        .eq("id", contract.id);
+      charged++;
+    } catch (err) {
+      errors.push(`contract ${contract.id}: ${err instanceof Error ? err.message : "charge failed"}`);
+    }
+  }
+
+  return { charged, skipped, errors };
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [invoiceReminders, contractRenewals, jobFollowUps] = await Promise.all([
+  const [
+    invoiceReminders,
+    contractRenewals,
+    jobFollowUps,
+    estimateFollowUps,
+    warrantyAlerts,
+    maintenancePlanCharges,
+  ] = await Promise.all([
     sendOverdueInvoiceReminders(),
     sendContractRenewalNotices(),
     sendJobFollowUps(),
+    sendStaleEstimateFollowUps(),
+    sendWarrantyAlerts(),
+    sendMaintenancePlanCharges(),
   ]);
 
-  return NextResponse.json({ invoiceReminders, contractRenewals, jobFollowUps });
+  return NextResponse.json({
+    invoiceReminders,
+    contractRenewals,
+    jobFollowUps,
+    estimateFollowUps,
+    warrantyAlerts,
+    maintenancePlanCharges,
+  });
 }

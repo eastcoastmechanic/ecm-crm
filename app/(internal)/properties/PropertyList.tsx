@@ -44,6 +44,7 @@ export default function PropertyList({
         <input
           type="text"
           placeholder="Search properties…"
+          aria-label="Search properties"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={inputClass}

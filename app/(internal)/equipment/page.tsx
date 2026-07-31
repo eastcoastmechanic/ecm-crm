@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
-import { addEquipment } from "./actions";
+import EquipmentForm from "./EquipmentForm";
 import EquipmentList from "./EquipmentList";
-import { buttonClass, cardClass, errorClass, headingClass, inputClass, subTextClass } from "../ui";
+import { errorClass, headingClass, subTextClass } from "../ui";
 
 export default async function EquipmentPage() {
   const [{ data: equipment, error }, { data: properties }] = await Promise.all([
@@ -22,45 +22,7 @@ export default async function EquipmentPage() {
         <p className={subTextClass}>Installed equipment tied to each property.</p>
       </div>
 
-      <form action={addEquipment} className={cardClass}>
-        <select name="property_id" required className={inputClass} defaultValue="">
-          <option value="" disabled>
-            Select property
-          </option>
-          {properties?.map((property) => (
-            <option key={property.id} value={property.id}>
-              {property.address}
-              {property.customers?.[0]?.name
-                ? ` — ${property.customers[0].name}`
-                : ""}
-            </option>
-          ))}
-        </select>
-        <input
-          name="type"
-          placeholder="Type (e.g. mini-split, boiler)"
-          required
-          className={inputClass}
-        />
-        <input name="brand" placeholder="Brand" className={inputClass} />
-        <input name="model" placeholder="Model" className={inputClass} />
-        <input
-          name="serial_number"
-          placeholder="Serial number"
-          className={inputClass}
-        />
-        <label className="flex flex-col gap-1 text-xs text-g300">
-          Install date
-          <input name="install_date" type="date" className={inputClass} />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-g300">
-          Warranty expiration
-          <input name="warranty_expiration" type="date" className={inputClass} />
-        </label>
-        <button type="submit" className={`${buttonClass} sm:col-span-2 sm:w-fit`}>
-          Add Equipment
-        </button>
-      </form>
+      <EquipmentForm properties={properties ?? []} />
 
       {error && (
         <p className={errorClass}>Error loading equipment: {error.message}</p>

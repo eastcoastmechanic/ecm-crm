@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { getDocumentForPdf, dueDateForSend } from "@/lib/documents";
 import { renderDocumentPdf } from "@/lib/pdf";
+import { getAssessmentReportForPdf } from "@/lib/assessment-reports";
+import { renderAssessmentReportPdf } from "@/lib/assessment-report-pdf";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { flagReferralRewardIfEligible } from "@/lib/referral";
 
 type LineItem = {
   category: string;
@@ -39,7 +42,7 @@ export async function updateDocument(formData: FormData) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("documents")
-    .select("line_items, type, due_date")
+    .select("line_items, type, due_date, customer_id")
     .eq("id", id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
@@ -92,6 +95,10 @@ export async function updateDocument(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  if (status === "paid" && existing.customer_id) {
+    await flagReferralRewardIfEligible(existing.customer_id, existing.type);
+  }
+
   revalidatePath(`/documents/${id}`);
   revalidatePath("/documents");
 }
@@ -108,6 +115,35 @@ function formatPrice(value: number) {
 
 export async function sendDocumentEmail(formData: FormData) {
   const id = formData.get("id") as string;
+
+  const { data: docType } = await supabase.from("documents").select("type").eq("id", id).single();
+
+  if (docType?.type === "assessment") {
+    const { data, customerEmail, error } = await getAssessmentReportForPdf(id);
+    if (error || !data) throw new Error(error ?? "Assessment not found");
+    if (!customerEmail) throw new Error("Customer has no email on file");
+
+    const pdfBuffer = await renderAssessmentReportPdf(data);
+
+    const { error: sendError } = await resend.emails.send({
+      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      to: customerEmail,
+      subject: `Condition Assessment ${data.doc_number ?? ""} from East Coast Mechanical`,
+      text: `Hi ${data.customer_name},\n\nAttached is the equipment condition assessment from your recent visit.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
+      attachments: [{ filename: `${data.doc_number ?? "assessment"}.pdf`, content: pdfBuffer }],
+    });
+    if (sendError) throw new Error(sendError.message);
+
+    const { error: updateError } = await supabase
+      .from("documents")
+      .update({ status: "sent", sent_at: new Date().toISOString() })
+      .eq("id", id);
+    if (updateError) throw new Error(updateError.message);
+
+    revalidatePath(`/documents/${id}`);
+    revalidatePath("/documents");
+    return;
+  }
 
   const { data, customerEmail, dueDate, error } = await getDocumentForPdf(id);
   if (error || !data) throw new Error(error ?? "Document not found");

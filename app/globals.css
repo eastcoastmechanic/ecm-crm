@@ -44,3 +44,12 @@ select option {
   background: var(--navy-2);
   color: #ffffff;
 }
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -3,7 +3,117 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PORTAL_PATHS = ["/portal/login", "/portal/auth"];
 
+// Every route under (internal) resolves at the root (route groups don't add a
+// URL prefix), so we gate by an explicit prefix list rather than a single
+// "/internal/*" pattern. Keep this in sync with app/(internal)/*.
+const INTERNAL_PATH_PREFIXES = [
+  "/dashboard",
+  "/customers",
+  "/properties",
+  "/equipment",
+  "/price-book",
+  "/documents",
+  "/diagnostics",
+  "/jobs",
+  "/leads",
+  "/tasks",
+  "/inventory",
+  "/analytics",
+  "/mass-save",
+  "/conversations",
+];
+
+const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize"];
+
+function isInternalPath(pathname: string) {
+  if (INTERNAL_API_PATHS.includes(pathname)) return true;
+  return INTERNAL_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+function hasValidBasicAuth(request: NextRequest) {
+  const expectedUser = process.env.INTERNAL_AUTH_USER;
+  const expectedPass = process.env.INTERNAL_AUTH_PASSWORD;
+  // Fail closed if the gate isn't configured — never fall back to "open".
+  if (!expectedUser || !expectedPass) return false;
+
+  const header = request.headers.get("authorization");
+  if (!header?.startsWith("Basic ")) return false;
+
+  let decoded: string;
+  try {
+    decoded = atob(header.slice(6));
+  } catch {
+    return false;
+  }
+  const sep = decoded.indexOf(":");
+  if (sep === -1) return false;
+
+  return decoded.slice(0, sep) === expectedUser && decoded.slice(sep + 1) === expectedPass;
+}
+
+function unauthorized() {
+  return new NextResponse("Authentication required", {
+    status: 401,
+    headers: { "WWW-Authenticate": 'Basic realm="ECM Internal"' },
+  });
+}
+
+// Alternative to the shared Basic-Auth password: a real Supabase Auth session
+// with a matching `staff` row (see db/migrations/0017_staff_referrals.sql —
+// staff deliberately has no anon policy, only a self-read policy). Basic Auth
+// stays active alongside this so existing access never breaks.
+async function checkStaffSession(
+  request: NextRequest
+): Promise<{ role: string | null; response: NextResponse }> {
+  let response = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { role: null, response };
+
+  const { data: staff } = await supabase
+    .from("staff")
+    .select("role")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  return { role: staff?.role ?? null, response };
+}
+
 export async function middleware(request: NextRequest) {
+  if (isInternalPath(request.nextUrl.pathname)) {
+    if (hasValidBasicAuth(request)) return NextResponse.next();
+
+    const { role, response } = await checkStaffSession(request);
+    if (!role) return unauthorized();
+
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-staff-role", role);
+    const finalResponse = NextResponse.next({ request: { headers: requestHeaders } });
+    response.cookies.getAll().forEach((cookie) => finalResponse.cookies.set(cookie));
+    return finalResponse;
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -43,5 +153,37 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/portal/:path*"],
+  matcher: [
+    "/portal/:path*",
+    "/dashboard/:path*",
+    "/dashboard",
+    "/customers/:path*",
+    "/customers",
+    "/properties/:path*",
+    "/properties",
+    "/equipment/:path*",
+    "/equipment",
+    "/price-book/:path*",
+    "/price-book",
+    "/documents/:path*",
+    "/documents",
+    "/diagnostics/:path*",
+    "/diagnostics",
+    "/jobs/:path*",
+    "/jobs",
+    "/leads/:path*",
+    "/leads",
+    "/tasks/:path*",
+    "/tasks",
+    "/inventory/:path*",
+    "/inventory",
+    "/analytics/:path*",
+    "/analytics",
+    "/mass-save/:path*",
+    "/mass-save",
+    "/conversations/:path*",
+    "/conversations",
+    "/api/internal-chat",
+    "/api/dispatch/optimize",
+  ],
 };

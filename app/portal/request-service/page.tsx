@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { requestService } from "./actions";
+import SubmitButton from "../../(internal)/SubmitButton";
 import { buttonClass, headingClass, inputClass, subTextClass } from "../../(internal)/ui";
 
 export default async function RequestServicePage() {
@@ -66,9 +67,9 @@ export default async function RequestServicePage() {
           />
         </label>
 
-        <button type="submit" className={`${buttonClass} w-fit`}>
+        <SubmitButton className={`${buttonClass} w-fit`} pendingText="Submitting…">
           Submit Request
-        </button>
+        </SubmitButton>
       </form>
     </div>
   );

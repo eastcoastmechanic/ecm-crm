@@ -58,15 +58,18 @@ export default function PortalLoginPage() {
           </p>
         </div>
         <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
-          <input
-            type="text"
-            inputMode="numeric"
-            required
-            placeholder="123456"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className={`${inputClass} w-40 text-center font-mono text-lg tracking-widest`}
-          />
+          <label className="flex flex-col gap-1 text-xs text-g300">
+            6-digit code
+            <input
+              type="text"
+              inputMode="numeric"
+              required
+              placeholder="123456"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className={`${inputClass} w-40 text-center font-mono text-lg tracking-widest`}
+            />
+          </label>
           {error && <p className={errorClass}>{error}</p>}
           <button
             type="submit"
@@ -90,14 +93,17 @@ export default function PortalLoginPage() {
         </p>
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <input
-          type="email"
-          required
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={inputClass}
-        />
+        <label className="flex flex-col gap-1 text-xs text-g300">
+          Email
+          <input
+            type="email"
+            required
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={inputClass}
+          />
+        </label>
         {error && <p className={errorClass}>{error}</p>}
         <button type="submit" disabled={status === "sending"} className={`${buttonClass} w-fit disabled:opacity-50`}>
           {status === "sending" ? "Sending…" : "Send sign-in link"}

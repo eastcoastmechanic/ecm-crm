@@ -16,7 +16,7 @@ export async function createCheckoutSession(formData: FormData) {
 
   const { data: doc, error } = await supabase
     .from("documents")
-    .select("id, doc_number, type, status, total")
+    .select("id, doc_number, type, status, total, customer_id")
     .eq("id", documentId)
     .single();
 
@@ -41,8 +41,15 @@ export async function createCheckoutSession(formData: FormData) {
         quantity: 1,
       },
     ],
+    // Saves the card against a Stripe customer so future maintenance-plan
+    // renewals can be charged off-session without asking again.
+    customer_creation: "always",
+    payment_intent_data: {
+      setup_future_usage: "off_session",
+    },
     metadata: {
       document_id: doc.id,
+      customer_id: doc.customer_id,
     },
     success_url: `${origin}/portal/documents/${doc.id}?paid=1`,
     cancel_url: `${origin}/portal/documents/${doc.id}`,
@@ -50,4 +57,40 @@ export async function createCheckoutSession(formData: FormData) {
 
   if (!session.url) throw new Error("Could not start checkout session");
   redirect(session.url);
+}
+
+export async function approveEstimate(formData: FormData) {
+  const documentId = formData.get("document_id") as string;
+  const signatureData = formData.get("signature_data") as string;
+  const supabase = await createPortalServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/portal/login");
+
+  if (!signatureData) throw new Error("A signature is required to approve this estimate");
+
+  const { data: doc, error } = await supabase
+    .from("documents")
+    .select("id, type, status")
+    .eq("id", documentId)
+    .single();
+
+  if (error || !doc) throw new Error("Estimate not found");
+  if (doc.type !== "estimate") throw new Error("Only estimates can be approved");
+  if (doc.status !== "sent") throw new Error("This estimate can't be approved right now");
+
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      status: "approved",
+      signed_at: new Date().toISOString(),
+      signature_data: signatureData,
+    })
+    .eq("id", documentId);
+
+  if (updateError) throw new Error(updateError.message);
+
+  redirect(`/portal/documents/${documentId}?approved=1`);
 }

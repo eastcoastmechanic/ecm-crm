@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { signOut } from "./actions";
+import SubmitButton from "../(internal)/SubmitButton";
 import {
   buttonClass,
   buttonSecondaryClass,
@@ -73,9 +74,7 @@ export default async function PortalDashboard() {
           to get your account linked.
         </p>
         <form action={signOut}>
-          <button type="submit" className={`${buttonSecondaryClass} w-fit`}>
-            Sign out
-          </button>
+          <SubmitButton className={`${buttonSecondaryClass} w-fit`}>Sign out</SubmitButton>
         </form>
       </div>
     );
@@ -114,9 +113,7 @@ export default async function PortalDashboard() {
           <p className={subTextClass}>Your equipment, service history, and invoices.</p>
         </div>
         <form action={signOut}>
-          <button type="submit" className={`${buttonSecondaryClass} w-fit`}>
-            Sign out
-          </button>
+          <SubmitButton className={`${buttonSecondaryClass} w-fit`}>Sign out</SubmitButton>
         </form>
       </div>
 
@@ -149,7 +146,11 @@ export default async function PortalDashboard() {
             const age = equipmentAge(item.install_date);
             const warranty = warrantyStatus(item.warranty_expiration);
             return (
-              <div key={item.id} className="py-3">
+              <Link
+                key={item.id}
+                href={`/portal/equipment/${item.id}`}
+                className="block py-3 hover:bg-white/3"
+              >
                 <div className={itemTitleClass}>
                   {item.type}
                   {item.brand ? ` — ${item.brand}` : ""}
@@ -160,7 +161,7 @@ export default async function PortalDashboard() {
                   {" · "}
                   Warranty: {warranty.label}
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

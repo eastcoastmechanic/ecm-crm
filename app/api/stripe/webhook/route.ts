@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
+import { flagReferralRewardIfEligible } from "@/lib/referral";
 
 export async function POST(request: Request) {
   const body = await request.text();
@@ -23,16 +24,32 @@ export async function POST(request: Request) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const documentId = session.metadata?.document_id;
+    const customerId = session.metadata?.customer_id;
 
     if (documentId) {
-      const { error } = await supabase
+      const { data: updatedDoc, error } = await supabase
         .from("documents")
         .update({ status: "paid", paid_at: new Date().toISOString() })
-        .eq("id", documentId);
+        .eq("id", documentId)
+        .select("type, customer_id")
+        .single();
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
+
+      if (updatedDoc?.customer_id) {
+        await flagReferralRewardIfEligible(updatedDoc.customer_id, updatedDoc.type);
+      }
+    }
+
+    // Captures the Stripe customer created for this checkout so a saved card
+    // can be reused later for maintenance-plan renewal auto-billing.
+    if (customerId && session.customer) {
+      await supabase
+        .from("customers")
+        .update({ stripe_customer_id: session.customer as string })
+        .eq("id", customerId);
     }
   }
 

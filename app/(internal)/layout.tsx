@@ -1,11 +1,15 @@
 import Image from "next/image";
+import { headers } from "next/headers";
 import NavLinks from "./NavLinks";
+import ChatWidget from "./ChatWidget";
 
-export default function InternalLayout({
+export default async function InternalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const staffRole = (await headers()).get("x-staff-role");
+
   return (
     <div className="min-h-screen">
       <header className="relative border-b border-white/6 bg-navy after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-gradient-to-r after:from-accent after:via-gold after:to-transparent">
@@ -17,10 +21,11 @@ export default function InternalLayout({
             </div>
           </div>
           <div className="hidden h-6 w-px bg-white/8 sm:block" />
-          <NavLinks />
+          <NavLinks role={staffRole} />
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <ChatWidget />
     </div>
   );
 }
