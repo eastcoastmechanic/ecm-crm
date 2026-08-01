@@ -27,14 +27,18 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
 
   if (process.env.SMS_GATEWAY_DEBUG_SIGNATURE === "1" && secret) {
-    const headerNames = [...request.headers.keys()];
+    const webhookHeaders = Object.fromEntries(
+      [...request.headers.entries()].filter(([name]) => name.startsWith("x-webhook"))
+    );
     const hexHmac = createHmac("sha256", secret).update(rawBody).digest("hex");
     const base64Hmac = createHmac("sha256", secret).update(rawBody).digest("base64");
     console.log("[sms-gateway webhook debug]", JSON.stringify({
-      headerNames,
+      webhookHeaders,
       receivedSignature: signature,
       computedHex: hexHmac,
       computedBase64: base64Hmac,
+      secretLength: secret.length,
+      rawBody,
     }));
   }
 
