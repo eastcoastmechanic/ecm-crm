@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { sendSMS } from "@/lib/sms";
 import { respondToSms } from "@/lib/receptionist/sms-agent";
+import { isExcludedFromAi } from "@/lib/receptionist/customer-lookup";
 
 type InfiniReachWebhookPayload = {
   event: string;
@@ -48,6 +49,10 @@ export async function POST(request: Request) {
   const body = event.data.body ?? "";
   if (!from) {
     return NextResponse.json({ ok: true });
+  }
+
+  if (await isExcludedFromAi(from)) {
+    return NextResponse.json({ ok: true, excluded: true });
   }
 
   const reply = await respondToSms({ fromPhone: from, body });
