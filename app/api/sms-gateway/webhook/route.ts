@@ -26,6 +26,18 @@ export async function POST(request: Request) {
   const signature = request.headers.get("X-Webhook-Signature");
   const rawBody = await request.text();
 
+  if (process.env.SMS_GATEWAY_DEBUG_SIGNATURE === "1" && secret) {
+    const headerNames = [...request.headers.keys()];
+    const hexHmac = createHmac("sha256", secret).update(rawBody).digest("hex");
+    const base64Hmac = createHmac("sha256", secret).update(rawBody).digest("base64");
+    console.log("[sms-gateway webhook debug]", JSON.stringify({
+      headerNames,
+      receivedSignature: signature,
+      computedHex: hexHmac,
+      computedBase64: base64Hmac,
+    }));
+  }
+
   if (!secret || !isValidSignature(rawBody, signature, secret)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
