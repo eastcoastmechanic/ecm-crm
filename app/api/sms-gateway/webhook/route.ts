@@ -12,9 +12,11 @@ type InfiniReachWebhookPayload = {
   };
 };
 
-function isValidSignature(rawBody: string, signature: string | null, secret: string) {
+// InfiniReach signs JSON.stringify(payload.data) only, not the full envelope
+// (event/timestamp wrapper) — confirmed empirically against real deliveries.
+function isValidSignature(dataString: string, signature: string | null, secret: string) {
   if (!signature) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const expected = createHmac("sha256", secret).update(dataString).digest("hex");
   const expectedBuf = Buffer.from(expected, "utf8");
   const signatureBuf = Buffer.from(signature, "utf8");
   if (expectedBuf.length !== signatureBuf.length) return false;
@@ -26,27 +28,18 @@ export async function POST(request: Request) {
   const signature = request.headers.get("X-Webhook-Signature");
   const rawBody = await request.text();
 
-  if (process.env.SMS_GATEWAY_DEBUG_SIGNATURE === "1" && secret) {
-    const webhookHeaders = Object.fromEntries(
-      [...request.headers.entries()].filter(([name]) => name.startsWith("x-webhook"))
-    );
-    const hexHmac = createHmac("sha256", secret).update(rawBody).digest("hex");
-    const base64Hmac = createHmac("sha256", secret).update(rawBody).digest("base64");
-    console.log("[sms-gateway webhook debug]", JSON.stringify({
-      webhookHeaders,
-      receivedSignature: signature,
-      computedHex: hexHmac,
-      computedBase64: base64Hmac,
-      secretLength: secret.length,
-      rawBody,
-    }));
+  let event: InfiniReachWebhookPayload;
+  try {
+    event = JSON.parse(rawBody) as InfiniReachWebhookPayload;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (!secret || !isValidSignature(rawBody, signature, secret)) {
+  const dataString = JSON.stringify(event.data);
+  if (!secret || !isValidSignature(dataString, signature, secret)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  const event = JSON.parse(rawBody) as InfiniReachWebhookPayload;
   if (event.event !== "message.inbound") {
     return NextResponse.json({ ok: true });
   }
