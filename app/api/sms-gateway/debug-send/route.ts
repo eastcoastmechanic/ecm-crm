@@ -15,10 +15,12 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const from = url.searchParams.get("from") ?? "";
+  const e164From = url.searchParams.get("e164From") ?? "";
   const to = url.searchParams.get("to") ?? "+15551234567";
 
   const body: Record<string, string> = { message: "debug test", to, channel: "sms" };
   if (from) body.from = from;
+  if (e164From) body.e164From = e164From;
 
   const res = await fetch(`${baseUrl}/api/v1/messages`, {
     method: "POST",
