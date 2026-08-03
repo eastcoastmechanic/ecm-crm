@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { addJobPhotos, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
+import { addTask, completeTask } from "../tasks/actions";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 
@@ -15,6 +16,13 @@ const statusDotClass: Record<string, string> = {
   in_progress: "bg-gold",
   complete: "bg-green",
   cancelled: "bg-g700",
+};
+
+type Task = {
+  id: string;
+  title: string;
+  notes: string | null;
+  due_at: string | null;
 };
 
 type Job = {
@@ -55,7 +63,15 @@ function monthGrid(cursor: Date) {
   });
 }
 
-export default function JobsView({ jobs, hourlyRate }: { jobs: Job[]; hourlyRate: number | null }) {
+export default function JobsView({
+  jobs,
+  tasks,
+  hourlyRate,
+}: {
+  jobs: Job[];
+  tasks: Task[];
+  hourlyRate: number | null;
+}) {
   const router = useRouter();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [monthCursor, setMonthCursor] = useState(() => {
@@ -68,6 +84,8 @@ export default function JobsView({ jobs, hourlyRate }: { jobs: Job[]; hourlyRate
   const [optimizeDate, setOptimizeDate] = useState(() => toDateKey(new Date()));
   const [optimizing, setOptimizing] = useState(false);
   const [optimizeMessage, setOptimizeMessage] = useState<string | null>(null);
+  const [addingTaskFor, setAddingTaskFor] = useState<string | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
 
   const days = useMemo(() => monthGrid(monthCursor), [monthCursor]);
   const today = new Date();
@@ -84,6 +102,20 @@ export default function JobsView({ jobs, hourlyRate }: { jobs: Job[]; hourlyRate
 
   function jobsOn(day: Date) {
     return filteredJobs.filter((j) => j.scheduled_at && sameDate(new Date(j.scheduled_at), day));
+  }
+
+  function tasksOn(day: Date) {
+    return tasks.filter((t) => t.due_at && sameDate(new Date(t.due_at), day));
+  }
+
+  async function handleCompleteTask(taskId: string) {
+    setCompletingTaskId(taskId);
+    try {
+      await completeTask(taskId);
+      router.refresh();
+    } finally {
+      setCompletingTaskId(null);
+    }
   }
 
   async function handleDrop(day: Date, jobId: string) {
@@ -220,6 +252,8 @@ export default function JobsView({ jobs, hourlyRate }: { jobs: Job[]; hourlyRate
               const inMonth = day.getMonth() === monthCursor.getMonth();
               const isToday = sameDate(day, today);
               const dayJobs = jobsOn(day);
+              const dayTasks = tasksOn(day);
+              const dateKey = toDateKey(day);
               return (
                 <div
                   key={day.toISOString()}
@@ -231,8 +265,18 @@ export default function JobsView({ jobs, hourlyRate }: { jobs: Job[]; hourlyRate
                   }}
                   className={`flex min-h-24 flex-col gap-1 bg-navy p-1.5 ${inMonth ? "" : "opacity-40"}`}
                 >
-                  <div className={`text-[11px] ${isToday ? "font-bold text-accent" : "text-g500"}`}>
-                    {day.getDate()}
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] ${isToday ? "font-bold text-accent" : "text-g500"}`}>
+                      {day.getDate()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAddingTaskFor(addingTaskFor === dateKey ? null : dateKey)}
+                      title="Add task"
+                      className="rounded px-1 text-[11px] leading-none text-g500 hover:bg-white/8 hover:text-white"
+                    >
+                      +
+                    </button>
                   </div>
                   {dayJobs.map((job) => (
                     <div
@@ -246,6 +290,57 @@ export default function JobsView({ jobs, hourlyRate }: { jobs: Job[]; hourlyRate
                       {job.customers?.name ?? "Unknown"}
                     </div>
                   ))}
+                  {dayTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="flex items-start gap-1 rounded bg-gold/15 px-1.5 py-1 text-[11px] leading-tight text-gold"
+                      title={task.notes ?? ""}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={false}
+                        onChange={() => handleCompleteTask(task.id)}
+                        disabled={completingTaskId === task.id}
+                        className="mt-0.5"
+                        aria-label={`Mark "${task.title}" complete`}
+                      />
+                      <span>{task.title}</span>
+                    </div>
+                  ))}
+                  {addingTaskFor === dateKey && (
+                    <form
+                      action={async (formData) => {
+                        await addTask(formData);
+                        setAddingTaskFor(null);
+                        router.refresh();
+                      }}
+                      className="mt-1 flex flex-col gap-1"
+                    >
+                      <input type="hidden" name="due_date" value={dateKey} />
+                      <input
+                        name="title"
+                        autoFocus
+                        placeholder="Task…"
+                        required
+                        className="w-full rounded border border-white/8 bg-white/4 px-1.5 py-1 text-[11px] text-white outline-none focus:border-accent"
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          type="submit"
+                          className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAddingTaskFor(null)}
+                          className="rounded px-1.5 py-0.5 text-[10px] text-g300 hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               );
             })}

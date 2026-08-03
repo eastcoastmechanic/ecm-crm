@@ -34,6 +34,36 @@ export async function addCustomer(formData: FormData) {
   revalidatePath("/customers");
 }
 
+export async function updateCustomer(formData: FormData) {
+  const id = formData.get("id") as string;
+  const name = (formData.get("name") as string)?.trim();
+  const email = (formData.get("email") as string)?.trim();
+  const phone = (formData.get("phone") as string)?.trim();
+  const billing_address = (formData.get("billing_address") as string)?.trim();
+  const notes = (formData.get("notes") as string)?.trim();
+  const sms_consent = formData.get("sms_consent") === "on";
+
+  if (!id) throw new Error("Missing customer id");
+  if (!name) throw new Error("Name is required");
+
+  const { error } = await supabase
+    .from("customers")
+    .update({
+      name,
+      email: email || null,
+      phone: phone || null,
+      billing_address: billing_address || null,
+      notes: notes || null,
+      sms_consent,
+    })
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/customers/${id}`);
+  revalidatePath("/customers");
+}
+
 const RELATED_TABLES: { table: string; singular: string; plural: string }[] = [
   { table: "properties", singular: "property", plural: "properties" },
   { table: "documents", singular: "document", plural: "documents" },

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { headingClass, subTextClass, itemSubClass, itemTitleClass, errorClass } from "../../ui";
+import EditCustomerForm from "./EditCustomerForm";
 
 export default async function CustomerProfilePage({
   params,
@@ -97,6 +98,7 @@ export default async function CustomerProfilePage({
             </Link>
           </p>
         )}
+        <EditCustomerForm customer={customer} />
       </div>
 
       {error && <p className={errorClass}>Error loading customer: {error}</p>}

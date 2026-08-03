@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { updateDocument, sendDocumentEmail } from "./actions";
+import { sendDocumentEmail } from "./actions";
 import AssessmentDetail from "./AssessmentDetail";
 import WarrantyDetail from "./WarrantyDetail";
 import MassSaveRebateDetail from "./MassSaveRebateDetail";
+import LineItemsEditor from "./LineItemsEditor";
 import SubmitButton from "../../SubmitButton";
-import { headingClass, subTextClass, buttonClass, buttonSecondaryClass, inputClass } from "../../ui";
+import { headingClass, subTextClass, buttonClass, buttonSecondaryClass } from "../../ui";
 
 type LineItem = {
   category: string;
@@ -29,8 +30,6 @@ function formatPrice(value: number | null) {
   if (value === null) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
-
-const numberInputClass = `${inputClass} w-24 text-right`;
 
 export default async function DocumentPage({
   params,
@@ -157,99 +156,7 @@ export default async function DocumentPage({
         ))}
       </div>
 
-      <form action={updateDocument} className="flex flex-col gap-4">
-        <input type="hidden" name="id" value={doc.id} />
-        <input type="hidden" name="item_count" value={lineData.items.length} />
-
-        <div className="overflow-x-auto rounded-xl border border-white/8">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/8 text-left text-[10px] font-bold uppercase tracking-wide text-g300">
-                <th className="px-3 py-2">Description</th>
-                <th className="px-3 py-2">Qty</th>
-                <th className="px-3 py-2">Good</th>
-                <th className="px-3 py-2">Better</th>
-                <th className="px-3 py-2">Best</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lineData.items.map((item, i) => (
-                <tr key={i} className="border-b border-white/8 last:border-0">
-                  <td className="px-3 py-2 align-top">
-                    <div className="font-medium text-white">{item.description}</div>
-                    <div className="text-xs text-g300">
-                      {item.category}
-                      {item.notes ? ` · ${item.notes}` : ""}
-                    </div>
-                    <input type="hidden" name={`category_${i}`} value={item.category} />
-                    <input type="hidden" name={`description_${i}`} value={item.description} />
-                    <input
-                      type="hidden"
-                      name={`price_book_item_name_${i}`}
-                      value={item.price_book_item_name ?? ""}
-                    />
-                    <input type="hidden" name={`unit_${i}`} value={item.unit} />
-                    <input type="hidden" name={`notes_${i}`} value={item.notes ?? ""} />
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <input
-                      type="number"
-                      step="1"
-                      min="0"
-                      name={`qty_${i}`}
-                      defaultValue={item.qty}
-                      className={`${inputClass} w-16 text-right`}
-                    />
-                    <span className="ml-1 text-xs text-g300">{item.unit}</span>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <input
-                      type="number"
-                      step="0.01"
-                      name={`good_${i}`}
-                      defaultValue={item.good ?? ""}
-                      className={numberInputClass}
-                    />
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <input
-                      type="number"
-                      step="0.01"
-                      name={`better_${i}`}
-                      defaultValue={item.better ?? ""}
-                      className={numberInputClass}
-                    />
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <input
-                      type="number"
-                      step="0.01"
-                      name={`best_${i}`}
-                      defaultValue={item.best ?? ""}
-                      className={numberInputClass}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <label className="flex flex-col gap-1 text-xs font-bold uppercase tracking-wide text-g300">
-            Status
-            <select name="status" defaultValue={doc.status} className={inputClass}>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="approved">Approved</option>
-              <option value="paid">Paid</option>
-            </select>
-          </label>
-          <SubmitButton className={buttonClass} pendingText="Saving…">
-            Save Changes
-          </SubmitButton>
-        </div>
-      </form>
+      <LineItemsEditor documentId={doc.id} status={doc.status} items={lineData.items} />
 
       <details className="rounded-xl border border-white/8 bg-white/3 p-4">
         <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-g300">

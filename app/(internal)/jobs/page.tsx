@@ -5,10 +5,17 @@ import SubmitButton from "../SubmitButton";
 import { buttonClass, errorClass, headingClass, subTextClass } from "../ui";
 
 export default async function JobsPage() {
-  const { data: jobs, error } = await supabase
-    .from("jobs")
-    .select("*, customers(name), properties(address), diagnostics(id)")
-    .order("scheduled_at", { ascending: false });
+  const [{ data: jobs, error }, { data: tasks }] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select("*, customers(name), properties(address), diagnostics(id)")
+      .order("scheduled_at", { ascending: false }),
+    supabase
+      .from("tasks")
+      .select("id, title, notes, due_at")
+      .is("completed_at", null)
+      .order("due_at", { ascending: true, nullsFirst: false }),
+  ]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -28,7 +35,11 @@ export default async function JobsPage() {
 
       {error && <p className={errorClass}>Error loading jobs: {error.message}</p>}
 
-      <JobsView jobs={jobs ?? []} hourlyRate={Number(process.env.HOURLY_LABOR_RATE) || null} />
+      <JobsView
+        jobs={jobs ?? []}
+        tasks={tasks ?? []}
+        hourlyRate={Number(process.env.HOURLY_LABOR_RATE) || null}
+      />
     </div>
   );
 }

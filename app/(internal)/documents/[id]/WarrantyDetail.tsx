@@ -65,10 +65,13 @@ export default function WarrantyDetail({
           >
             Download PDF
           </a>
-          {doc.status === "sent" && doc.sent_at ? (
-            <span className={subTextClass}>Sent {new Date(doc.sent_at).toLocaleDateString()}</span>
-          ) : hasEmail ? (
-            <form action={sendDocumentEmail}>
+          {hasEmail ? (
+            <form action={sendDocumentEmail} className="flex items-center gap-2">
+              {doc.sent_at && (
+                <span className={subTextClass}>
+                  Last sent {new Date(doc.sent_at).toLocaleDateString()}
+                </span>
+              )}
               <input type="hidden" name="id" value={doc.id} />
               <SubmitButton className={buttonClass} pendingText="Sending…">
                 Email to Customer
