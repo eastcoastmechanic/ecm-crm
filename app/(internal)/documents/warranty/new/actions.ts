@@ -25,10 +25,11 @@ function addYears(dateStr: string, years: number): string {
 export async function submitWarranty(formData: FormData) {
   let customer_id = formData.get("customer_id") as string;
   let property_id = formData.get("property_id") as string;
-  let equipment_id = (formData.get("equipment_id") as string) || null;
+  const rowCount = Number(formData.get("row_count") ?? 0);
 
   if (!customer_id) throw new Error("Customer is required");
   if (!property_id) throw new Error("Property is required");
+  if (rowCount === 0) throw new Error("Add at least one piece of equipment");
 
   if (customer_id === NEW_CUSTOMER_VALUE) {
     const newCustomerName = (formData.get("new_customer_name") as string)?.trim();
@@ -52,66 +53,105 @@ export async function submitWarranty(formData: FormData) {
     property_id = resolved.propertyId!;
   }
 
-  const model = (formData.get("model") as string)?.trim() || null;
-  const serial_number = (formData.get("serial_number") as string)?.trim() || null;
-  const install_date = (formData.get("install_date") as string) || null;
+  const items: {
+    equipment_id: string | null;
+    equipment_label: string;
+    model: string | null;
+    serial_number: string | null;
+    install_date: string | null;
+    manufacturer: {
+      docket_number: string | null;
+      years: number | null;
+      registered: boolean;
+      registration_date: string | null;
+      expiration_date: string | null;
+    };
+    craftsmanship: {
+      years: number;
+      expiration_date: string | null;
+    };
+  }[] = [];
 
-  let equipmentLabel: string;
+  for (let i = 0; i < rowCount; i++) {
+    let equipment_id = (formData.get(`equipment_id_${i}`) as string) || null;
+    const model = (formData.get(`model_${i}`) as string)?.trim() || null;
+    const serial_number = (formData.get(`serial_number_${i}`) as string)?.trim() || null;
+    const install_date = (formData.get(`install_date_${i}`) as string) || null;
 
-  if (!equipment_id) {
-    const newType = (formData.get("new_equipment_type") as string)?.trim();
-    const newBrand = (formData.get("new_equipment_brand") as string)?.trim() || null;
-    if (!newType) throw new Error("Pick existing equipment or enter a type for new equipment");
+    let equipmentLabel: string;
 
-    const resolved = await resolveCustomerPropertyEquipment({
-      customerId: customer_id,
-      propertyId: property_id,
-      equipment: { type: newType, brand: newBrand, model },
+    if (!equipment_id) {
+      const newType = (formData.get(`new_equipment_type_${i}`) as string)?.trim();
+      const newBrand = (formData.get(`new_equipment_brand_${i}`) as string)?.trim() || null;
+      if (!newType) throw new Error(`Equipment ${i + 1}: pick existing equipment or enter a type`);
+
+      const resolved = await resolveCustomerPropertyEquipment({
+        customerId: customer_id,
+        propertyId: property_id,
+        equipment: { type: newType, brand: newBrand, model },
+      });
+      equipment_id = resolved.equipmentId;
+      equipmentLabel = [newType, newBrand, model].filter(Boolean).join(" ");
+    } else {
+      const { data: existing } = await supabase
+        .from("equipment")
+        .select("type, brand, model")
+        .eq("id", equipment_id)
+        .single();
+      equipmentLabel = existing
+        ? [existing.type, existing.brand, model ?? existing.model].filter(Boolean).join(" ")
+        : "Equipment";
+    }
+
+    const docket_number = (formData.get(`docket_number_${i}`) as string)?.trim() || null;
+    const manufacturer_years = formData.get(`manufacturer_years_${i}`)
+      ? Number(formData.get(`manufacturer_years_${i}`))
+      : null;
+    const registered = formData.get(`registered_${i}`) === "on";
+    const registration_date = (formData.get(`registration_date_${i}`) as string) || null;
+
+    const manufacturer_expiration =
+      install_date && manufacturer_years ? addYears(install_date, manufacturer_years) : null;
+    const craftsmanship_expiration = install_date
+      ? addYears(install_date, CRAFTSMANSHIP_WARRANTY_YEARS)
+      : null;
+
+    if (equipment_id) {
+      const warranty_expiration =
+        [manufacturer_expiration, craftsmanship_expiration]
+          .filter((d): d is string => !!d)
+          .sort()
+          .pop() ?? null;
+
+      await supabase
+        .from("equipment")
+        .update({
+          ...(model ? { model } : {}),
+          ...(serial_number ? { serial_number } : {}),
+          ...(install_date ? { install_date } : {}),
+          ...(warranty_expiration ? { warranty_expiration } : {}),
+        })
+        .eq("id", equipment_id);
+    }
+
+    items.push({
+      equipment_id,
+      equipment_label: equipmentLabel,
+      model,
+      serial_number,
+      install_date,
+      manufacturer: {
+        docket_number,
+        years: manufacturer_years,
+        registered,
+        registration_date,
+        expiration_date: manufacturer_expiration,
+      },
+      craftsmanship: {
+        years: CRAFTSMANSHIP_WARRANTY_YEARS,
+        expiration_date: craftsmanship_expiration,
+      },
     });
-    equipment_id = resolved.equipmentId;
-    equipmentLabel = [newType, newBrand, model].filter(Boolean).join(" ");
-  } else {
-    const { data: existing } = await supabase
-      .from("equipment")
-      .select("type, brand, model")
-      .eq("id", equipment_id)
-      .single();
-    equipmentLabel = existing
-      ? [existing.type, existing.brand, model ?? existing.model].filter(Boolean).join(" ")
-      : "Equipment";
-  }
-
-  const docket_number = (formData.get("docket_number") as string)?.trim() || null;
-  const manufacturer_years = formData.get("manufacturer_years")
-    ? Number(formData.get("manufacturer_years"))
-    : null;
-  const registered = formData.get("registered") === "on";
-  const registration_date = (formData.get("registration_date") as string) || null;
-
-  const manufacturer_expiration =
-    install_date && manufacturer_years ? addYears(install_date, manufacturer_years) : null;
-  const craftsmanship_expiration = install_date
-    ? addYears(install_date, CRAFTSMANSHIP_WARRANTY_YEARS)
-    : null;
-
-  // Keep the equipment record in sync with what's actually being registered
-  // here, whether it was picked from the list or just created above.
-  if (equipment_id) {
-    const warranty_expiration =
-      [manufacturer_expiration, craftsmanship_expiration]
-        .filter((d): d is string => !!d)
-        .sort()
-        .pop() ?? null;
-
-    await supabase
-      .from("equipment")
-      .update({
-        ...(model ? { model } : {}),
-        ...(serial_number ? { serial_number } : {}),
-        ...(install_date ? { install_date } : {}),
-        ...(warranty_expiration ? { warranty_expiration } : {}),
-      })
-      .eq("id", equipment_id);
   }
 
   const doc_number = await nextWarrantyNumber();
@@ -125,24 +165,7 @@ export async function submitWarranty(formData: FormData) {
       property_id,
       status: "active",
       ai_generated: false,
-      line_items: {
-        equipment_id,
-        equipment_label: equipmentLabel,
-        model,
-        serial_number,
-        install_date,
-        manufacturer: {
-          docket_number,
-          years: manufacturer_years,
-          registered,
-          registration_date,
-          expiration_date: manufacturer_expiration,
-        },
-        craftsmanship: {
-          years: CRAFTSMANSHIP_WARRANTY_YEARS,
-          expiration_date: craftsmanship_expiration,
-        },
-      },
+      line_items: { items },
     })
     .select("id")
     .single();

@@ -6,6 +6,8 @@ import { getDocumentForPdf, dueDateForSend } from "@/lib/documents";
 import { renderDocumentPdf } from "@/lib/pdf";
 import { getAssessmentReportForPdf } from "@/lib/assessment-reports";
 import { renderAssessmentReportPdf } from "@/lib/assessment-report-pdf";
+import { getWarrantyReportForPdf } from "@/lib/warranty-reports";
+import { renderWarrantyReportPdf } from "@/lib/warranty-report-pdf";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { flagReferralRewardIfEligible } from "@/lib/referral";
 
@@ -131,6 +133,33 @@ export async function sendDocumentEmail(formData: FormData) {
       subject: `Condition Assessment ${data.doc_number ?? ""} from East Coast Mechanical`,
       text: `Hi ${data.customer_name},\n\nAttached is the equipment condition assessment from your recent visit.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
       attachments: [{ filename: `${data.doc_number ?? "assessment"}.pdf`, content: pdfBuffer }],
+    });
+    if (sendError) throw new Error(sendError.message);
+
+    const { error: updateError } = await supabase
+      .from("documents")
+      .update({ status: "sent", sent_at: new Date().toISOString() })
+      .eq("id", id);
+    if (updateError) throw new Error(updateError.message);
+
+    revalidatePath(`/documents/${id}`);
+    revalidatePath("/documents");
+    return;
+  }
+
+  if (docType?.type === "warranty") {
+    const { data, customerEmail, error } = await getWarrantyReportForPdf(id);
+    if (error || !data) throw new Error(error ?? "Warranty not found");
+    if (!customerEmail) throw new Error("Customer has no email on file");
+
+    const pdfBuffer = await renderWarrantyReportPdf(data);
+
+    const { error: sendError } = await resend.emails.send({
+      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      to: customerEmail,
+      subject: `Warranty Registration ${data.doc_number ?? ""} from East Coast Mechanical`,
+      text: `Hi ${data.customer_name},\n\nAttached is your warranty registration, including our standard 1-year craftsmanship warranty on the install.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
+      attachments: [{ filename: `${data.doc_number ?? "warranty"}.pdf`, content: pdfBuffer }],
     });
     if (sendError) throw new Error(sendError.message);
 

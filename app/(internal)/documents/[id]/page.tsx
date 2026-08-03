@@ -51,7 +51,7 @@ export default async function DocumentPage({
   }
 
   if (doc.type === "warranty") {
-    return <WarrantyDetail doc={doc} />;
+    return <WarrantyDetail doc={doc} hasEmail={!!doc.customers?.email} />;
   }
 
   const rawLineData = doc.line_items as {

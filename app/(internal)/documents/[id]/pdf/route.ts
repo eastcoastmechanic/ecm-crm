@@ -4,6 +4,8 @@ import { getDocumentForPdf } from "@/lib/documents";
 import { renderDocumentPdf } from "@/lib/pdf";
 import { getAssessmentReportForPdf } from "@/lib/assessment-reports";
 import { renderAssessmentReportPdf } from "@/lib/assessment-report-pdf";
+import { getWarrantyReportForPdf } from "@/lib/warranty-reports";
+import { renderWarrantyReportPdf } from "@/lib/warranty-report-pdf";
 
 export async function GET(
   _request: Request,
@@ -23,6 +25,20 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${data.doc_number ?? "assessment"}.pdf"`,
+      },
+    });
+  }
+
+  if (docType?.type === "warranty") {
+    const { data, error } = await getWarrantyReportForPdf(id);
+    if (error || !data) {
+      return NextResponse.json({ error: error ?? "Warranty not found" }, { status: 404 });
+    }
+    const pdfBuffer = await renderWarrantyReportPdf(data);
+    return new NextResponse(new Uint8Array(pdfBuffer), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${data.doc_number ?? "warranty"}.pdf"`,
       },
     });
   }
