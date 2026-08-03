@@ -8,6 +8,7 @@ const PUBLIC_PORTAL_PATHS = ["/portal/login", "/portal/auth"];
 // "/internal/*" pattern. Keep this in sync with app/(internal)/*.
 const INTERNAL_PATH_PREFIXES = [
   "/dashboard",
+  "/account",
   "/customers",
   "/properties",
   "/equipment",
@@ -157,6 +158,8 @@ export const config = {
     "/portal/:path*",
     "/dashboard/:path*",
     "/dashboard",
+    "/account/:path*",
+    "/account",
     "/customers/:path*",
     "/customers",
     "/properties/:path*",

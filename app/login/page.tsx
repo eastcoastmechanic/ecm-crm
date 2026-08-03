@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortalBrowserClient } from "@/lib/supabase-portal/client";
 import {
   buttonClass,
+  buttonSecondaryClass,
   headingClass,
   inputClass,
   subTextClass,
@@ -11,12 +12,30 @@ import {
 } from "../(internal)/ui";
 
 export default function StaffLoginPage() {
+  const [mode, setMode] = useState<"password" | "code">("password");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "verifying" | "error">("idle");
   const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handlePasswordSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus("verifying");
+    setError("");
+
+    const supabase = createPortalBrowserClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      setError(error.message);
+      setStatus("error");
+      return;
+    }
+    window.location.href = "/dashboard";
+  }
+
+  async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
     setStatus("sending");
     setError("");
@@ -53,71 +72,139 @@ export default function StaffLoginPage() {
     window.location.href = "/dashboard";
   }
 
+  if (status === "sent" || (status === "verifying" && mode === "code")) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
+        <div>
+          <h1 className={headingClass}>Check your email</h1>
+          <p className={subTextClass}>
+            We sent a sign-in link to {email}. Open it on this device, or enter the 6-digit code
+            from that email below.
+          </p>
+        </div>
+        <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-xs text-g300">
+            6-digit code
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+              placeholder="123456"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className={`${inputClass} text-center font-mono text-lg tracking-widest`}
+            />
+          </label>
+          {error && <p className={errorClass}>{error}</p>}
+          <button
+            type="submit"
+            disabled={status === "verifying"}
+            className={`${buttonClass} w-fit disabled:opacity-50`}
+          >
+            {status === "verifying" ? "Verifying…" : "Verify Code"}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
-      {status === "sent" || status === "verifying" ? (
-        <>
-          <div>
-            <h1 className={headingClass}>Check your email</h1>
-            <p className={subTextClass}>
-              We sent a sign-in link to {email}. Open it on this device, or enter the 6-digit
-              code from that email below.
-            </p>
-          </div>
-          <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-xs text-g300">
-              6-digit code
-              <input
-                type="text"
-                inputMode="numeric"
-                required
-                placeholder="123456"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className={`${inputClass} text-center font-mono text-lg tracking-widest`}
-              />
-            </label>
-            {error && <p className={errorClass}>{error}</p>}
-            <button
-              type="submit"
-              disabled={status === "verifying"}
-              className={`${buttonClass} w-fit disabled:opacity-50`}
-            >
-              {status === "verifying" ? "Verifying…" : "Verify Code"}
-            </button>
-          </form>
-        </>
+      <div>
+        <h1 className={headingClass}>Staff Sign In</h1>
+        <p className={subTextClass}>
+          {mode === "password"
+            ? "Sign in with your email and password. Your phone can save this so it auto-fills with Face ID / Touch ID next time."
+            : "First time here, or forgot your password? We'll email you a sign-in code — set a real password from Account settings once you're in."}
+        </p>
+      </div>
+
+      {mode === "password" ? (
+        <form
+          onSubmit={handlePasswordSignIn}
+          className="flex flex-col gap-3"
+          autoComplete="on"
+        >
+          <label className="flex flex-col gap-1 text-xs text-g300">
+            Email
+            <input
+              type="email"
+              name="email"
+              autoComplete="username"
+              required
+              placeholder="you@eastcoastmechanical.org"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-g300">
+            Password
+            <input
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+          {error && <p className={errorClass}>{error}</p>}
+          <button
+            type="submit"
+            disabled={status === "verifying"}
+            className={`${buttonClass} w-fit disabled:opacity-50`}
+          >
+            {status === "verifying" ? "Signing in…" : "Sign In"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("code");
+              setError("");
+              setStatus("idle");
+            }}
+            className={`${buttonSecondaryClass} w-fit`}
+          >
+            Use email code instead
+          </button>
+        </form>
       ) : (
-        <>
-          <div>
-            <h1 className={headingClass}>Staff Sign In</h1>
-            <p className={subTextClass}>
-              Enter your email and we&apos;ll send you a link (and a backup code) to sign in.
-              Your account needs to be added by an owner before this works.
-            </p>
-          </div>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-xs text-g300">
-              Email
-              <input
-                type="email"
-                required
-                placeholder="you@eastcoastmechanical.org"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputClass}
-              />
-            </label>
-            {error && <p className={errorClass}>{error}</p>}
-            <button
-              type="submit"
-              disabled={status === "sending"}
-              className={`${buttonClass} w-fit disabled:opacity-50`}
-            >
-              {status === "sending" ? "Sending…" : "Send sign-in link"}
-            </button>
-          </form>
-        </>
+        <form onSubmit={handleSendCode} className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-xs text-g300">
+            Email
+            <input
+              type="email"
+              autoComplete="username"
+              required
+              placeholder="you@eastcoastmechanical.org"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+          {error && <p className={errorClass}>{error}</p>}
+          <button
+            type="submit"
+            disabled={status === "sending"}
+            className={`${buttonClass} w-fit disabled:opacity-50`}
+          >
+            {status === "sending" ? "Sending…" : "Send sign-in code"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("password");
+              setError("");
+              setStatus("idle");
+            }}
+            className={`${buttonSecondaryClass} w-fit`}
+          >
+            Back to password sign-in
+          </button>
+        </form>
       )}
     </div>
   );

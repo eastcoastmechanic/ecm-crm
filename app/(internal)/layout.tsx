@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { headers } from "next/headers";
 import NavLinks from "./NavLinks";
 import ChatWidget from "./ChatWidget";
@@ -22,6 +23,12 @@ export default async function InternalLayout({
           </div>
           <div className="hidden h-6 w-px bg-white/8 sm:block" />
           <NavLinks role={staffRole} />
+          <Link
+            href="/account"
+            className="ml-auto shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-g300 transition-colors hover:text-white"
+          >
+            Account
+          </Link>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
