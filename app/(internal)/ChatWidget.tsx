@@ -1,26 +1,57 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 type Message = { role: "user" | "assistant"; content: string };
+
+type SpeechRecognitionResultLike = { 0: { transcript: string } };
+type SpeechRecognitionEventLike = { results: ArrayLike<SpeechRecognitionResultLike> };
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+function subscribeNoop() {
+  return () => {};
+}
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  const [listening, setListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  const micSupported = useSyncExternalStore(
+    subscribeNoop,
+    () => getSpeechRecognitionCtor() !== null,
+    () => false
+  );
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, pending]);
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || pending) return;
+  async function sendText(text: string) {
+    if (!text.trim() || pending) return;
 
-    const nextMessages = [...messages, { role: "user" as const, content: text }];
+    const nextMessages = [...messages, { role: "user" as const, content: text.trim() }];
     setMessages(nextMessages);
     setInput("");
     setPending(true);
@@ -39,6 +70,36 @@ export default function ChatWidget() {
     } finally {
       setPending(false);
     }
+  }
+
+  function sendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    sendText(input);
+  }
+
+  function startVoiceCommand() {
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor || listening) return;
+
+    // Not continuous: one spoken command, then auto-stop and auto-send —
+    // "just talk to it" shouldn't need a manual button press afterward.
+    const recognition = new Ctor();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((r) => r[0].transcript)
+        .join(" ")
+        .trim();
+      if (transcript) sendText(transcript);
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+
+    recognitionRef.current = recognition;
+    setOpen(true);
+    setListening(true);
+    recognition.start();
   }
 
   return (
@@ -78,12 +139,30 @@ export default function ChatWidget() {
                 {m.content}
               </div>
             ))}
+            {listening && (
+              <div className="self-end rounded-xl bg-accent/20 px-3 py-2 text-sm text-white">
+                🎤 Listening…
+              </div>
+            )}
             {pending && (
               <div className="self-start rounded-xl bg-white/6 px-3 py-2 text-sm text-g300">Working…</div>
             )}
           </div>
 
           <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-white/8 p-3">
+            {micSupported && (
+              <button
+                type="button"
+                onClick={startVoiceCommand}
+                disabled={listening || pending}
+                aria-label="Speak a command"
+                className={`shrink-0 rounded-lg border border-white/8 bg-white/4 px-2.5 py-2 text-sm transition-colors hover:bg-white/8 disabled:opacity-50 ${
+                  listening ? "animate-pulse text-accent" : "text-g300"
+                }`}
+              >
+                🎤
+              </button>
+            )}
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
