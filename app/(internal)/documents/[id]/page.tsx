@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { updateDocument, sendDocumentEmail } from "./actions";
 import AssessmentDetail from "./AssessmentDetail";
 import WarrantyDetail from "./WarrantyDetail";
+import MassSaveRebateDetail from "./MassSaveRebateDetail";
 import SubmitButton from "../../SubmitButton";
 import { headingClass, subTextClass, buttonClass, buttonSecondaryClass, inputClass } from "../../ui";
 
@@ -52,6 +53,10 @@ export default async function DocumentPage({
 
   if (doc.type === "warranty") {
     return <WarrantyDetail doc={doc} hasEmail={!!doc.customers?.email} />;
+  }
+
+  if (doc.type === "mass_save_rebate") {
+    return <MassSaveRebateDetail doc={doc} />;
   }
 
   const rawLineData = doc.line_items as {

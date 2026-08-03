@@ -11,6 +11,7 @@ const typeLabel: Record<string, string> = {
   proposal: "Proposal",
   assessment: "Condition Assessment",
   warranty: "Warranty",
+  mass_save_rebate: "Mass Save Rebate",
 };
 
 const statusClass: Record<string, string> = {

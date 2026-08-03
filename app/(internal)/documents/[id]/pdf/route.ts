@@ -6,6 +6,8 @@ import { getAssessmentReportForPdf } from "@/lib/assessment-reports";
 import { renderAssessmentReportPdf } from "@/lib/assessment-report-pdf";
 import { getWarrantyReportForPdf } from "@/lib/warranty-reports";
 import { renderWarrantyReportPdf } from "@/lib/warranty-report-pdf";
+import { getMassSaveRebateFillData } from "@/lib/mass-save-reports";
+import { fillMassSaveRebateForm } from "@/lib/mass-save-pdf-fill";
 
 export async function GET(
   _request: Request,
@@ -39,6 +41,20 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${data.doc_number ?? "warranty"}.pdf"`,
+      },
+    });
+  }
+
+  if (docType?.type === "mass_save_rebate") {
+    const { data, docNumber, error } = await getMassSaveRebateFillData(id);
+    if (error || !data) {
+      return NextResponse.json({ error: error ?? "Rebate application not found" }, { status: 404 });
+    }
+    const pdfBuffer = await fillMassSaveRebateForm(data);
+    return new NextResponse(new Uint8Array(pdfBuffer), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${docNumber ?? "mass-save-rebate"}.pdf"`,
       },
     });
   }

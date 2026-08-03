@@ -19,6 +19,9 @@ export default async function DocumentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/documents/mass-save-rebate/new" className={buttonSecondaryClass}>
+            + New Mass Save Rebate
+          </Link>
           <Link href="/documents/warranty/new" className={buttonSecondaryClass}>
             + New Warranty
           </Link>
