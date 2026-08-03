@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { claude, CLAUDE_MODEL } from "@/lib/claude";
 import { fetchAllPriceBookItems, formatPriceBookForPrompt } from "@/lib/price-book";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
+import { buildFileContentBlocks } from "@/lib/vision-extract";
 
 const LineItemSchema = z.object({
   category: z.string(),
@@ -59,6 +60,21 @@ async function nextDocNumber(type: string) {
   return `${DOC_PREFIX[type]}-${seq}`;
 }
 
+async function uploadDocumentPhotos(files: File[]) {
+  const uploaded: { url: string; name: string }[] = [];
+  for (const file of files) {
+    if (!file || file.size === 0) continue;
+    const path = `${crypto.randomUUID()}-${file.name}`;
+    const { error } = await supabase.storage.from("document-photos").upload(path, file, {
+      contentType: file.type,
+    });
+    if (error) throw new Error(`Failed to upload ${file.name}: ${error.message}`);
+    const { data: publicUrl } = supabase.storage.from("document-photos").getPublicUrl(path);
+    uploaded.push({ url: publicUrl.publicUrl, name: file.name });
+  }
+  return uploaded;
+}
+
 function sumTier(items: z.infer<typeof LineItemSchema>[], tier: "good" | "better" | "best") {
   const total = items.reduce((sum, item) => {
     const price = item[tier];
@@ -77,6 +93,7 @@ export type GenerateDocumentInput = {
   address?: string | null;
   type: "estimate" | "invoice" | "proposal";
   rawRequest: string;
+  photos?: File[];
 };
 
 export type GenerateDocumentResult = {
@@ -153,6 +170,8 @@ ${priceBookText}
 
 If the request clearly qualifies for a MassSave rebate (heat pumps, heat pump water heaters, R-32/R-454B refrigerant — never R-410A), set mass_save_eligible=true and describe the rebate amount/program in mass_save_note. Otherwise set mass_save_eligible=false and mass_save_note to null.
 
+${input.photos?.length ? "The tech attached jobsite photos and/or plan documents — use them to identify equipment, dimensions, layout, and scope directly, and let them inform your line items alongside the text description below." : ""}
+
 You return a list of "documents". Almost every job produces exactly ONE entry — its good/better/best line item prices already represent the normal tier choice (standard vs premium model of the SAME system). Only return MORE THAN ONE entry when the job explicitly describes two or more distinct, mutually exclusive options to choose between (e.g. "Option A: heat pump" vs "Option B: straight AC replacement", or "quote the repair and the full replacement separately"). In that case:
 - Every entry must have a short, non-null "option_label" (e.g. "Option A: Heat Pump System") — when there's more than one document, ALL of them need a label, not just some.
 - Each entry's line_items and good/better/best totals must cover ONLY that option's own equipment and costs.
@@ -174,11 +193,22 @@ ${
 Job request from the tech:
 ${input.rawRequest}`;
 
+  const photoFiles = (input.photos ?? []).filter((f) => f && f.size > 0);
+  const [fileBlocks, uploadedPhotos] = await Promise.all([
+    photoFiles.length ? buildFileContentBlocks(photoFiles) : Promise.resolve([]),
+    photoFiles.length ? uploadDocumentPhotos(photoFiles) : Promise.resolve([]),
+  ]);
+
   const response = await claude.messages.parse({
     model: CLAUDE_MODEL,
     max_tokens: 8192,
     system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
+    messages: [
+      {
+        role: "user",
+        content: fileBlocks.length ? [...fileBlocks, { type: "text", text: userMessage }] : userMessage,
+      },
+    ],
     output_config: {
       format: zodOutputFormat(GeneratedDocSchema),
     },
@@ -224,6 +254,7 @@ ${input.rawRequest}`;
         total: totals.better,
         ai_generated: true,
         raw_request: input.rawRequest,
+        photos: uploadedPhotos,
       })
       .select("id")
       .single();

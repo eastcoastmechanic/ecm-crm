@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import type Anthropic from "@anthropic-ai/sdk";
 import { claude, CLAUDE_MODEL } from "@/lib/claude";
 
 const SUPPORTED_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
@@ -9,6 +10,28 @@ function toMediaType(mimeType: string): SupportedMediaType {
   return (SUPPORTED_MEDIA_TYPES as readonly string[]).includes(mimeType)
     ? (mimeType as SupportedMediaType)
     : "image/jpeg";
+}
+
+/**
+ * Builds Claude content blocks (image or PDF document) from uploaded files,
+ * for attaching alongside a text prompt in a single multimodal message —
+ * shared by anything that lets a tech attach photos/plans as generation
+ * input, not just single-field extraction.
+ */
+export async function buildFileContentBlocks(
+  files: File[]
+): Promise<Anthropic.Messages.ContentBlockParam[]> {
+  const blocks: Anthropic.Messages.ContentBlockParam[] = [];
+  for (const file of files) {
+    if (!file || file.size === 0) continue;
+    const data = Buffer.from(await file.arrayBuffer()).toString("base64");
+    if (file.type === "application/pdf") {
+      blocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data } });
+    } else {
+      blocks.push({ type: "image", source: { type: "base64", media_type: toMediaType(file.type), data } });
+    }
+  }
+  return blocks;
 }
 
 export async function extractFromImage<T extends z.ZodTypeAny>(

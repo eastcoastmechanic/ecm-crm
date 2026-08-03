@@ -150,6 +150,18 @@ export default function NewDocumentForm({
             className={`${inputClass} min-h-32`}
           />
         </label>
+        <label className="flex flex-col gap-1 text-xs text-g300 sm:col-span-2">
+          Photos &amp; plans (optional)
+          <input
+            type="file"
+            name="photos"
+            multiple
+            accept="image/*,application/pdf"
+            aria-label="Photos and plans"
+            className={inputClass}
+          />
+          <span className="text-g500">Attach jobsite photos or plan PDFs — Claude will use them to help identify equipment, dimensions, and scope.</span>
+        </label>
       </div>
 
       {customers.length === 0 && (

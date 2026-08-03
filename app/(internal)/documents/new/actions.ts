@@ -10,6 +10,7 @@ export async function generateDocument(formData: FormData) {
   const property_id = (formData.get("property_id") as string) || null;
   const type = formData.get("type") as "estimate" | "invoice" | "proposal";
   const raw_request = (formData.get("raw_request") as string)?.trim();
+  const photos = formData.getAll("photos") as File[];
 
   if (!customer_id) throw new Error("Customer is required");
 
@@ -24,6 +25,7 @@ export async function generateDocument(formData: FormData) {
     propertyId: property_id,
     type,
     rawRequest: raw_request,
+    photos,
   });
 
   revalidatePath("/documents");
