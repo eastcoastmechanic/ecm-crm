@@ -107,6 +107,15 @@ export default function WarrantyForm({
           value={propertyId}
           onChange={setPropertyId}
         />
+        <label className="flex flex-col gap-1 text-xs text-g300 sm:col-span-2">
+          Installed by
+          <input
+            name="technician_name"
+            defaultValue="Joshua Crowley"
+            placeholder="Technician name"
+            className={inputClass}
+          />
+        </label>
       </div>
 
       <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Equipment</h2>

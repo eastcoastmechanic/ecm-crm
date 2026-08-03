@@ -23,8 +23,15 @@ export type WarrantyReportPdfData = {
   created_at: string;
   customer_name: string;
   property_address: string | null;
+  technician_name: string | null;
   items: WarrantyReportItem[];
 };
+
+const MANUFACTURER_COVERAGE_TEXT =
+  "Covers replacement parts found to be defective in material or workmanship, per the manufacturer's published terms. Does not cover labor beyond what the manufacturer specifies, or damage from misuse, neglect, lack of routine maintenance, or unauthorized repairs. Registration with the manufacturer (noted above) is required for full coverage — contact the manufacturer directly to file a parts claim using the docket number above.";
+
+const CRAFTSMANSHIP_COVERAGE_TEXT =
+  "East Coast Mechanical warrants that this installation was completed correctly and in accordance with manufacturer specifications and applicable code. If a defect in our workmanship causes a failure during the warranty period, we will repair or correct it at no charge for labor. Does not cover normal wear and tear, damage from misuse or lack of maintenance, acts of nature, or parts/work not installed by East Coast Mechanical.";
 
 Font.registerHyphenationCallback((word) => [word]);
 
@@ -101,6 +108,10 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   fieldText: { fontSize: 8.5, color: colors.g700, width: "50%", marginBottom: 3 },
+  coverageText: { fontSize: 8, color: colors.g700, marginTop: 5, lineHeight: 1.4 },
+  signatureBlock: { marginTop: 16, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  signatureLabel: { fontSize: 7.5, color: colors.g300, marginBottom: 2 },
+  signatureName: { fontSize: 10, fontWeight: 700, color: colors.navy },
   footer: {
     position: "absolute",
     bottom: 0,
@@ -141,6 +152,9 @@ export function WarrantyReportPdf({ doc }: { doc: WarrantyReportPdfData }) {
           <View style={styles.customerBlock}>
             <Text style={styles.customerName}>{doc.customer_name}</Text>
             {doc.property_address && <Text style={styles.customerSub}>{doc.property_address}</Text>}
+            {doc.technician_name && (
+              <Text style={styles.customerSub}>Installed by {doc.technician_name}</Text>
+            )}
           </View>
 
           {doc.items.map((item, i) => (
@@ -167,23 +181,38 @@ export function WarrantyReportPdf({ doc }: { doc: WarrantyReportPdfData }) {
                   <Text style={styles.fieldText}>
                     Registry date: {formatDate(item.manufacturer.registration_date)}
                   </Text>
+                  <Text style={styles.fieldText}>Starts: {formatDate(item.install_date)}</Text>
                   <Text style={styles.fieldText}>
-                    Expires: {formatDate(item.manufacturer.expiration_date)}
+                    Ends: {formatDate(item.manufacturer.expiration_date)}
                   </Text>
                 </View>
+                <Text style={styles.coverageText}>{MANUFACTURER_COVERAGE_TEXT}</Text>
               </View>
 
               <View style={styles.craftsCard}>
                 <Text style={{ ...styles.sectionLabel, color: colors.accent }}>
                   CRAFTSMANSHIP WARRANTY — EAST COAST MECHANICAL
                 </Text>
-                <Text style={{ fontSize: 8.5, color: colors.g700 }}>
-                  {item.craftsmanship.years} year{item.craftsmanship.years === 1 ? "" : "s"} on labor —
-                  expires {formatDate(item.craftsmanship.expiration_date)}
-                </Text>
+                <View style={styles.row}>
+                  <Text style={styles.fieldText}>
+                    Length: {item.craftsmanship.years} year{item.craftsmanship.years === 1 ? "" : "s"}{" "}
+                    on labor
+                  </Text>
+                  <Text style={styles.fieldText}>Starts: {formatDate(item.install_date)}</Text>
+                  <Text style={styles.fieldText}>
+                    Ends: {formatDate(item.craftsmanship.expiration_date)}
+                  </Text>
+                </View>
+                <Text style={styles.coverageText}>{CRAFTSMANSHIP_COVERAGE_TEXT}</Text>
               </View>
             </View>
           ))}
+
+          <View style={styles.signatureBlock}>
+            <Text style={styles.signatureLabel}>Issued by</Text>
+            <Text style={styles.signatureName}>Joshua Crowley</Text>
+            <Text style={styles.customerSub}>Owner, East Coast Mechanical</Text>
+          </View>
         </View>
 
         <Text

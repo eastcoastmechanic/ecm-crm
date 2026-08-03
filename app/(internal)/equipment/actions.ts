@@ -67,3 +67,54 @@ export async function addEquipment(formData: FormData) {
 
   revalidatePath("/equipment");
 }
+
+export async function updateEquipment(formData: FormData) {
+  const id = formData.get("id") as string;
+  const property_id = formData.get("property_id") as string;
+  const type = (formData.get("type") as string)?.trim();
+  const brand = (formData.get("brand") as string)?.trim();
+  const model = (formData.get("model") as string)?.trim();
+  const serial_number = (formData.get("serial_number") as string)?.trim();
+  const refrigerant_type = (formData.get("refrigerant_type") as string)?.trim();
+  const install_date = formData.get("install_date") as string;
+  const warranty_expiration = formData.get("warranty_expiration") as string;
+
+  if (!id) throw new Error("Missing equipment id");
+  if (!property_id) throw new Error("Property is required");
+  if (!type) throw new Error("Equipment type is required");
+
+  const { error } = await supabase
+    .from("equipment")
+    .update({
+      property_id,
+      type,
+      brand: brand || null,
+      model: model || null,
+      serial_number: serial_number || null,
+      refrigerant_type: refrigerant_type || null,
+      install_date: install_date || null,
+      warranty_expiration: warranty_expiration || null,
+    })
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/equipment");
+}
+
+export async function deleteEquipment(id: string): Promise<{ error?: string }> {
+  const { error } = await supabase.from("equipment").delete().eq("id", id);
+
+  if (error) {
+    if (error.code === "23503") {
+      return {
+        error:
+          "Can't delete — this equipment still has diagnostics or leads attached. Remove those first.",
+      };
+    }
+    return { error: error.message };
+  }
+
+  revalidatePath("/equipment");
+  return {};
+}

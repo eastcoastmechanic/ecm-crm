@@ -42,3 +42,46 @@ export async function addProperty(formData: FormData) {
   revalidatePath("/properties");
   revalidatePath("/customers");
 }
+
+export async function updateProperty(formData: FormData) {
+  const id = formData.get("id") as string;
+  const customer_id = formData.get("customer_id") as string;
+  const address = (formData.get("address") as string)?.trim();
+  const property_type = formData.get("property_type") as string;
+
+  if (!id) throw new Error("Missing property id");
+  if (!customer_id) throw new Error("Customer is required");
+  if (!address) throw new Error("Address is required");
+
+  const { error } = await supabase
+    .from("properties")
+    .update({
+      customer_id,
+      address,
+      property_type: property_type || null,
+    })
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/properties");
+  revalidatePath("/customers");
+}
+
+export async function deleteProperty(id: string): Promise<{ error?: string }> {
+  const { error } = await supabase.from("properties").delete().eq("id", id);
+
+  if (error) {
+    if (error.code === "23503") {
+      return {
+        error:
+          "Can't delete — this property still has equipment, jobs, or documents attached. Remove or reassign those first.",
+      };
+    }
+    return { error: error.message };
+  }
+
+  revalidatePath("/properties");
+  revalidatePath("/customers");
+  return {};
+}

@@ -26,6 +26,7 @@ export async function submitWarranty(formData: FormData) {
   let customer_id = formData.get("customer_id") as string;
   let property_id = formData.get("property_id") as string;
   const rowCount = Number(formData.get("row_count") ?? 0);
+  const technician_name = (formData.get("technician_name") as string)?.trim() || null;
 
   if (!customer_id) throw new Error("Customer is required");
   if (!property_id) throw new Error("Property is required");
@@ -165,7 +166,7 @@ export async function submitWarranty(formData: FormData) {
       property_id,
       status: "active",
       ai_generated: false,
-      line_items: { items },
+      line_items: { technician_name, items },
     })
     .select("id")
     .single();

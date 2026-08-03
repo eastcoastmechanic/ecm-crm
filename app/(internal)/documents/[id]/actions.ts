@@ -37,6 +37,117 @@ function sumTier(items: LineItem[], tier: "good" | "better" | "best") {
   return Math.round(total * 100) / 100;
 }
 
+const CRAFTSMANSHIP_WARRANTY_YEARS = 1;
+
+function addYears(dateStr: string, years: number): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setFullYear(d.getFullYear() + years);
+  return d.toISOString().slice(0, 10);
+}
+
+type WarrantyActionItem = {
+  equipment_id: string | null;
+  equipment_label: string;
+  model: string | null;
+  serial_number: string | null;
+  install_date: string | null;
+  manufacturer: {
+    docket_number: string | null;
+    years: number | null;
+    registered: boolean;
+    registration_date: string | null;
+    expiration_date: string | null;
+  };
+  craftsmanship: {
+    years: number;
+    expiration_date: string | null;
+  };
+};
+
+export async function updateWarranty(formData: FormData) {
+  const id = formData.get("id") as string;
+  const technician_name = (formData.get("technician_name") as string)?.trim() || null;
+  const itemCount = Number(formData.get("item_count") ?? 0);
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("documents")
+    .select("line_items")
+    .eq("id", id)
+    .single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  const existingItems =
+    (existing.line_items as { items?: WarrantyActionItem[] } | null)?.items ?? [];
+
+  const items: WarrantyActionItem[] = [];
+  for (let i = 0; i < itemCount; i++) {
+    const existingItem = existingItems[i];
+    const model = (formData.get(`model_${i}`) as string)?.trim() || null;
+    const serial_number = (formData.get(`serial_number_${i}`) as string)?.trim() || null;
+    const install_date = (formData.get(`install_date_${i}`) as string) || null;
+    const docket_number = (formData.get(`docket_number_${i}`) as string)?.trim() || null;
+    const manufacturer_years = formData.get(`manufacturer_years_${i}`)
+      ? Number(formData.get(`manufacturer_years_${i}`))
+      : null;
+    const registered = formData.get(`registered_${i}`) === "on";
+    const registration_date = (formData.get(`registration_date_${i}`) as string) || null;
+
+    const manufacturer_expiration =
+      install_date && manufacturer_years ? addYears(install_date, manufacturer_years) : null;
+    const craftsmanship_years = existingItem?.craftsmanship.years ?? CRAFTSMANSHIP_WARRANTY_YEARS;
+    const craftsmanship_expiration = install_date
+      ? addYears(install_date, craftsmanship_years)
+      : null;
+
+    if (existingItem?.equipment_id) {
+      const warranty_expiration =
+        [manufacturer_expiration, craftsmanship_expiration]
+          .filter((d): d is string => !!d)
+          .sort()
+          .pop() ?? null;
+
+      await supabase
+        .from("equipment")
+        .update({
+          ...(model ? { model } : {}),
+          ...(serial_number ? { serial_number } : {}),
+          ...(install_date ? { install_date } : {}),
+          ...(warranty_expiration ? { warranty_expiration } : {}),
+        })
+        .eq("id", existingItem.equipment_id);
+    }
+
+    items.push({
+      equipment_id: existingItem?.equipment_id ?? null,
+      equipment_label: existingItem?.equipment_label ?? "Equipment",
+      model,
+      serial_number,
+      install_date,
+      manufacturer: {
+        docket_number,
+        years: manufacturer_years,
+        registered,
+        registration_date,
+        expiration_date: manufacturer_expiration,
+      },
+      craftsmanship: {
+        years: craftsmanship_years,
+        expiration_date: craftsmanship_expiration,
+      },
+    });
+  }
+
+  const { error } = await supabase
+    .from("documents")
+    .update({ line_items: { technician_name, items } })
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/documents/${id}`);
+  revalidatePath("/documents");
+}
+
 export async function updateDocument(formData: FormData) {
   const id = formData.get("id") as string;
   const status = formData.get("status") as string;

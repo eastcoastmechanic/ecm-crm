@@ -16,7 +16,10 @@ export async function getWarrantyReportForPdf(id: string): Promise<{
     return { data: null, customerEmail: null, error: error?.message ?? "Warranty not found" };
   }
 
-  const lineData = doc.line_items as { items?: WarrantyReportItem[] } | null;
+  const lineData = doc.line_items as {
+    items?: WarrantyReportItem[];
+    technician_name?: string | null;
+  } | null;
 
   return {
     data: {
@@ -24,6 +27,7 @@ export async function getWarrantyReportForPdf(id: string): Promise<{
       created_at: doc.created_at,
       customer_name: doc.customers?.name ?? "Customer",
       property_address: doc.properties?.address ?? null,
+      technician_name: lineData?.technician_name ?? null,
       items: lineData?.items ?? [],
     },
     customerEmail: doc.customers?.email ?? null,

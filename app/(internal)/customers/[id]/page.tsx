@@ -3,6 +3,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { headingClass, subTextClass, itemSubClass, itemTitleClass, errorClass } from "../../ui";
 import EditCustomerForm from "./EditCustomerForm";
+import PropertiesEquipmentSection from "./PropertiesEquipmentSection";
 
 export default async function CustomerProfilePage({
   params,
@@ -41,6 +42,15 @@ export default async function CustomerProfilePage({
     equipment: { type: string | null; brand: string | null; model: string | null; property_id: string } | null;
   };
 
+  type CustomerEquipment = {
+    id: string;
+    type: string;
+    brand: string | null;
+    model: string | null;
+    serial_number: string | null;
+    property_id: string;
+  };
+
   const [{ data: equipment }, { data: jobs }, { data: documents }, { data: diagnostics }] =
     await Promise.all([
       propertyIds.length
@@ -48,7 +58,8 @@ export default async function CustomerProfilePage({
             .from("equipment")
             .select("id, type, brand, model, serial_number, property_id")
             .in("property_id", propertyIds)
-        : Promise.resolve({ data: [] }),
+            .returns<CustomerEquipment[]>()
+        : Promise.resolve({ data: [] as CustomerEquipment[] }),
       supabase
         .from("jobs")
         .select("id, scheduled_at, status, notes")
@@ -68,11 +79,11 @@ export default async function CustomerProfilePage({
         : Promise.resolve({ data: [] as CustomerDiagnostic[] }),
     ]);
 
-  const equipmentByProperty = new Map<string, typeof equipment>();
+  const equipmentByProperty: Record<string, CustomerEquipment[]> = {};
   for (const item of equipment ?? []) {
-    const list = equipmentByProperty.get(item.property_id) ?? [];
+    const list = equipmentByProperty[item.property_id] ?? [];
     list.push(item);
-    equipmentByProperty.set(item.property_id, list);
+    equipmentByProperty[item.property_id] = list;
   }
 
   const customerDiagnostics = (diagnostics ?? []).filter((d) =>
@@ -123,33 +134,11 @@ export default async function CustomerProfilePage({
         </section>
       )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-bold uppercase tracking-wide text-g300">
-          Properties &amp; Equipment
-        </h2>
-        {(properties ?? []).length === 0 && <p className={subTextClass}>No properties on file.</p>}
-        <div className="flex flex-col gap-3">
-          {(properties ?? []).map((property) => (
-            <div key={property.id} className="rounded-xl border border-white/8 p-4">
-              <div className={itemTitleClass}>{property.address}</div>
-              {property.property_type && <div className={itemSubClass}>{property.property_type}</div>}
-              <div className="mt-2 flex flex-col gap-1">
-                {(equipmentByProperty.get(property.id) ?? []).map((item) => (
-                  <div key={item.id} className={itemSubClass}>
-                    {item.type}
-                    {item.brand ? ` — ${item.brand}` : ""}
-                    {item.model ? ` ${item.model}` : ""}
-                    {item.serial_number ? ` (S/N ${item.serial_number})` : ""}
-                  </div>
-                ))}
-                {(equipmentByProperty.get(property.id) ?? []).length === 0 && (
-                  <div className={itemSubClass}>No equipment on file.</div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <PropertiesEquipmentSection
+        customerId={id}
+        properties={properties ?? []}
+        equipmentByProperty={equipmentByProperty}
+      />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Jobs</h2>
