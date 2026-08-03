@@ -19,6 +19,9 @@ export default async function DocumentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/documents/warranty/new" className={buttonSecondaryClass}>
+            + New Warranty
+          </Link>
           <Link href="/documents/assessment/new" className={buttonSecondaryClass}>
             + New Condition Assessment
           </Link>
