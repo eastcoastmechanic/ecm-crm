@@ -49,13 +49,24 @@ export default async function DocumentPage({
     return <AssessmentDetail doc={doc} hasEmail={!!doc.customers?.email} />;
   }
 
-  const lineData = doc.line_items as {
-    items: LineItem[];
-    brand: { good: string | null; better: string | null; best: string | null };
-    mass_save_eligible: boolean;
-    mass_save_note: string | null;
-    totals: { good: number; better: number; best: number };
+  const rawLineData = doc.line_items as {
+    items?: LineItem[];
+    brand?: { good: string | null; better: string | null; best: string | null };
+    mass_save_eligible?: boolean;
+    mass_save_note?: string | null;
+    totals?: { good: number; better: number; best: number };
     option_label?: string | null;
+  } | null;
+
+  // Some older rows predate the totals/items shape (created before this
+  // schema was finalized) — fall back rather than crash the page.
+  const lineData = {
+    items: rawLineData?.items ?? [],
+    brand: rawLineData?.brand ?? { good: null, better: null, best: null },
+    mass_save_eligible: rawLineData?.mass_save_eligible ?? false,
+    mass_save_note: rawLineData?.mass_save_note ?? null,
+    totals: rawLineData?.totals ?? { good: 0, better: 0, best: 0 },
+    option_label: rawLineData?.option_label ?? null,
   };
 
   return (

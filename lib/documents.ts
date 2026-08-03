@@ -22,12 +22,22 @@ export async function getDocumentForPdf(id: string): Promise<{
     };
   }
 
-  const lineData = doc.line_items as {
-    items: PdfDocumentData["line_items"];
-    brand: PdfDocumentData["brand"];
-    mass_save_eligible: boolean;
-    mass_save_note: string | null;
-    totals: PdfDocumentData["totals"];
+  const rawLineData = doc.line_items as {
+    items?: PdfDocumentData["line_items"];
+    brand?: PdfDocumentData["brand"];
+    mass_save_eligible?: boolean;
+    mass_save_note?: string | null;
+    totals?: PdfDocumentData["totals"];
+  } | null;
+
+  // Some older rows predate the totals/items shape — fall back rather than
+  // crash PDF generation / email sending for those documents.
+  const lineData = {
+    items: rawLineData?.items ?? [],
+    brand: rawLineData?.brand ?? { good: null, better: null, best: null },
+    mass_save_eligible: rawLineData?.mass_save_eligible ?? false,
+    mass_save_note: rawLineData?.mass_save_note ?? null,
+    totals: rawLineData?.totals ?? { good: 0, better: 0, best: 0 },
   };
 
   return {
