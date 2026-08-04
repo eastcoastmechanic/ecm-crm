@@ -1,0 +1,71 @@
+openapi: 3.0.3
+info:
+  title: ECM Platform Agent
+  description: >
+    Natural-language CRM command endpoint for East Coast Mechanical's ECM
+    Platform, for use by the Microsoft Copilot Studio agent only. Contains
+    a single action — no unrelated webhook/cron endpoints are exposed here.
+  version: "0.1.0"
+servers:
+  - url: https://ecm-crm-eastcoastmechanics-projects.vercel.app
+
+paths:
+  /api/copilot/agent:
+    post:
+      summary: Send a command to the ECM Platform CRM agent
+      description: >
+        Accepts one line of natural language, classifies it via Claude into
+        create_customer / create_document / create_task / unclear, executes
+        the matching action against the CRM database, and returns a plain-text reply.
+      operationId: sendAgentCommand
+      security:
+        - bearerAuth: []
+          vercelProtectionBypass: []
+      parameters:
+        - name: x-vercel-protection-bypass
+          in: header
+          required: true
+          description: Must match the project's VERCEL_AUTOMATION_BYPASS_SECRET.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command:
+                  type: string
+                  description: One-line natural-language instruction, e.g. "Add a customer named Jane Doe, phone 555-1234"
+                  example: "Create an estimate for John Smith - replacing a leaking condenser at 12 Main St"
+      responses:
+        "200":
+          description: Command processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reply:
+                    type: string
+                    example: "Added customer Jane Doe."
+        "401":
+          description: Missing or invalid auth
+        "400":
+          description: Missing command in request body
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: >
+        Value must be the literal string "Bearer <COPILOT_API_KEY>", including the "Bearer " prefix
+        (modeled as apiKey because Swagger 2.0 has no native bearer-scheme type).
+    vercelProtectionBypass:
+      type: apiKey
+      in: header
+      name: x-vercel-protection-bypass

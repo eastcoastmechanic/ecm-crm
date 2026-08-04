@@ -1,25 +1,29 @@
 openapi: 3.0.3
 info:
-  title: ECM Platform API
+  title: ECM Platform Copilot API
   description: >
     REST surface for East Coast Mechanical's CRM ("ECM Platform").
     This spec has two parts:
       1. **Existing endpoints** (`/api/stripe/webhook`, `/api/sms/webhook`, `/api/cron/email-reminders`) —
          documented as they exist today. These are single-purpose webhooks/cron jobs and are
          NOT suitable for Copilot Studio to call.
-      2. **Proposed endpoint** (`/api/copilot/assistant`) — NOT YET IMPLEMENTED. This is the
-         recommended minimal integration point for Microsoft Copilot Studio, wrapping the
-         existing `runAssistantCommand` Server Action logic
-         (app/(internal)/assistant-actions.ts) behind a bearer-token-protected HTTP route.
+      2. **Copilot Studio endpoint** (`/api/copilot/agent`) — the integration point for
+         Microsoft Copilot Studio, wrapping the internal `respondToInternalChat` agent
+         (lib/internal-assistant/agent.ts) behind bearer-token auth. Requires two headers:
+         `Authorization` (the COPILOT_API_KEY, as literal value "Bearer <key>") and
+         `x-vercel-protection-bypass` (to get past this project's Vercel SSO wall).
   version: "0.1.0"
 servers:
-  - url: https://ecm-crm.vercel.app
-    description: Production (Vercel)
+  - url: https://ecm-crm-eastcoastmechanics-projects.vercel.app
+    description: >
+      Production (Vercel). Use this alias, not the bare ecm-crm.vercel.app
+      domain -- that one is not kept in sync with production deploys and
+      serves stale/404 responses.
 
 paths:
-  /api/copilot/assistant:
+  /api/copilot/agent:
     post:
-      summary: (PROPOSED — not yet implemented) Natural-language CRM command endpoint for Copilot Studio
+      summary: Natural-language CRM command endpoint for Copilot Studio
       description: >
         Single freeform entry point for Copilot Studio. Accepts one line of natural language,
         classifies it via Claude into create_customer / create_document / create_task / unclear,
@@ -29,6 +33,20 @@ paths:
       operationId: runAssistantCommand
       security:
         - bearerAuth: []
+          vercelProtectionBypass: []
+      parameters:
+        - name: x-vercel-protection-bypass
+          in: header
+          required: true
+          description: >
+            Required in addition to the bearer token. This project has Vercel
+            Authentication (SSO) enabled on all *.vercel.app URLs, which
+            blocks anonymous callers before the request reaches app code.
+            This header's value must match the VERCEL_AUTOMATION_BYPASS_SECRET
+            configured under Project Settings -> Deployment Protection ->
+            Protection Bypass for Automation.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -159,11 +177,14 @@ paths:
 components:
   securitySchemes:
     bearerAuth:
-      type: http
-      scheme: bearer
+      type: apiKey
+      in: header
+      name: Authorization
       description: >
-        For /api/copilot/assistant (proposed): a dedicated COPILOT_API_KEY, sent as
-        `Authorization: Bearer <COPILOT_API_KEY>`. Same pattern as the existing CRON_SECRET check.
+        For /api/copilot/agent and /api/cron/email-reminders: a dedicated secret
+        (COPILOT_API_KEY or CRON_SECRET). Because this is modeled as an apiKey header
+        (Swagger 2.0 has no native bearer-scheme type), the value entered when configuring
+        this connector must be the literal string "Bearer <secret>", including the "Bearer " prefix.
     stripeSignature:
       type: apiKey
       in: header
@@ -172,3 +193,7 @@ components:
       type: apiKey
       in: header
       name: x-signature
+    vercelProtectionBypass:
+      type: apiKey
+      in: header
+      name: x-vercel-protection-bypass
