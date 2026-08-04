@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { supabase } from "@/lib/supabase";
-import { claude, CLAUDE_MODEL } from "@/lib/claude";
+import { claude, CLAUDE_MODEL_FAST } from "@/lib/claude";
 
 const FollowUpSchema = z.object({
   summary: z.string(),
@@ -40,7 +40,7 @@ export async function runMissedContactSweep(): Promise<{ inserted: number; error
     let parsed: z.infer<typeof FollowUpSchema> | null = null;
     try {
       const response = await claude.messages.parse({
-        model: CLAUDE_MODEL,
+        model: CLAUDE_MODEL_FAST,
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
         messages: [

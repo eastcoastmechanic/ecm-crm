@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { supabase } from "@/lib/supabase";
-import { claude, CLAUDE_MODEL } from "@/lib/claude";
+import { claude, CLAUDE_MODEL_BALANCED } from "@/lib/claude";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { EQUIPMENT_LIFESPAN_REFERENCE } from "@/lib/equipment-lifespan-reference";
 import { NEW_CUSTOMER_VALUE, NEW_PROPERTY_VALUE } from "../../../intake-constants";
@@ -154,7 +154,7 @@ Tech's observations: ${r.observations || "none noted"}`
     .join("\n\n");
 
   const response = await claude.messages.parse({
-    model: CLAUDE_MODEL,
+    model: CLAUDE_MODEL_BALANCED,
     max_tokens: 4096,
     system: systemPrompt,
     messages: [{ role: "user", content: userMessage }],

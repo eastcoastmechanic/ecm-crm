@@ -1,4 +1,4 @@
-import { claude, CLAUDE_MODEL } from "@/lib/claude";
+import { claude, CLAUDE_MODEL_BALANCED } from "@/lib/claude";
 import { supabase } from "@/lib/supabase";
 import { buildWebChatTools } from "./web-tools";
 import { BUSINESS_HOURS, COMPANY_NAME } from "./config";
@@ -40,7 +40,7 @@ export async function respondToWebChat(params: {
   transcript.push({ role: "user", content: message });
 
   const finalMessage = await claude.beta.messages.toolRunner({
-    model: CLAUDE_MODEL,
+    model: CLAUDE_MODEL_BALANCED,
     max_tokens: 1024,
     system: buildSystemPrompt(),
     thinking: { type: "adaptive" },

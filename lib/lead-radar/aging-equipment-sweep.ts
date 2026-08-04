@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { supabase } from "@/lib/supabase";
-import { claude, CLAUDE_MODEL } from "@/lib/claude";
+import { claude, CLAUDE_MODEL_FAST } from "@/lib/claude";
 import { EQUIPMENT_LIFESPAN_REFERENCE } from "@/lib/equipment-lifespan-reference";
 
 const AgingItemSchema = z.object({
@@ -88,7 +88,7 @@ export async function runAgingEquipmentSweep(): Promise<{ inserted: number; erro
   let parsed: z.infer<typeof AgingResultSchema> | null = null;
   try {
     const response = await claude.messages.parse({
-      model: CLAUDE_MODEL,
+      model: CLAUDE_MODEL_FAST,
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],

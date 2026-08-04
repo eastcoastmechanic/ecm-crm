@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { supabase } from "@/lib/supabase";
-import { claude, CLAUDE_MODEL } from "@/lib/claude";
+import { claude, CLAUDE_MODEL_BALANCED } from "@/lib/claude";
 import { SERVICE_AREA_LABEL } from "./service-area";
 
 const WebLeadSchema = z.object({
@@ -35,7 +35,7 @@ export async function runWebSearchSweep(): Promise<{ inserted: number; errors: s
   let parsed: z.infer<typeof WebSearchResultSchema> | null = null;
   try {
     const response = await claude.messages.parse({
-      model: CLAUDE_MODEL,
+      model: CLAUDE_MODEL_BALANCED,
       max_tokens: 8192,
       system: SYSTEM_PROMPT,
       messages: [

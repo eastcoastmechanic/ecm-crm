@@ -1,4 +1,4 @@
-import { claude, CLAUDE_MODEL } from "@/lib/claude";
+import { claude, CLAUDE_MODEL_BALANCED } from "@/lib/claude";
 import { supabase } from "@/lib/supabase";
 import { findCustomerByPhone } from "./customer-lookup";
 import { buildReceptionistTools } from "./tools";
@@ -71,7 +71,7 @@ export async function respondToCall(params: {
   });
 
   const finalMessage = await claude.beta.messages.toolRunner({
-    model: CLAUDE_MODEL,
+    model: CLAUDE_MODEL_BALANCED,
     max_tokens: 1024,
     system: buildSystemPrompt(matchedCustomer?.name ?? null),
     thinking: { type: "adaptive" },

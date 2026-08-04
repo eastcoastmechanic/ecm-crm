@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type Anthropic from "@anthropic-ai/sdk";
-import { claude, CLAUDE_MODEL } from "@/lib/claude";
+import { claude, CLAUDE_MODEL_FAST } from "@/lib/claude";
 
 const SUPPORTED_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 type SupportedMediaType = (typeof SUPPORTED_MEDIA_TYPES)[number];
@@ -42,7 +42,7 @@ export async function extractFromImage<T extends z.ZodTypeAny>(
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const response = await claude.messages.parse({
-    model: CLAUDE_MODEL,
+    model: CLAUDE_MODEL_FAST,
     max_tokens: 2048,
     system: systemPrompt,
     messages: [
