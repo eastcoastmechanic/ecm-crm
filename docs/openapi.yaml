@@ -1,0 +1,174 @@
+openapi: 3.0.3
+info:
+  title: ECM Platform API
+  description: >
+    REST surface for East Coast Mechanical's CRM ("ECM Platform").
+    This spec has two parts:
+      1. **Existing endpoints** (`/api/stripe/webhook`, `/api/sms/webhook`, `/api/cron/email-reminders`) —
+         documented as they exist today. These are single-purpose webhooks/cron jobs and are
+         NOT suitable for Copilot Studio to call.
+      2. **Proposed endpoint** (`/api/copilot/assistant`) — NOT YET IMPLEMENTED. This is the
+         recommended minimal integration point for Microsoft Copilot Studio, wrapping the
+         existing `runAssistantCommand` Server Action logic
+         (app/(internal)/assistant-actions.ts) behind a bearer-token-protected HTTP route.
+  version: "0.1.0"
+servers:
+  - url: https://ecm-crm.vercel.app
+    description: Production (Vercel)
+
+paths:
+  /api/copilot/assistant:
+    post:
+      summary: (PROPOSED — not yet implemented) Natural-language CRM command endpoint for Copilot Studio
+      description: >
+        Single freeform entry point for Copilot Studio. Accepts one line of natural language,
+        classifies it via Claude into create_customer / create_document / create_task / unclear,
+        executes the matching action against Supabase, and returns a plain-text reply.
+        This is a thin HTTP wrapper around the existing `runAssistantCommand` function —
+        no new business logic, only a new transport + auth layer.
+      operationId: runAssistantCommand
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command:
+                  type: string
+                  description: One-line natural-language instruction, e.g. "Add a customer named Jane Doe, phone 555-1234"
+                  example: "Create an estimate for John Smith - replacing a leaking condenser at 12 Main St"
+      responses:
+        "200":
+          description: Command processed (successfully or with a clarifying/error reply — check `reply` text)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reply:
+                    type: string
+                    example: "Added customer Jane Doe."
+        "401":
+          description: Missing or invalid bearer token
+        "400":
+          description: Missing `command` in request body
+
+  /api/stripe/webhook:
+    post:
+      summary: Stripe payment webhook (existing — not for Copilot Studio use)
+      description: Verifies Stripe signature and marks a document as paid on checkout.session.completed.
+      security:
+        - stripeSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Raw Stripe Event object
+      responses:
+        "200":
+          description: Event processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        "400":
+          description: Invalid/missing signature
+
+  /api/sms/webhook:
+    post:
+      summary: Inbound SMS webhook (existing — not for Copilot Studio use)
+      description: HMAC-signed webhook from a self-hosted SMS Gateway app; logs inbound messages against matching customers.
+      security:
+        - hmacSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event, payload]
+              properties:
+                event:
+                  type: string
+                  example: "sms:received"
+                payload:
+                  type: object
+                  properties:
+                    sender:
+                      type: string
+                    recipient:
+                      type: string
+                      nullable: true
+                    message:
+                      type: string
+                    messageId:
+                      type: string
+      responses:
+        "200":
+          description: Message logged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        "401":
+          description: Invalid HMAC signature
+        "400":
+          description: Malformed payload
+
+  /api/cron/email-reminders:
+    get:
+      summary: Daily reminder job (existing — not for Copilot Studio use)
+      description: Vercel Cron trigger; sends overdue invoice, contract renewal, job follow-up, and SMS reminders.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Summary of reminders sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoiceReminders:
+                    type: object
+                    properties: { sent: { type: integer }, errors: { type: integer } }
+                  contractRenewals:
+                    type: object
+                    properties: { sent: { type: integer }, errors: { type: integer } }
+                  jobFollowUps:
+                    type: object
+                    properties: { sent: { type: integer }, errors: { type: integer } }
+                  smsReminders:
+                    type: object
+                    properties: { sent: { type: integer }, errors: { type: integer } }
+        "401":
+          description: Missing/invalid CRON_SECRET bearer token
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        For /api/copilot/assistant (proposed): a dedicated COPILOT_API_KEY, sent as
+        `Authorization: Bearer <COPILOT_API_KEY>`. Same pattern as the existing CRON_SECRET check.
+    stripeSignature:
+      type: apiKey
+      in: header
+      name: stripe-signature
+    hmacSignature:
+      type: apiKey
+      in: header
+      name: x-signature
