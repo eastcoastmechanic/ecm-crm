@@ -2,6 +2,8 @@ import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { supabase } from "@/lib/supabase";
 import { generateDocumentForCustomer } from "@/lib/document-generation";
+import { createWarrantyForCustomer, type WarrantyEquipmentInput } from "@/lib/warranty-creation";
+import { createMassSaveRebateForCustomer } from "@/lib/mass-save-rebate-creation";
 import { updateCustomer, deleteCustomer } from "@/app/(internal)/customers/actions";
 import { addProperty, updateProperty, deleteProperty } from "@/app/(internal)/properties/actions";
 import { addEquipment, updateEquipment, deleteEquipment } from "@/app/(internal)/equipment/actions";
@@ -400,6 +402,81 @@ const updateWarrantyTool = betaZodTool({
   },
 });
 
+const createWarrantyTool = betaZodTool({
+  name: "create_warranty",
+  description: "Create a real warranty registration document for an existing customer/property, covering one or more pieces of equipment. Computes manufacturer + craftsmanship expiration dates automatically. Use find_customer and list_properties first to get the ids; use list_equipment if warrantying existing equipment rather than newly-installed equipment.",
+  inputSchema: z.object({
+    customerId: z.string(),
+    propertyId: z.string(),
+    technicianName: z.string().optional().describe("Installer name, defaults to Joshua Crowley if omitted"),
+    equipment: z
+      .array(
+        z.object({
+          equipmentId: z.string().optional().describe("Existing equipment id, from list_equipment — omit for newly-installed equipment"),
+          newEquipmentType: z.string().optional().describe("Required if equipmentId is omitted, e.g. 'mini-split', 'boiler'"),
+          newEquipmentBrand: z.string().optional(),
+          model: z.string().optional(),
+          serialNumber: z.string().optional(),
+          installDate: z.string().optional().describe("YYYY-MM-DD"),
+          docketNumber: z.string().optional(),
+          manufacturerYears: z.number().optional(),
+          registered: z.boolean().optional(),
+          registrationDate: z.string().optional().describe("YYYY-MM-DD"),
+        })
+      )
+      .min(1)
+      .describe("One entry per piece of equipment this warranty covers"),
+  }),
+  run: async ({ customerId, propertyId, technicianName, equipment }) => {
+    try {
+      const result = await createWarrantyForCustomer({
+        customerId,
+        propertyId,
+        technicianName: technicianName ?? "Joshua Crowley",
+        equipment: equipment as WarrantyEquipmentInput[],
+      });
+      return `Created warranty ${result.docNumber}. /documents/${result.documentId}`;
+    } catch (err) {
+      return `Failed to create warranty: ${err instanceof Error ? err.message : "unknown error"}`;
+    }
+  },
+});
+
+const createMassSaveRebateTool = betaZodTool({
+  name: "create_mass_save_rebate",
+  description: "Create a draft Mass Save Air Source Heat Pump rebate application document for an existing customer/property. Almost every field is optional and defaults to blank, same as the human form — this creates a real draft document under the customer that can be finished/filled in the app, it does not need to be submission-ready from chat alone. Use find_customer and list_properties first to get the ids.",
+  inputSchema: z.object({
+    customerId: z.string(),
+    propertyId: z.string(),
+    equipmentIds: z.array(z.string()).optional().describe("Existing equipment ids (from list_equipment) this rebate covers"),
+    electricSponsor: z.string().optional(),
+    gasSponsor: z.string().optional(),
+    occupancy: z.string().optional(),
+    housingType: z.string().optional(),
+    totalSquareFootage: z.string().optional(),
+    preExistingHeating: z.string().optional(),
+  }),
+  run: async ({ customerId, propertyId, equipmentIds, electricSponsor, gasSponsor, occupancy, housingType, totalSquareFootage, preExistingHeating }) => {
+    try {
+      const result = await createMassSaveRebateForCustomer({
+        customerId,
+        propertyId,
+        equipment: (equipmentIds ?? []).map((id) => ({ equipmentId: id })),
+        sponsor: { electric: electricSponsor ?? null, gas: gasSponsor ?? null },
+        project: {
+          occupancy: occupancy ?? null,
+          housingType: housingType ?? null,
+          totalSquareFootage: totalSquareFootage ?? null,
+          preExistingHeating: preExistingHeating ?? null,
+        },
+      });
+      return `Created draft Mass Save rebate application. /documents/${result.documentId} — finish filling in exact rebate details in the app before submitting.`;
+    } catch (err) {
+      return `Failed to create Mass Save rebate: ${err instanceof Error ? err.message : "unknown error"}`;
+    }
+  },
+});
+
 function buildDocumentTool(type: "estimate" | "invoice" | "proposal") {
   return betaZodTool({
     name: `create_${type}`,
@@ -516,6 +593,8 @@ export function buildInternalTools() {
     listDocumentsTool,
     deleteDocumentTool,
     updateWarrantyTool,
+    createWarrantyTool,
+    createMassSaveRebateTool,
     buildDocumentTool("estimate"),
     buildDocumentTool("invoice"),
     buildDocumentTool("proposal"),

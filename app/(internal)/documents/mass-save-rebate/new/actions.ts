@@ -3,9 +3,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { supabase } from "@/lib/supabase";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { extractFromImage } from "@/lib/vision-extract";
+import { createMassSaveRebateForCustomer, type MassSaveEquipmentInput } from "@/lib/mass-save-rebate-creation";
 import { NEW_CUSTOMER_VALUE, NEW_PROPERTY_VALUE } from "../../../intake-constants";
 
 const LabelSchema = z.object({
@@ -71,67 +71,49 @@ export async function submitMassSaveRebate(formData: FormData) {
     property_id = resolved.propertyId!;
   }
 
-  const equipment: {
-    equipment_id: string | null;
-    label: string;
-    install_date: string | null;
-    ahri_reference: string | null;
-    cooling_capacity_btu: string | null;
-    tons: string | null;
-    area_served: string | null;
-  }[] = [];
-
+  const equipment: MassSaveEquipmentInput[] = [];
   for (let i = 0; i < rowCount; i++) {
-    const equipment_id = firstOrNull(formData, `equipment_id_${i}`);
-    let label = "Equipment";
-    if (equipment_id) {
-      const { data } = await supabase
-        .from("equipment")
-        .select("type, brand, model")
-        .eq("id", equipment_id)
-        .single();
-      if (data) label = [data.type, data.brand, data.model].filter(Boolean).join(" ");
-    }
-
     equipment.push({
-      equipment_id,
-      label,
-      install_date: firstOrNull(formData, `eq_install_date_${i}`),
-      ahri_reference: firstOrNull(formData, `eq_ahri_${i}`),
-      cooling_capacity_btu: firstOrNull(formData, `eq_btu_${i}`),
+      equipmentId: firstOrNull(formData, `equipment_id_${i}`),
+      installDate: firstOrNull(formData, `eq_install_date_${i}`),
+      ahriReference: firstOrNull(formData, `eq_ahri_${i}`),
+      coolingCapacityBtu: firstOrNull(formData, `eq_btu_${i}`),
       tons: firstOrNull(formData, `eq_tons_${i}`),
-      area_served: firstOrNull(formData, `eq_area_${i}`),
+      areaServed: firstOrNull(formData, `eq_area_${i}`),
     });
   }
 
   const rebate_types = formData.getAll("rebate_types") as string[];
 
-  const lineItems = {
+  const { documentId } = await createMassSaveRebateForCustomer({
+    customerId: customer_id,
+    propertyId: property_id,
+    equipment,
     sponsor: {
       electric: firstOrNull(formData, "electric_sponsor"),
-      electric_account_number: firstOrNull(formData, "electric_account_number"),
+      electricAccountNumber: firstOrNull(formData, "electric_account_number"),
       gas: firstOrNull(formData, "gas_sponsor"),
-      gas_account_number: firstOrNull(formData, "gas_account_number"),
+      gasAccountNumber: firstOrNull(formData, "gas_account_number"),
     },
     project: {
       occupancy: firstOrNull(formData, "occupancy"),
-      assessment_site_id: firstOrNull(formData, "assessment_site_id"),
-      housing_type: firstOrNull(formData, "housing_type"),
-      total_square_footage: firstOrNull(formData, "total_square_footage"),
-      multi_unit_count: firstOrNull(formData, "multi_unit_count"),
-      pre_existing_heating: firstOrNull(formData, "pre_existing_heating"),
-      rebate_types,
+      assessmentSiteId: firstOrNull(formData, "assessment_site_id"),
+      housingType: firstOrNull(formData, "housing_type"),
+      totalSquareFootage: firstOrNull(formData, "total_square_footage"),
+      multiUnitCount: firstOrNull(formData, "multi_unit_count"),
+      preExistingHeating: firstOrNull(formData, "pre_existing_heating"),
+      rebateTypes: rebate_types,
     },
-    integrated_control: {
+    integratedControl: {
       model: firstOrNull(formData, "ic_model"),
-      switchover_temp: firstOrNull(formData, "ic_switchover_temp"),
+      switchoverTemp: firstOrNull(formData, "ic_switchover_temp"),
       count: firstOrNull(formData, "ic_count"),
       location: firstOrNull(formData, "ic_location"),
     },
     installer: {
-      company_name: firstOrNull(formData, "installer_company_name") ?? "East Coast Mechanical",
-      hpin_company_id: firstOrNull(formData, "installer_hpin_id"),
-      contact_person: firstOrNull(formData, "installer_contact_person"),
+      companyName: firstOrNull(formData, "installer_company_name") ?? "East Coast Mechanical",
+      hpinCompanyId: firstOrNull(formData, "installer_hpin_id"),
+      contactPerson: firstOrNull(formData, "installer_contact_person"),
       phone: firstOrNull(formData, "installer_phone"),
       email: firstOrNull(formData, "installer_email"),
       address: firstOrNull(formData, "installer_address"),
@@ -140,26 +122,9 @@ export async function submitMassSaveRebate(formData: FormData) {
       zip: firstOrNull(formData, "installer_zip"),
     },
     payee: firstOrNull(formData, "payee"),
-    equipment,
-  };
-
-  const { data: document, error } = await supabase
-    .from("documents")
-    .insert({
-      doc_number: null,
-      type: "mass_save_rebate",
-      customer_id,
-      property_id,
-      status: "draft",
-      ai_generated: false,
-      line_items: lineItems,
-    })
-    .select("id")
-    .single();
-
-  if (error) throw new Error(error.message);
+  });
 
   revalidatePath("/documents");
   revalidatePath("/mass-save");
-  redirect(`/documents/${document.id}`);
+  redirect(`/documents/${documentId}`);
 }
