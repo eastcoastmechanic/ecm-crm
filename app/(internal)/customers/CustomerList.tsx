@@ -45,7 +45,12 @@ export default function CustomerList({
   }, [customers, properties, propertyId, search]);
 
   async function handleDelete(customer: Customer) {
-    if (!window.confirm(`Delete ${customer.name}? This cannot be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete ${customer.name}? This also permanently deletes their properties, equipment, jobs, documents, and service history. This cannot be undone.`
+      )
+    )
+      return;
 
     setErrors((prev) => ({ ...prev, [customer.id]: "" }));
     setDeletingId(customer.id);

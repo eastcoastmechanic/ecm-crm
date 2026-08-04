@@ -64,37 +64,70 @@ export async function updateCustomer(formData: FormData) {
   revalidatePath("/customers");
 }
 
-const RELATED_TABLES: { table: string; singular: string; plural: string }[] = [
-  { table: "properties", singular: "property", plural: "properties" },
-  { table: "documents", singular: "document", plural: "documents" },
-  { table: "jobs", singular: "job", plural: "jobs" },
-  { table: "service_contracts", singular: "service contract", plural: "service contracts" },
-  { table: "ai_conversations", singular: "conversation", plural: "conversations" },
-  { table: "leads", singular: "lead", plural: "leads" },
-];
+async function idsWhere(table: string, column: string, value: string): Promise<string[]> {
+  const { data } = await supabase.from(table).select("id").eq(column, value);
+  return (data ?? []).map((row) => row.id as string);
+}
 
+async function idsWhereIn(table: string, column: string, values: string[]): Promise<string[]> {
+  if (values.length === 0) return [];
+  const { data } = await supabase.from(table).select("id").in(column, values);
+  return (data ?? []).map((row) => row.id as string);
+}
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+// Deletes a customer and everything hanging off it — properties, equipment,
+// jobs, documents, diagnostics, satisfaction surveys, SMS history, service
+// contracts, and AI conversation history. Traced from the live DB's actual
+// foreign keys (not the schema.sql snapshot, which is stale for newer
+// tables). Runs as a sequence of awaited deletes rather than a single SQL
+// transaction, same style as the rest of this codebase (e.g. submitWarranty)
+// — Supabase's REST client doesn't expose multi-statement transactions.
 export async function deleteCustomer(id: string): Promise<{ error?: string }> {
-  const blockers: string[] = [];
+  const propertyIds = await idsWhere("properties", "customer_id", id);
 
-  for (const { table, singular, plural } of RELATED_TABLES) {
-    const { count } = await supabase
-      .from(table)
-      .select("id", { count: "exact", head: true })
-      .eq("customer_id", id);
-    if (count && count > 0) {
-      blockers.push(`${count} ${count === 1 ? singular : plural}`);
-    }
-  }
+  const jobIds = unique([
+    ...(await idsWhere("jobs", "customer_id", id)),
+    ...(await idsWhereIn("jobs", "property_id", propertyIds)),
+  ]);
 
-  if (blockers.length > 0) {
-    return {
-      error: `Can't delete — this customer still has ${blockers.join(", ")}. Remove those first.`,
-    };
-  }
+  const equipmentIds = await idsWhereIn("equipment", "property_id", propertyIds);
+
+  if (equipmentIds.length) await supabase.from("diagnostics").delete().in("equipment_id", equipmentIds);
+  if (jobIds.length) await supabase.from("diagnostics").delete().in("job_id", jobIds);
+  if (jobIds.length) await supabase.from("satisfaction_surveys").delete().in("job_id", jobIds);
+
+  await supabase.from("sms_messages").delete().eq("customer_id", id);
+  if (jobIds.length) await supabase.from("sms_messages").delete().in("job_id", jobIds);
+
+  if (equipmentIds.length) await supabase.from("equipment").delete().in("id", equipmentIds);
+  if (jobIds.length) await supabase.from("jobs").delete().in("id", jobIds);
+
+  await supabase.from("documents").delete().eq("customer_id", id);
+  if (propertyIds.length) await supabase.from("documents").delete().in("property_id", propertyIds);
+
+  await supabase.from("service_contracts").delete().eq("customer_id", id);
+  if (propertyIds.length) await supabase.from("service_contracts").delete().in("property_id", propertyIds);
+
+  if (propertyIds.length) await supabase.from("properties").delete().in("id", propertyIds);
+
+  await supabase.from("ai_conversations").delete().eq("customer_id", id);
+
+  // Unlink rather than delete — these reference this customer without belonging to them.
+  await supabase.from("leads").update({ converted_customer_id: null }).eq("converted_customer_id", id);
+  await supabase.from("customers").update({ referred_by_customer_id: null }).eq("referred_by_customer_id", id);
+  await supabase.from("tasks").update({ customer_id: null }).eq("customer_id", id);
 
   const { error } = await supabase.from("customers").delete().eq("id", id);
   if (error) return { error: error.message };
 
   revalidatePath("/customers");
+  revalidatePath("/properties");
+  revalidatePath("/equipment");
+  revalidatePath("/documents");
+  revalidatePath("/jobs");
   return {};
 }
