@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { supabase } from "@/lib/supabase";
-import { generateDocumentForCustomer } from "@/lib/document-generation";
+import { generateDocumentForCustomer, startDocumentGenerationInBackground } from "@/lib/document-generation";
 import { createWarrantyForCustomer, type WarrantyEquipmentInput } from "@/lib/warranty-creation";
 import { createMassSaveRebateForCustomer } from "@/lib/mass-save-rebate-creation";
 import { updateCustomer, deleteCustomer } from "@/app/(internal)/customers/actions";
@@ -480,7 +480,11 @@ const createMassSaveRebateTool = betaZodTool({
 function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boolean) {
   return betaZodTool({
     name: `create_${type}`,
-    description: `Generate a real ${type} using the price book and Claude, for an existing or brand-new customer. Creates an actual draft ${type} in the CRM. By default it's priced good/better/best (three tiers); pass pricingMode "flat" if the tech/customer wants one straight price per line instead of a tiered choice.`,
+    description: `Generate a real ${type} using the price book and Claude, for an existing or brand-new customer. Creates an actual draft ${type} in the CRM. By default it's priced good/better/best (three tiers); pass pricingMode "flat" if the tech/customer wants one straight price per line instead of a tiered choice.${
+      fast
+        ? " Runs in the background and returns immediately without a price -- real price-book pricing takes about a minute, so tell the tech to check the CRM shortly rather than expecting the number in this reply."
+        : ""
+    }`,
     inputSchema: z.object({
       customerId: z.string().optional().describe("Existing customer id, from find_customer"),
       customerName: z.string().optional().describe("Required only if this is a brand-new customer"),
@@ -498,6 +502,27 @@ function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boo
         return "Need either an existing customerId (use find_customer) or a customerName for a new customer.";
       }
       try {
+        if (fast) {
+          // Pricing a real good/better/best estimate against the full price
+          // book reliably takes 70s+, longer than the Teams/Copilot connector's
+          // own timeout -- so this path can't wait on it. Kick generation off
+          // in the background and reply immediately; the finished document
+          // lands in the CRM a bit later instead of in this same chat turn.
+          const { customerName: resolvedName, propertyAddress } = await startDocumentGenerationInBackground({
+            customerId,
+            customerName,
+            phone,
+            email,
+            address,
+            type,
+            rawRequest: jobDescription,
+            pricingMode,
+            fast,
+          });
+          return `Generating the ${type} for ${resolvedName}${
+            propertyAddress ? ` at ${propertyAddress}` : ""
+          } now — real price-book pricing takes about a minute, so check the CRM shortly for the finished draft.`;
+        }
         const results = await generateDocumentForCustomer({
           customerId,
           customerName,

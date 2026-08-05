@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { after } from "next/server";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { supabase } from "@/lib/supabase";
 import { claude, CLAUDE_MODEL, CLAUDE_MODEL_BALANCED } from "@/lib/claude";
@@ -284,4 +285,59 @@ ${input.rawRequest}`;
   }
 
   return results;
+}
+
+export type StartDocumentGenerationResult = {
+  customerName: string;
+  propertyAddress: string | null;
+};
+
+/**
+ * Resolves the customer/property (fast, DB-only) and returns right away,
+ * kicking the actual price-book generation off in the background via
+ * `after()`. Chat surfaces like Copilot Studio/Teams route through this
+ * instead of generateDocumentForCustomer directly: pricing a real
+ * good/better/best estimate against the full price book reliably takes
+ * 70s+, which is longer than those connectors' own timeout, so waiting on
+ * it synchronously means the caller always sees a timeout even though the
+ * document finishes seconds later. The finished document still lands in
+ * the CRM as normal -- the tech just checks there instead of getting the
+ * price back in the same chat turn.
+ */
+export async function startDocumentGenerationInBackground(
+  input: GenerateDocumentInput
+): Promise<StartDocumentGenerationResult> {
+  if (!DOC_PREFIX[input.type]) throw new Error("Invalid document type");
+  if (!input.rawRequest?.trim()) throw new Error("Describe the job before generating");
+
+  const resolved = await resolveCustomerPropertyEquipment({
+    customerId: input.customerId,
+    customerName: input.customerName,
+    phone: input.phone,
+    email: input.email,
+    smsConsent: input.smsConsent,
+    propertyId: input.propertyId,
+    address: input.address,
+  });
+  const customerId = resolved.customerId;
+  const propertyId = resolved.propertyId;
+  if (!customerId) throw new Error("Customer is required");
+
+  const [{ data: customer }, propertyResult] = await Promise.all([
+    supabase.from("customers").select("name").eq("id", customerId).single(),
+    propertyId
+      ? supabase.from("properties").select("address").eq("id", propertyId).single()
+      : Promise.resolve({ data: null as { address: string } | null }),
+  ]);
+
+  after(() => {
+    generateDocumentForCustomer({ ...input, customerId, propertyId }).catch((err) => {
+      console.error(`[startDocumentGenerationInBackground] ${input.type} generation failed:`, err);
+    });
+  });
+
+  return {
+    customerName: customer?.name ?? input.customerName ?? "the customer",
+    propertyAddress: propertyResult.data?.address ?? null,
+  };
 }
