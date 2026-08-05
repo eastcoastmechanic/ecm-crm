@@ -98,16 +98,16 @@ const styles = StyleSheet.create({
   },
   companyName: {
     color: colors.white,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 700,
-    letterSpacing: 0.5,
+    letterSpacing: 0.75,
   },
   companyTag: {
     color: colors.gold,
-    fontSize: 7.5,
-    fontWeight: 700,
-    letterSpacing: 1.5,
-    marginTop: 2,
+    fontSize: 8,
+    fontWeight: 600,
+    letterSpacing: 0.3,
+    marginTop: 3,
   },
   docTypePill: {
     alignSelf: "flex-end",
@@ -368,8 +368,8 @@ export function DocumentPdf({ doc, logo }: { doc: PdfDocumentData; logo: string 
           <View style={styles.headerLeft}>
             {logo && <Image src={logo} style={styles.logo} />}
             <View>
-              <Text style={styles.companyName}>East Coast Mechanical</Text>
-              <Text style={styles.companyTag}>HVAC &amp; PLUMBING</Text>
+              <Text style={styles.companyName}>EAST COAST MECHANICAL</Text>
+              <Text style={styles.companyTag}>Heating  |  Cooling  |  Plumbing  |  Air Quality</Text>
             </View>
           </View>
           <View>
