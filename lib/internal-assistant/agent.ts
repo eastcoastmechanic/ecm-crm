@@ -41,6 +41,7 @@ export async function respondToInternalChat(
   messages: ChatMessage[],
   options?: { fast?: boolean }
 ): Promise<string> {
+  const toolRunnerStartedAt = Date.now();
   const finalMessage = await claude.beta.messages.toolRunner({
     model: CLAUDE_MODEL,
     max_tokens: 2048,
@@ -50,6 +51,7 @@ export async function respondToInternalChat(
     tools: buildInternalTools({ fast: options?.fast }),
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   });
+  console.log(`[respondToInternalChat] toolRunner ${Date.now() - toolRunnerStartedAt}ms`);
 
   return finalMessage.content
     .filter((b) => b.type === "text")

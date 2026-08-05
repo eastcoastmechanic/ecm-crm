@@ -213,6 +213,7 @@ ${input.rawRequest}`;
     photoFiles.length ? uploadDocumentPhotos(photoFiles) : Promise.resolve([]),
   ]);
 
+  const parseStartedAt = Date.now();
   const response = await claude.messages.parse({
     model: input.fast ? CLAUDE_MODEL_BALANCED : CLAUDE_MODEL,
     max_tokens: 8192,
@@ -227,6 +228,9 @@ ${input.rawRequest}`;
       format: zodOutputFormat(GeneratedDocSchema),
     },
   });
+  console.log(
+    `[generateDocumentForCustomer] claude.messages.parse ${Date.now() - parseStartedAt}ms (fast=${!!input.fast}, priceBookChars=${priceBookText.length})`
+  );
 
   const parsed = response.parsed_output;
   if (!parsed || parsed.documents.length === 0) {

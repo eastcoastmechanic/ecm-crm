@@ -34,11 +34,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Message must be between 1 and 2000 characters" }, { status: 400 });
   }
 
+  const startedAt = Date.now();
   try {
     const reply = await respondToInternalChat(messages, { fast: true });
+    console.log(`[copilot/agent] total ${Date.now() - startedAt}ms`);
     return NextResponse.json({ reply });
   } catch (err) {
-    console.error("Copilot assistant error:", err);
+    console.error(`[copilot/agent] failed after ${Date.now() - startedAt}ms:`, err);
     return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
   }
 }
