@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
-import { idsWhere, cascadeUnlinkEquipment, cascadeUnlinkJobs } from "@/lib/cascade-delete";
+import { idsWhere, cascadeUnlinkEquipment, cascadeUnlinkJobs, cascadeUnlinkDocuments } from "@/lib/cascade-delete";
 import { NEW_CUSTOMER_VALUE } from "../intake-constants";
 
 export async function addProperty(formData: FormData) {
@@ -81,7 +81,10 @@ export async function deleteProperty(id: string): Promise<{ error?: string }> {
   if (equipmentIds.length) await supabase.from("equipment").delete().in("id", equipmentIds);
   if (jobIds.length) await supabase.from("jobs").delete().in("id", jobIds);
 
-  await supabase.from("documents").delete().eq("property_id", id);
+  const documentIds = await idsWhere("documents", "property_id", id);
+  await cascadeUnlinkDocuments(documentIds);
+  if (documentIds.length) await supabase.from("documents").delete().in("id", documentIds);
+
   await supabase.from("service_contracts").delete().eq("property_id", id);
 
   const { error } = await supabase.from("properties").delete().eq("id", id);

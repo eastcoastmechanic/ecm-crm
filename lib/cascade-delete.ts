@@ -33,3 +33,10 @@ export async function cascadeUnlinkJobs(jobIds: string[]): Promise<void> {
   await supabase.from("sms_messages").delete().in("job_id", jobIds);
   await supabase.from("tasks").update({ job_id: null }).in("job_id", jobIds);
 }
+
+// Clears jobs.document_id before the caller deletes these document rows
+// themselves (a job converted from an estimate keeps a pointer back to it).
+export async function cascadeUnlinkDocuments(documentIds: string[]): Promise<void> {
+  if (documentIds.length === 0) return;
+  await supabase.from("jobs").update({ document_id: null }).in("document_id", documentIds);
+}

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
-import { idsWhere, idsWhereIn, unique, cascadeUnlinkEquipment, cascadeUnlinkJobs } from "@/lib/cascade-delete";
+import { idsWhere, idsWhereIn, unique, cascadeUnlinkEquipment, cascadeUnlinkJobs, cascadeUnlinkDocuments } from "@/lib/cascade-delete";
 
 export async function addCustomer(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
@@ -90,8 +90,12 @@ export async function deleteCustomer(id: string): Promise<{ error?: string }> {
   if (equipmentIds.length) await supabase.from("equipment").delete().in("id", equipmentIds);
   if (jobIds.length) await supabase.from("jobs").delete().in("id", jobIds);
 
-  await supabase.from("documents").delete().eq("customer_id", id);
-  if (propertyIds.length) await supabase.from("documents").delete().in("property_id", propertyIds);
+  const documentIds = unique([
+    ...(await idsWhere("documents", "customer_id", id)),
+    ...(await idsWhereIn("documents", "property_id", propertyIds)),
+  ]);
+  await cascadeUnlinkDocuments(documentIds);
+  if (documentIds.length) await supabase.from("documents").delete().in("id", documentIds);
 
   await supabase.from("service_contracts").delete().eq("customer_id", id);
   if (propertyIds.length) await supabase.from("service_contracts").delete().in("property_id", propertyIds);
