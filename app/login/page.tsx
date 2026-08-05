@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createPortalBrowserClient } from "@/lib/supabase-portal/client";
 import {
   buttonClass,
@@ -11,7 +12,19 @@ import {
   errorClass,
 } from "../(internal)/ui";
 
+function useRedirectTarget() {
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
+  // Only ever follow a same-site relative path -- the param is attacker-controllable
+  // (it comes straight from the URL), so reject anything that could send the
+  // browser off-site (a bare "//host/..." is parsed as protocol-relative).
+  return redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+    ? redirectTo
+    : "/dashboard";
+}
+
 export default function StaffLoginPage() {
+  const redirectTarget = useRedirectTarget();
   const [mode, setMode] = useState<"password" | "code">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +45,7 @@ export default function StaffLoginPage() {
       setStatus("error");
       return;
     }
-    window.location.href = "/dashboard";
+    window.location.href = redirectTarget;
   }
 
   async function handleSendCode(e: React.FormEvent) {
@@ -69,7 +82,7 @@ export default function StaffLoginPage() {
       setStatus("sent");
       return;
     }
-    window.location.href = "/dashboard";
+    window.location.href = redirectTarget;
   }
 
   if (status === "sent" || (status === "verifying" && mode === "code")) {

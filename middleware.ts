@@ -52,13 +52,6 @@ function hasValidBasicAuth(request: NextRequest) {
   return decoded.slice(0, sep) === expectedUser && decoded.slice(sep + 1) === expectedPass;
 }
 
-function unauthorized() {
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="ECM Internal"' },
-  });
-}
-
 // Alternative to the shared Basic-Auth password: a real Supabase Auth session
 // with a matching `staff` row (see db/migrations/0017_staff_referrals.sql —
 // staff deliberately has no anon policy, only a self-read policy). Basic Auth
@@ -106,7 +99,25 @@ export async function middleware(request: NextRequest) {
     if (hasValidBasicAuth(request)) return NextResponse.next();
 
     const { role, response } = await checkStaffSession(request);
-    if (!role) return unauthorized();
+    if (!role) {
+      // Internal API routes are called via fetch() from client code that
+      // expects a plain error status, not an HTML page -- redirecting those
+      // would make the response body an HTML login page instead of JSON/text.
+      if (INTERNAL_API_PATHS.includes(request.nextUrl.pathname)) {
+        return new NextResponse("Authentication required", { status: 401 });
+      }
+      // For real page navigations, the old bare-401 text response was a dead
+      // end on a phone, especially opened from a home-screen PWA icon: no
+      // link back to sign-in, so the only way out users found was deleting
+      // and re-adding the shortcut. Redirect to the real login page instead,
+      // same as the portal branch below already does.
+      const redirectTarget = request.nextUrl.pathname + request.nextUrl.search;
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      url.searchParams.set("redirect", redirectTarget);
+      return NextResponse.redirect(url);
+    }
 
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-staff-role", role);
