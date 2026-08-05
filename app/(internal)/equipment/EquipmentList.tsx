@@ -119,7 +119,10 @@ export default function EquipmentList({
 
   async function handleDelete(item: Equipment) {
     const label = [item.type, item.brand, item.model].filter(Boolean).join(" ");
-    if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
+    if (
+      !window.confirm(`Delete "${label}"? This also permanently deletes its diagnostic history. This cannot be undone.`)
+    )
+      return;
 
     setErrors((prev) => ({ ...prev, [item.id]: "" }));
     setDeletingId(item.id);

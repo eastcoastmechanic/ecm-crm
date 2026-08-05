@@ -92,7 +92,12 @@ export default function PropertyList({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   async function handleDelete(property: Property) {
-    if (!window.confirm(`Delete "${property.address}"? This cannot be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete "${property.address}"? This also permanently deletes its equipment, jobs, documents, and service history. This cannot be undone.`
+      )
+    )
+      return;
 
     setErrors((prev) => ({ ...prev, [property.id]: "" }));
     setDeletingId(property.id);

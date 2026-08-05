@@ -86,7 +86,7 @@ const updateCustomerTool = betaZodTool({
 
 const deleteCustomerTool = betaZodTool({
   name: "delete_customer",
-  description: "Permanently delete a customer. Fails with a clear reason if they still have properties, documents, jobs, or other linked records — those must be removed first.",
+  description: "Permanently delete a customer and everything under them — properties, equipment, jobs, documents, diagnostics, and service history. This cannot be undone; confirm with the user before calling.",
   inputSchema: z.object({
     customerId: z.string(),
   }),
@@ -169,7 +169,7 @@ const updatePropertyTool = betaZodTool({
 
 const deletePropertyTool = betaZodTool({
   name: "delete_property",
-  description: "Permanently delete a property. Fails with a clear reason if it still has equipment, jobs, or documents attached — those must be removed first.",
+  description: "Permanently delete a property and everything under it — equipment, jobs, documents, and service contracts. This cannot be undone; confirm with the user before calling.",
   inputSchema: z.object({
     propertyId: z.string(),
   }),
@@ -272,7 +272,7 @@ const updateEquipmentTool = betaZodTool({
 
 const deleteEquipmentTool = betaZodTool({
   name: "delete_equipment",
-  description: "Permanently delete a piece of equipment. Fails with a clear reason if it still has diagnostics or leads attached.",
+  description: "Permanently delete a piece of equipment and its diagnostic history. Any leads pointing at it are unlinked, not deleted. This cannot be undone; confirm with the user before calling.",
   inputSchema: z.object({
     equipmentId: z.string(),
   }),

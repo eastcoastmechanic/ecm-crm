@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
+import { idsWhere, cascadeUnlinkEquipment, cascadeUnlinkJobs } from "@/lib/cascade-delete";
 import { NEW_CUSTOMER_VALUE } from "../intake-constants";
 
 export async function addProperty(formData: FormData) {
@@ -68,20 +69,28 @@ export async function updateProperty(formData: FormData) {
   revalidatePath("/customers");
 }
 
+// Deletes a property and everything hanging off it — equipment, jobs,
+// documents, and service contracts — mirroring deleteCustomer's cascade.
 export async function deleteProperty(id: string): Promise<{ error?: string }> {
-  const { error } = await supabase.from("properties").delete().eq("id", id);
+  const jobIds = await idsWhere("jobs", "property_id", id);
+  const equipmentIds = await idsWhere("equipment", "property_id", id);
 
-  if (error) {
-    if (error.code === "23503") {
-      return {
-        error:
-          "Can't delete — this property still has equipment, jobs, or documents attached. Remove or reassign those first.",
-      };
-    }
-    return { error: error.message };
-  }
+  await cascadeUnlinkEquipment(equipmentIds);
+  await cascadeUnlinkJobs(jobIds);
+
+  if (equipmentIds.length) await supabase.from("equipment").delete().in("id", equipmentIds);
+  if (jobIds.length) await supabase.from("jobs").delete().in("id", jobIds);
+
+  await supabase.from("documents").delete().eq("property_id", id);
+  await supabase.from("service_contracts").delete().eq("property_id", id);
+
+  const { error } = await supabase.from("properties").delete().eq("id", id);
+  if (error) return { error: error.message };
 
   revalidatePath("/properties");
   revalidatePath("/customers");
+  revalidatePath("/equipment");
+  revalidatePath("/documents");
+  revalidatePath("/jobs");
   return {};
 }

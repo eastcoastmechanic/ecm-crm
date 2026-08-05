@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
+import { idsWhere, idsWhereIn, unique, cascadeUnlinkEquipment, cascadeUnlinkJobs } from "@/lib/cascade-delete";
 
 export async function addCustomer(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
@@ -64,21 +65,6 @@ export async function updateCustomer(formData: FormData) {
   revalidatePath("/customers");
 }
 
-async function idsWhere(table: string, column: string, value: string): Promise<string[]> {
-  const { data } = await supabase.from(table).select("id").eq(column, value);
-  return (data ?? []).map((row) => row.id as string);
-}
-
-async function idsWhereIn(table: string, column: string, values: string[]): Promise<string[]> {
-  if (values.length === 0) return [];
-  const { data } = await supabase.from(table).select("id").in(column, values);
-  return (data ?? []).map((row) => row.id as string);
-}
-
-function unique(values: string[]): string[] {
-  return Array.from(new Set(values));
-}
-
 // Deletes a customer and everything hanging off it — properties, equipment,
 // jobs, documents, diagnostics, satisfaction surveys, SMS history, service
 // contracts, and AI conversation history. Traced from the live DB's actual
@@ -96,12 +82,10 @@ export async function deleteCustomer(id: string): Promise<{ error?: string }> {
 
   const equipmentIds = await idsWhereIn("equipment", "property_id", propertyIds);
 
-  if (equipmentIds.length) await supabase.from("diagnostics").delete().in("equipment_id", equipmentIds);
-  if (jobIds.length) await supabase.from("diagnostics").delete().in("job_id", jobIds);
-  if (jobIds.length) await supabase.from("satisfaction_surveys").delete().in("job_id", jobIds);
+  await cascadeUnlinkEquipment(equipmentIds);
+  await cascadeUnlinkJobs(jobIds);
 
   await supabase.from("sms_messages").delete().eq("customer_id", id);
-  if (jobIds.length) await supabase.from("sms_messages").delete().in("job_id", jobIds);
 
   if (equipmentIds.length) await supabase.from("equipment").delete().in("id", equipmentIds);
   if (jobIds.length) await supabase.from("jobs").delete().in("id", jobIds);

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { extractFromImage } from "@/lib/vision-extract";
+import { cascadeUnlinkEquipment } from "@/lib/cascade-delete";
 
 const NameplateSchema = z.object({
   type: z.string().nullable(),
@@ -102,19 +103,14 @@ export async function updateEquipment(formData: FormData) {
   revalidatePath("/equipment");
 }
 
+// Deletes equipment and its diagnostics; unlinks any leads that reference it.
 export async function deleteEquipment(id: string): Promise<{ error?: string }> {
-  const { error } = await supabase.from("equipment").delete().eq("id", id);
+  await cascadeUnlinkEquipment([id]);
 
-  if (error) {
-    if (error.code === "23503") {
-      return {
-        error:
-          "Can't delete — this equipment still has diagnostics or leads attached. Remove those first.",
-      };
-    }
-    return { error: error.message };
-  }
+  const { error } = await supabase.from("equipment").delete().eq("id", id);
+  if (error) return { error: error.message };
 
   revalidatePath("/equipment");
+  revalidatePath("/properties");
   return {};
 }
