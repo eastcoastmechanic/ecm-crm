@@ -477,7 +477,7 @@ const createMassSaveRebateTool = betaZodTool({
   },
 });
 
-function buildDocumentTool(type: "estimate" | "invoice" | "proposal") {
+function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boolean) {
   return betaZodTool({
     name: `create_${type}`,
     description: `Generate a real ${type} using the price book and Claude, for an existing or brand-new customer. Creates an actual draft ${type} in the CRM. By default it's priced good/better/best (three tiers); pass pricingMode "flat" if the tech/customer wants one straight price per line instead of a tiered choice.`,
@@ -507,6 +507,7 @@ function buildDocumentTool(type: "estimate" | "invoice" | "proposal") {
           type,
           rawRequest: jobDescription,
           pricingMode,
+          fast,
         });
         const lines = results.map((r) =>
           r.pricingMode === "flat"
@@ -582,7 +583,8 @@ const completeTaskTool = betaZodTool({
   },
 });
 
-export function buildInternalTools() {
+export function buildInternalTools(options?: { fast?: boolean }) {
+  const fast = options?.fast;
   return [
     addCustomerTool,
     findCustomerTool,
@@ -601,9 +603,9 @@ export function buildInternalTools() {
     updateWarrantyTool,
     createWarrantyTool,
     createMassSaveRebateTool,
-    buildDocumentTool("estimate"),
-    buildDocumentTool("invoice"),
-    buildDocumentTool("proposal"),
+    buildDocumentTool("estimate", fast),
+    buildDocumentTool("invoice", fast),
+    buildDocumentTool("proposal", fast),
     addTaskTool,
     listOpenTasksTool,
     completeTaskTool,

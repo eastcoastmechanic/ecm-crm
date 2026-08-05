@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { supabase } from "@/lib/supabase";
-import { claude, CLAUDE_MODEL } from "@/lib/claude";
+import { claude, CLAUDE_MODEL, CLAUDE_MODEL_BALANCED } from "@/lib/claude";
 import { fetchAllPriceBookItems, formatPriceBookForPrompt } from "@/lib/price-book";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { buildFileContentBlocks } from "@/lib/vision-extract";
@@ -95,6 +95,11 @@ export type GenerateDocumentInput = {
   rawRequest: string;
   photos?: File[];
   pricingMode?: "tiered" | "flat";
+  // Callers with a hard response-time budget (Copilot Studio/Teams
+  // connectors time out around 100s) -- trades some pricing judgment for
+  // a much faster model, since this call alone (3 tiered pricing options
+  // against the full price book) can otherwise run 20-60s+ on Opus.
+  fast?: boolean;
 };
 
 export type GenerateDocumentResult = {
@@ -209,7 +214,7 @@ ${input.rawRequest}`;
   ]);
 
   const response = await claude.messages.parse({
-    model: CLAUDE_MODEL,
+    model: input.fast ? CLAUDE_MODEL_BALANCED : CLAUDE_MODEL,
     max_tokens: 8192,
     system: systemPrompt,
     messages: [

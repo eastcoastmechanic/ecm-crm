@@ -29,9 +29,14 @@ Unlike a customer-facing assistant, when you take an action here it's real and f
 
 // `fast: true` is for callers with a hard response-time budget (Copilot
 // Studio/Teams connectors time out around 100s) -- lowers the thinking
-// effort ceiling so it can't run long on a complex multi-tool request. The
-// CRM's own chat widget (no such external timeout) keeps the default
-// "medium" effort for better tool selection on tricky asks.
+// effort ceiling so the assistant's own reasoning can't run long, AND
+// flows through to buildInternalTools so document-generation tools
+// (create_estimate/invoice/proposal) use a faster model for their own
+// separate Claude call too -- that inner call alone (pricing 3 tiers
+// against the full price book on Opus) can take 20-60s+, which the
+// outer effort setting alone doesn't touch. The CRM's own chat widget
+// (no such external timeout) keeps the default "medium"/Opus everywhere
+// for better judgment on tricky asks.
 export async function respondToInternalChat(
   messages: ChatMessage[],
   options?: { fast?: boolean }
@@ -42,7 +47,7 @@ export async function respondToInternalChat(
     system: buildSystemPrompt(),
     thinking: { type: "adaptive" },
     output_config: { effort: options?.fast ? "low" : "medium" },
-    tools: buildInternalTools(),
+    tools: buildInternalTools({ fast: options?.fast }),
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   });
 
