@@ -12,11 +12,33 @@ servers:
 paths:
   /api/copilot/agent:
     post:
-      summary: Send a command to the ECM Platform CRM agent
+      summary: Full-capability command interface to the East Coast Mechanical CRM — call this for ANY customer, job, document, equipment, warranty, rebate, or task request
       description: >
-        Accepts one line of natural language, classifies it via Claude into
-        create_customer / create_document / create_task / unclear, executes
-        the matching action against the CRM database, and returns a plain-text reply.
+        This is a real, full-featured CRM assistant, not a narrow 3-category
+        classifier — always call it for any request touching customer records,
+        properties, equipment, documents, warranties, Mass Save rebates,
+        tasks, or job/schedule information, including simple lookups. Never
+        try to answer these from memory, guess an answer, or fall back to
+        general knowledge instead of calling this tool: the CRM database is
+        the only source of truth for this data.
+
+
+        Supports, among others: finding/adding/updating/deleting a customer;
+        adding/updating/deleting a customer's properties and equipment;
+        listing a customer's documents; generating a REAL priced
+        estimate/invoice/proposal from the live price book (good/better/best
+        tiered, or a flat single price on request) and updating or deleting
+        an existing one; creating or updating a warranty registration;
+        drafting a Mass Save Air Source Heat Pump rebate application; and
+        adding, listing, or completing follow-up tasks/to-dos. Actions taken
+        here are real and immediate (no separate confirmation step) — pass
+        the tech's request straight through in natural language and relay
+        back exactly what the reply says happened.
+
+
+        If a request is ambiguous (e.g. which existing customer, which
+        document) the reply will ask a clarifying question — relay that
+        question back to the user rather than guessing an ID.
       operationId: sendAgentCommand
       security:
         - bearerAuth: []
@@ -38,7 +60,13 @@ paths:
               properties:
                 command:
                   type: string
-                  description: One-line natural-language instruction, e.g. "Add a customer named Jane Doe, phone 555-1234"
+                  description: >
+                    One-line natural-language instruction covering any CRM
+                    action or lookup — not limited to creating things, e.g.
+                    "Look up Jane Doe's job history", "What equipment is
+                    installed at 12 Main St", "Add a task to follow up with
+                    John Smith Friday", "Register a warranty for the heat
+                    pump we just installed at 12 Main St".
                   example: "Create an estimate for John Smith - replacing a leaking condenser at 12 Main St"
       responses:
         "200":
