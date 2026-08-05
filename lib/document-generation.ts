@@ -330,11 +330,20 @@ export async function startDocumentGenerationInBackground(
       : Promise.resolve({ data: null as { address: string } | null }),
   ]);
 
+  console.log(`[startDocumentGenerationInBackground] scheduling after() for ${input.type}, customerId=${customerId}`);
   after(() => {
-    generateDocumentForCustomer({ ...input, customerId, propertyId }).catch((err) => {
-      console.error(`[startDocumentGenerationInBackground] ${input.type} generation failed:`, err);
-    });
+    console.log(`[startDocumentGenerationInBackground] after() callback started for ${input.type}, customerId=${customerId}`);
+    return generateDocumentForCustomer({ ...input, customerId, propertyId })
+      .then((results) => {
+        console.log(
+          `[startDocumentGenerationInBackground] after() callback finished for ${input.type}: ${results.map((r) => r.docNumber).join(", ")}`
+        );
+      })
+      .catch((err) => {
+        console.error(`[startDocumentGenerationInBackground] ${input.type} generation failed:`, err);
+      });
   });
+  console.log(`[startDocumentGenerationInBackground] after() scheduled, returning immediately`);
 
   return {
     customerName: customer?.name ?? input.customerName ?? "the customer",
