@@ -152,6 +152,7 @@ export async function updateDocument(formData: FormData) {
   const id = formData.get("id") as string;
   const status = formData.get("status") as string;
   const itemCount = Number(formData.get("item_count") ?? 0);
+  const pricingMode = (formData.get("pricing_mode") as "tiered" | "flat") || "tiered";
 
   const { data: existing, error: fetchError } = await supabase
     .from("documents")
@@ -196,6 +197,7 @@ export async function updateDocument(formData: FormData) {
         ...existingData,
         items,
         totals,
+        pricing_mode: pricingMode,
       },
       subtotal: totals.better,
       tax: 0,

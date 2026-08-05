@@ -25,11 +25,14 @@ export default function LineItemsEditor({
   documentId,
   status,
   items,
+  pricingMode = "tiered",
 }: {
   documentId: string;
   status: string;
   items: LineItem[];
+  pricingMode?: "tiered" | "flat";
 }) {
+  const isFlat = pricingMode === "flat";
   const [rows, setRows] = useState(() =>
     items.map((item) => ({ rowId: nextRowId++, ...item }))
   );
@@ -64,6 +67,7 @@ export default function LineItemsEditor({
     <form action={updateDocument} className="flex flex-col gap-4">
       <input type="hidden" name="id" value={documentId} />
       <input type="hidden" name="item_count" value={rows.length} />
+      <input type="hidden" name="pricing_mode" value={pricingMode} />
 
       <div className="overflow-x-auto rounded-xl border border-white/8">
         <table className="w-full text-sm">
@@ -71,9 +75,15 @@ export default function LineItemsEditor({
             <tr className="border-b border-white/8 text-left text-[10px] font-bold uppercase tracking-wide text-g300">
               <th className="px-3 py-2">Description</th>
               <th className="px-3 py-2">Qty</th>
-              <th className="px-3 py-2">Good</th>
-              <th className="px-3 py-2">Better</th>
-              <th className="px-3 py-2">Best</th>
+              {isFlat ? (
+                <th className="px-3 py-2">Price</th>
+              ) : (
+                <>
+                  <th className="px-3 py-2">Good</th>
+                  <th className="px-3 py-2">Better</th>
+                  <th className="px-3 py-2">Best</th>
+                </>
+              )}
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -125,33 +135,53 @@ export default function LineItemsEditor({
                     className={`${inputClass} mt-1 w-16 text-xs`}
                   />
                 </td>
-                <td className="px-3 py-2 align-top">
-                  <input
-                    type="number"
-                    step="0.01"
-                    name={`good_${i}`}
-                    defaultValue={item.good ?? ""}
-                    className={numberInputClass}
-                  />
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <input
-                    type="number"
-                    step="0.01"
-                    name={`better_${i}`}
-                    defaultValue={item.better ?? ""}
-                    className={numberInputClass}
-                  />
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <input
-                    type="number"
-                    step="0.01"
-                    name={`best_${i}`}
-                    defaultValue={item.best ?? ""}
-                    className={numberInputClass}
-                  />
-                </td>
+                {isFlat ? (
+                  <td className="px-3 py-2 align-top">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={item.good ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value === "" ? null : Number(e.target.value);
+                        updateRow(item.rowId, { good: value, better: value, best: value });
+                      }}
+                      className={numberInputClass}
+                    />
+                    <input type="hidden" name={`good_${i}`} value={item.good ?? ""} />
+                    <input type="hidden" name={`better_${i}`} value={item.better ?? ""} />
+                    <input type="hidden" name={`best_${i}`} value={item.best ?? ""} />
+                  </td>
+                ) : (
+                  <>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        type="number"
+                        step="0.01"
+                        name={`good_${i}`}
+                        defaultValue={item.good ?? ""}
+                        className={numberInputClass}
+                      />
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        type="number"
+                        step="0.01"
+                        name={`better_${i}`}
+                        defaultValue={item.better ?? ""}
+                        className={numberInputClass}
+                      />
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        type="number"
+                        step="0.01"
+                        name={`best_${i}`}
+                        defaultValue={item.best ?? ""}
+                        className={numberInputClass}
+                      />
+                    </td>
+                  </>
+                )}
                 <td className="px-3 py-2 align-top">
                   <button
                     type="button"

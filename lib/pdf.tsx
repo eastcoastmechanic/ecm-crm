@@ -22,6 +22,7 @@ export type PdfDocumentData = {
   mass_save_eligible: boolean;
   mass_save_note: string | null;
   totals: { good: number; better: number; best: number };
+  pricing_mode?: "tiered" | "flat";
 };
 
 const typeLabel: Record<PdfDocumentData["type"], string> = {
@@ -183,6 +184,9 @@ const styles = StyleSheet.create({
   colDesc: { width: "46%" },
   colQty: { width: "12%", textAlign: "center" },
   colPrice: { width: "14%", textAlign: "right" },
+  colDescFlat: { width: "62%" },
+  colPriceFlat: { width: "26%", textAlign: "right" },
+  flatCardWrap: { flexDirection: "row", marginBottom: 18 },
   descTitle: {
     fontWeight: 700,
     color: colors.navy,
@@ -213,6 +217,7 @@ function formatPrice(value: number | null) {
 }
 
 export function DocumentPdf({ doc }: { doc: PdfDocumentData }) {
+  const isFlat = doc.pricing_mode === "flat";
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
@@ -248,26 +253,42 @@ export function DocumentPdf({ doc }: { doc: PdfDocumentData }) {
             </View>
           )}
 
-          <View style={styles.tierRow}>
-            {(["good", "better", "best"] as const).map((tier) => (
-              <View
-                key={tier}
-                style={tier === "better" ? { ...styles.tierCard, ...styles.tierCardBetter } : styles.tierCard}
-              >
-                <Text style={styles.tierLabel}>{tier === "better" ? "BETTER (RECOMMENDED)" : tier.toUpperCase()}</Text>
-                <Text style={styles.tierPrice}>{formatPrice(doc.totals[tier])}</Text>
-                {doc.brand[tier] && <Text style={styles.tierBrand}>{doc.brand[tier]}</Text>}
+          {isFlat ? (
+            <View style={styles.flatCardWrap}>
+              <View style={{ ...styles.tierCard, ...styles.tierCardBetter, flex: 0, width: 160 }}>
+                <Text style={styles.tierLabel}>TOTAL</Text>
+                <Text style={styles.tierPrice}>{formatPrice(doc.totals.better)}</Text>
+                {doc.brand.better && <Text style={styles.tierBrand}>{doc.brand.better}</Text>}
               </View>
-            ))}
-          </View>
+            </View>
+          ) : (
+            <View style={styles.tierRow}>
+              {(["good", "better", "best"] as const).map((tier) => (
+                <View
+                  key={tier}
+                  style={tier === "better" ? { ...styles.tierCard, ...styles.tierCardBetter } : styles.tierCard}
+                >
+                  <Text style={styles.tierLabel}>{tier === "better" ? "BETTER (RECOMMENDED)" : tier.toUpperCase()}</Text>
+                  <Text style={styles.tierPrice}>{formatPrice(doc.totals[tier])}</Text>
+                  {doc.brand[tier] && <Text style={styles.tierBrand}>{doc.brand[tier]}</Text>}
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={styles.table}>
             <View style={styles.tableHeaderRow}>
-              <Text style={{ ...styles.th, ...styles.colDesc }}>DESCRIPTION</Text>
+              <Text style={{ ...styles.th, ...(isFlat ? styles.colDescFlat : styles.colDesc) }}>DESCRIPTION</Text>
               <Text style={{ ...styles.th, ...styles.colQty }}>QTY</Text>
-              <Text style={{ ...styles.th, ...styles.colPrice }}>GOOD</Text>
-              <Text style={{ ...styles.th, ...styles.colPrice }}>BETTER</Text>
-              <Text style={{ ...styles.th, ...styles.colPrice }}>BEST</Text>
+              {isFlat ? (
+                <Text style={{ ...styles.th, ...styles.colPriceFlat }}>PRICE</Text>
+              ) : (
+                <>
+                  <Text style={{ ...styles.th, ...styles.colPrice }}>GOOD</Text>
+                  <Text style={{ ...styles.th, ...styles.colPrice }}>BETTER</Text>
+                  <Text style={{ ...styles.th, ...styles.colPrice }}>BEST</Text>
+                </>
+              )}
             </View>
             {doc.line_items.map((item, i) => (
               <View
@@ -275,7 +296,7 @@ export function DocumentPdf({ doc }: { doc: PdfDocumentData }) {
                 style={i === doc.line_items.length - 1 ? { ...styles.tableRow, borderBottomWidth: 0 } : styles.tableRow}
                 wrap={false}
               >
-                <View style={{ ...styles.td, ...styles.colDesc }}>
+                <View style={{ ...styles.td, ...(isFlat ? styles.colDescFlat : styles.colDesc) }}>
                   <Text style={styles.descTitle}>{item.description}</Text>
                   <Text style={styles.descSub}>
                     {item.category}
@@ -285,9 +306,15 @@ export function DocumentPdf({ doc }: { doc: PdfDocumentData }) {
                 <Text style={{ ...styles.td, ...styles.colQty }}>
                   {item.qty} {item.unit}
                 </Text>
-                <Text style={{ ...styles.td, ...styles.colPrice }}>{formatPrice(item.good)}</Text>
-                <Text style={{ ...styles.td, ...styles.colPrice }}>{formatPrice(item.better)}</Text>
-                <Text style={{ ...styles.td, ...styles.colPrice }}>{formatPrice(item.best)}</Text>
+                {isFlat ? (
+                  <Text style={{ ...styles.td, ...styles.colPriceFlat }}>{formatPrice(item.better)}</Text>
+                ) : (
+                  <>
+                    <Text style={{ ...styles.td, ...styles.colPrice }}>{formatPrice(item.good)}</Text>
+                    <Text style={{ ...styles.td, ...styles.colPrice }}>{formatPrice(item.better)}</Text>
+                    <Text style={{ ...styles.td, ...styles.colPrice }}>{formatPrice(item.best)}</Text>
+                  </>
+                )}
               </View>
             ))}
           </View>

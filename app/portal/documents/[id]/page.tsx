@@ -62,7 +62,9 @@ export default async function PortalDocumentPage({
     mass_save_eligible: boolean;
     mass_save_note: string | null;
     totals: { good: number; better: number; best: number };
+    pricing_mode?: "tiered" | "flat";
   };
+  const isFlat = lineData.pricing_mode === "flat";
 
   return (
     <div className="flex flex-col gap-8">
@@ -85,28 +87,38 @@ export default async function PortalDocumentPage({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {(["good", "better", "best"] as const).map((tier) => (
-          <div
-            key={tier}
-            className={`rounded-xl border p-4 text-center ${
-              tier === "better"
-                ? "border-blue bg-blue/20"
-                : tier === "best"
-                  ? "border-accent/40 bg-accent/10"
-                  : "border-white/8 bg-white/3"
-            }`}
-          >
-            <div className="text-[10px] font-bold uppercase tracking-wide text-g300">
-              {tier === "better" ? "Better ★" : tier}
-            </div>
-            <div className="mt-1 font-display text-xl font-extrabold">
-              {formatPrice(lineData.totals[tier])}
-            </div>
-            <div className="mt-1 text-xs text-g300">{lineData.brand?.[tier] || "—"}</div>
+      {isFlat ? (
+        <div className="rounded-xl border border-blue bg-blue/20 p-4 text-center sm:w-64">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-g300">Total</div>
+          <div className="mt-1 font-display text-xl font-extrabold">
+            {formatPrice(lineData.totals.better)}
           </div>
-        ))}
-      </div>
+          <div className="mt-1 text-xs text-g300">{lineData.brand?.better || "—"}</div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {(["good", "better", "best"] as const).map((tier) => (
+            <div
+              key={tier}
+              className={`rounded-xl border p-4 text-center ${
+                tier === "better"
+                  ? "border-blue bg-blue/20"
+                  : tier === "best"
+                    ? "border-accent/40 bg-accent/10"
+                    : "border-white/8 bg-white/3"
+              }`}
+            >
+              <div className="text-[10px] font-bold uppercase tracking-wide text-g300">
+                {tier === "better" ? "Better ★" : tier}
+              </div>
+              <div className="mt-1 font-display text-xl font-extrabold">
+                {formatPrice(lineData.totals[tier])}
+              </div>
+              <div className="mt-1 text-xs text-g300">{lineData.brand?.[tier] || "—"}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {(doc.type === "estimate" || doc.type === "proposal") && lineData.totals.better > 0 && (
         <div className="rounded-xl border border-white/8 bg-white/3 p-4">
@@ -124,8 +136,8 @@ export default async function PortalDocumentPage({
             ))}
           </div>
           <p className="mt-2 text-xs text-g500">
-            Estimate only, based on the Better tier price at {ILLUSTRATIVE_APR}% illustrative
-            APR — not a credit offer or pre-qualification.
+            Estimate only, based on the {isFlat ? "quoted" : "Better tier"} price at {ILLUSTRATIVE_APR}%
+            illustrative APR — not a credit offer or pre-qualification.
           </p>
         </div>
       )}
@@ -136,7 +148,7 @@ export default async function PortalDocumentPage({
             <tr className="border-b border-white/8 text-left text-[10px] font-bold uppercase tracking-wide text-g300">
               <th className="px-3 py-2">Description</th>
               <th className="px-3 py-2">Qty</th>
-              <th className="px-3 py-2">Price (selected tier)</th>
+              <th className="px-3 py-2">{isFlat ? "Price" : "Price (selected tier)"}</th>
             </tr>
           </thead>
           <tbody>

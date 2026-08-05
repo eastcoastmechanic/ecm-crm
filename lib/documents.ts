@@ -28,6 +28,7 @@ export async function getDocumentForPdf(id: string): Promise<{
     mass_save_eligible?: boolean;
     mass_save_note?: string | null;
     totals?: PdfDocumentData["totals"];
+    pricing_mode?: "tiered" | "flat";
   } | null;
 
   // Some older rows predate the totals/items shape — fall back rather than
@@ -38,6 +39,7 @@ export async function getDocumentForPdf(id: string): Promise<{
     mass_save_eligible: rawLineData?.mass_save_eligible ?? false,
     mass_save_note: rawLineData?.mass_save_note ?? null,
     totals: rawLineData?.totals ?? { good: 0, better: 0, best: 0 },
+    pricing_mode: rawLineData?.pricing_mode ?? "tiered",
   };
 
   return {
@@ -52,6 +54,7 @@ export async function getDocumentForPdf(id: string): Promise<{
       mass_save_eligible: lineData.mass_save_eligible,
       mass_save_note: lineData.mass_save_note,
       totals: lineData.totals,
+      pricing_mode: lineData.pricing_mode,
     },
     customerEmail: doc.customers?.email ?? null,
     dueDate: doc.due_date,

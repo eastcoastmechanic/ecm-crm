@@ -9,6 +9,7 @@ export async function generateDocument(formData: FormData) {
   const customer_id = formData.get("customer_id") as string;
   const property_id = (formData.get("property_id") as string) || null;
   const type = formData.get("type") as "estimate" | "invoice" | "proposal";
+  const pricing_mode = (formData.get("pricing_mode") as "tiered" | "flat") || "tiered";
   const raw_request = (formData.get("raw_request") as string)?.trim();
   const photos = formData.getAll("photos") as File[];
 
@@ -26,6 +27,7 @@ export async function generateDocument(formData: FormData) {
     type,
     rawRequest: raw_request,
     photos,
+    pricingMode: pricing_mode,
   });
 
   revalidatePath("/documents");

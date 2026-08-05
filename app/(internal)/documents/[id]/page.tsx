@@ -65,6 +65,7 @@ export default async function DocumentPage({
     mass_save_note?: string | null;
     totals?: { good: number; better: number; best: number };
     option_label?: string | null;
+    pricing_mode?: "tiered" | "flat";
   } | null;
 
   // Some older rows predate the totals/items shape (created before this
@@ -76,7 +77,9 @@ export default async function DocumentPage({
     mass_save_note: rawLineData?.mass_save_note ?? null,
     totals: rawLineData?.totals ?? { good: 0, better: 0, best: 0 },
     option_label: rawLineData?.option_label ?? null,
+    pricing_mode: rawLineData?.pricing_mode ?? "tiered",
   };
+  const isFlat = lineData.pricing_mode === "flat";
 
   return (
     <div className="flex flex-col gap-8">
@@ -133,30 +136,40 @@ export default async function DocumentPage({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {(["good", "better", "best"] as const).map((tier) => (
-          <div
-            key={tier}
-            className={`rounded-xl border p-4 text-center ${
-              tier === "better"
-                ? "border-blue bg-blue/20"
-                : tier === "best"
-                  ? "border-accent/40 bg-accent/10"
-                  : "border-white/8 bg-white/3"
-            }`}
-          >
-            <div className="text-[10px] font-bold uppercase tracking-wide text-g300">
-              {tier === "better" ? "Better ★" : tier}
-            </div>
-            <div className="mt-1 font-display text-xl font-extrabold">
-              {formatPrice(lineData.totals[tier])}
-            </div>
-            <div className="mt-1 text-xs text-g300">{lineData.brand?.[tier] || "—"}</div>
+      {isFlat ? (
+        <div className="rounded-xl border border-blue bg-blue/20 p-4 text-center sm:w-64">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-g300">Total</div>
+          <div className="mt-1 font-display text-xl font-extrabold">
+            {formatPrice(lineData.totals.better)}
           </div>
-        ))}
-      </div>
+          <div className="mt-1 text-xs text-g300">{lineData.brand?.better || "—"}</div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {(["good", "better", "best"] as const).map((tier) => (
+            <div
+              key={tier}
+              className={`rounded-xl border p-4 text-center ${
+                tier === "better"
+                  ? "border-blue bg-blue/20"
+                  : tier === "best"
+                    ? "border-accent/40 bg-accent/10"
+                    : "border-white/8 bg-white/3"
+              }`}
+            >
+              <div className="text-[10px] font-bold uppercase tracking-wide text-g300">
+                {tier === "better" ? "Better ★" : tier}
+              </div>
+              <div className="mt-1 font-display text-xl font-extrabold">
+                {formatPrice(lineData.totals[tier])}
+              </div>
+              <div className="mt-1 text-xs text-g300">{lineData.brand?.[tier] || "—"}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      <LineItemsEditor documentId={doc.id} status={doc.status} items={lineData.items} />
+      <LineItemsEditor documentId={doc.id} status={doc.status} items={lineData.items} pricingMode={lineData.pricing_mode} />
 
       <details className="rounded-xl border border-white/8 bg-white/3 p-4">
         <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-g300">

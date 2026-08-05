@@ -115,6 +115,13 @@ export default function NewDocumentForm({
             <option value="proposal">Proposal</option>
           </select>
         </label>
+        <label className="flex flex-col gap-1 text-xs text-g300">
+          Pricing style
+          <select name="pricing_mode" className={inputClass} defaultValue="tiered">
+            <option value="tiered">Good / Better / Best</option>
+            <option value="flat">Flat rate (one price per line)</option>
+          </select>
+        </label>
         <CustomerPicker customers={customers} value={customerId} onChange={setCustomerId} />
         <label className="flex flex-col gap-1 text-xs text-g300 sm:col-span-2">
           Property

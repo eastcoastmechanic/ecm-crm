@@ -94,6 +94,7 @@ export type GenerateDocumentInput = {
   type: "estimate" | "invoice" | "proposal";
   rawRequest: string;
   photos?: File[];
+  pricingMode?: "tiered" | "flat";
 };
 
 export type GenerateDocumentResult = {
@@ -101,6 +102,7 @@ export type GenerateDocumentResult = {
   docNumber: string;
   optionLabel: string | null;
   totals: { good: number; better: number; best: number };
+  pricingMode: "tiered" | "flat";
 };
 
 /**
@@ -154,12 +156,19 @@ export async function generateDocumentForCustomer(
   }
 
   const priceBookText = formatPriceBookForPrompt(priceBookRows);
+  const pricingMode = input.pricingMode ?? "tiered";
 
   const systemPrompt = `You are the AI estimating assistant for East Coast Mechanical (ECM), an HVAC & plumbing contractor in Plymouth, MA.
 
 Select line items from the price book below to build a ${input.type}. Prices are fully installed (equipment + standard labor) unless the item is an hourly or per-unit add-on. Reference the exact price book name in "price_book_item_name" when a good match exists. If nothing matches well, leave price_book_item_name null, write a clear description, and set your own reasonable good/better/best prices, noting "[custom item]" in notes.
 
 Some price book items show three tiered prices (G=Good B=Better X=Best); others show a single flat price ($X) because they're a specific real distributor SKU with one sell price, not a tiered choice — for those, use that same $X value for good, better, and best on that line item.
+
+${
+  pricingMode === "flat"
+    ? `This ${input.type} is FLAT-RATE, not tiered: the customer sees one price per line, not a good/better/best choice. For every line item, set good, better, and best to the exact same single price — pick the price you'd actually charge (use a tiered item's "better" price as that single price, not an average). Do the same for "brand": put the actual brand/model you'd install in all three of good/better/best.`
+    : ``
+}
 
 Set "category" to the price book category the item came from (or a sensible category for custom items).
 
@@ -248,6 +257,7 @@ ${input.rawRequest}`;
           mass_save_note: doc.mass_save_note,
           totals,
           option_label: doc.option_label,
+          pricing_mode: pricingMode,
         },
         subtotal: totals.better,
         tax: 0,
@@ -261,7 +271,7 @@ ${input.rawRequest}`;
 
     if (error) throw new Error(error.message);
 
-    results.push({ documentId: document.id, docNumber, optionLabel: doc.option_label, totals });
+    results.push({ documentId: document.id, docNumber, optionLabel: doc.option_label, totals, pricingMode });
   }
 
   return results;

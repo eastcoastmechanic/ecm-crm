@@ -480,7 +480,7 @@ const createMassSaveRebateTool = betaZodTool({
 function buildDocumentTool(type: "estimate" | "invoice" | "proposal") {
   return betaZodTool({
     name: `create_${type}`,
-    description: `Generate a real ${type} using the price book and Claude, for an existing or brand-new customer. Creates an actual draft ${type} in the CRM.`,
+    description: `Generate a real ${type} using the price book and Claude, for an existing or brand-new customer. Creates an actual draft ${type} in the CRM. By default it's priced good/better/best (three tiers); pass pricingMode "flat" if the tech/customer wants one straight price per line instead of a tiered choice.`,
     inputSchema: z.object({
       customerId: z.string().optional().describe("Existing customer id, from find_customer"),
       customerName: z.string().optional().describe("Required only if this is a brand-new customer"),
@@ -488,8 +488,12 @@ function buildDocumentTool(type: "estimate" | "invoice" | "proposal") {
       email: z.string().optional(),
       address: z.string().optional().describe("Service address, if known"),
       jobDescription: z.string().describe("What the job involves, in enough detail to select price book items"),
+      pricingMode: z
+        .enum(["tiered", "flat"])
+        .optional()
+        .describe("'tiered' (default) shows good/better/best per line; 'flat' shows one price per line, no tiers."),
     }),
-    run: async ({ customerId, customerName, phone, email, address, jobDescription }) => {
+    run: async ({ customerId, customerName, phone, email, address, jobDescription, pricingMode }) => {
       if (!customerId && !customerName) {
         return "Need either an existing customerId (use find_customer) or a customerName for a new customer.";
       }
@@ -502,12 +506,14 @@ function buildDocumentTool(type: "estimate" | "invoice" | "proposal") {
           address,
           type,
           rawRequest: jobDescription,
+          pricingMode,
         });
-        const lines = results.map(
-          (r) =>
-            `${r.docNumber}${r.optionLabel ? ` (${r.optionLabel})` : ""} — Good ${formatMoney(
-              r.totals.good
-            )} / Better ${formatMoney(r.totals.better)} / Best ${formatMoney(r.totals.best)}. /documents/${r.documentId}`
+        const lines = results.map((r) =>
+          r.pricingMode === "flat"
+            ? `${r.docNumber}${r.optionLabel ? ` (${r.optionLabel})` : ""} — ${formatMoney(r.totals.better)} flat. /documents/${r.documentId}`
+            : `${r.docNumber}${r.optionLabel ? ` (${r.optionLabel})` : ""} — Good ${formatMoney(
+                r.totals.good
+              )} / Better ${formatMoney(r.totals.better)} / Best ${formatMoney(r.totals.best)}. /documents/${r.documentId}`
         );
         return results.length === 1
           ? `Created ${lines[0]}`
