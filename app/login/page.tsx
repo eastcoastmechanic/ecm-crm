@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createPortalBrowserClient } from "@/lib/supabase-portal/client";
 import {
@@ -24,6 +24,14 @@ function useRedirectTarget() {
 }
 
 export default function StaffLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <StaffLoginForm />
+    </Suspense>
+  );
+}
+
+function StaffLoginForm() {
   const redirectTarget = useRedirectTarget();
   const [mode, setMode] = useState<"password" | "code">("password");
   const [email, setEmail] = useState("");
