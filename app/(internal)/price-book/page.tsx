@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { fetchAllPriceBookItems } from "@/lib/price-book";
 import { addPriceBookItem } from "./actions";
@@ -8,6 +9,7 @@ import { buttonClass, cardClass, headingClass, inputClass, subTextClass } from "
 export const dynamic = "force-dynamic";
 
 export default async function PriceBookPage() {
+  const canSeeProfit = (await headers()).get("x-staff-role") === "owner";
   const items = await fetchAllPriceBookItems<PriceBookItem>(supabase);
 
   return (
@@ -64,10 +66,23 @@ export default async function PriceBookPage() {
             className={inputClass}
           />
         </label>
+        {canSeeProfit && (
+          <label className="flex flex-col gap-1 text-xs text-gold" title="Internal only — never shown to the customer">
+            Cost
+            <input
+              name="unit_cost"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Wholesale cost"
+              className={inputClass}
+            />
+          </label>
+        )}
         <SubmitButton className={`${buttonClass} sm:col-span-2 sm:w-fit`}>Add Price Book Item</SubmitButton>
       </form>
 
-      <PriceBookList items={items} />
+      <PriceBookList items={items} canSeeProfit={canSeeProfit} />
     </div>
   );
 }

@@ -7,6 +7,8 @@ type PriceBookRow = {
   unit_price: number | null;
 };
 
+export type PriceBookRowWithCost = PriceBookRow & { unit_cost: number | null };
+
 const PAGE_SIZE = 1000;
 
 /**

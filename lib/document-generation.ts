@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { supabase } from "@/lib/supabase";
 import { claude, CLAUDE_MODEL, CLAUDE_MODEL_BALANCED } from "@/lib/claude";
-import { fetchAllPriceBookItems, formatPriceBookForPrompt } from "@/lib/price-book";
+import { fetchAllPriceBookItems, formatPriceBookForPrompt, type PriceBookRowWithCost } from "@/lib/price-book";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { buildFileContentBlocks } from "@/lib/vision-extract";
 
@@ -74,6 +74,25 @@ async function uploadDocumentPhotos(files: File[]) {
     uploaded.push({ url: publicUrl.publicUrl, name: file.name });
   }
   return uploaded;
+}
+
+/**
+ * Maps a price book item name to its internal-only unit cost, so generated
+ * line items can carry cost alongside the sell prices without ever exposing
+ * it to Claude (cost never goes into the prompt). Prefers the "better" tier
+ * row when a name has multiple tiered rows, since that's the sell price
+ * used for profit everywhere else — falls back to whatever row has a cost
+ * if there's no better-tier match (e.g. flat/untiered items).
+ */
+function buildCostLookup(rows: PriceBookRowWithCost[]): Map<string, number | null> {
+  const map = new Map<string, number | null>();
+  for (const row of rows) {
+    if (row.unit_cost === null) continue;
+    if (row.tier === "better" || !map.has(row.name)) {
+      map.set(row.name, row.unit_cost);
+    }
+  }
+  return map;
 }
 
 function sumTier(items: z.infer<typeof LineItemSchema>[], tier: "good" | "better" | "best") {
@@ -148,9 +167,10 @@ export async function generateDocumentForCustomer(
     propertyId
       ? supabase.from("properties").select("*").eq("id", propertyId).single()
       : Promise.resolve({ data: null }),
-    fetchAllPriceBookItems(supabase, "category, name, tier, unit_price"),
+    fetchAllPriceBookItems<PriceBookRowWithCost>(supabase, "category, name, tier, unit_price, unit_cost"),
   ]);
   const property = propertyResult.data;
+  const costLookup = buildCostLookup(priceBookRows);
 
   let equipment: { type: string; brand: string | null; model: string | null }[] = [];
   if (propertyId) {
@@ -249,6 +269,13 @@ ${input.rawRequest}`;
       better: sumTier(doc.line_items, "better"),
       best: sumTier(doc.line_items, "best"),
     };
+    // Internal-only: attach unit cost by matching the price book item Claude
+    // referenced, so staff can see profit without this ever going near the
+    // prompt or the customer-facing PDF/portal (neither reads this field).
+    const itemsWithCost = doc.line_items.map((item) => ({
+      ...item,
+      cost: item.price_book_item_name ? (costLookup.get(item.price_book_item_name) ?? null) : null,
+    }));
 
     const docNumber = await nextDocNumber(input.type);
 
@@ -261,7 +288,7 @@ ${input.rawRequest}`;
         property_id: propertyId,
         status: "draft",
         line_items: {
-          items: doc.line_items,
+          items: itemsWithCost,
           brand: doc.brand,
           mass_save_eligible: doc.mass_save_eligible,
           mass_save_note: doc.mass_save_note,

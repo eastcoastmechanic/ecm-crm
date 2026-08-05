@@ -21,6 +21,7 @@ type LineItem = {
   better: number | null;
   best: number | null;
   notes: string | null;
+  cost?: number | null;
 };
 
 function parseNullableNumber(value: FormDataEntryValue | null): number | null {
@@ -170,6 +171,11 @@ export async function updateDocument(formData: FormData) {
 
   const items: LineItem[] = [];
   for (let i = 0; i < itemCount; i++) {
+    // Cost is only ever rendered as an input for owner-role users
+    // (LineItemsEditor.tsx) — when the field is absent from the submission
+    // (any other role editing the same document), keep whatever cost was
+    // already stored instead of reading it as a blank and wiping it out.
+    const costKey = `cost_${i}`;
     items.push({
       category: (formData.get(`category_${i}`) as string) ?? "",
       description: (formData.get(`description_${i}`) as string) ?? "",
@@ -180,6 +186,9 @@ export async function updateDocument(formData: FormData) {
       better: parseNullableNumber(formData.get(`better_${i}`)),
       best: parseNullableNumber(formData.get(`best_${i}`)),
       notes: (formData.get(`notes_${i}`) as string) || null,
+      cost: formData.has(costKey)
+        ? parseNullableNumber(formData.get(costKey))
+        : (existingData.items[i]?.cost ?? null),
     });
   }
 

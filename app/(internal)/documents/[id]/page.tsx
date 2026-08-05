@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { sendDocumentEmail } from "./actions";
 import AssessmentDetail from "./AssessmentDetail";
@@ -18,6 +19,7 @@ type LineItem = {
   better: number | null;
   best: number | null;
   notes: string | null;
+  cost?: number | null;
 };
 
 const typeLabel: Record<string, string> = {
@@ -31,12 +33,76 @@ function formatPrice(value: number | null) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
+/**
+ * Profit on the Better tier only (Better is the operative sell price
+ * everywhere else in the CRM — totals, portal, PDFs). Items with no cost on
+ * file are excluded from the cost sum but flagged via `incomplete`, so the
+ * number reads as "profit on what we know" rather than silently pretending
+ * unpriced items cost nothing.
+ */
+function computeProfit(items: LineItem[]) {
+  let revenue = 0;
+  let cost = 0;
+  let incomplete = false;
+  for (const item of items) {
+    const sell = item.better ?? 0;
+    revenue += sell * item.qty;
+    if (item.cost === null || item.cost === undefined) {
+      incomplete = incomplete || sell > 0;
+      continue;
+    }
+    cost += item.cost * item.qty;
+  }
+  const profit = revenue - cost;
+  const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+  return { revenue, cost, profit, margin, incomplete };
+}
+
+// Owner-only — never rendered for other roles, and reads nothing that the
+// customer-facing PDF (lib/pdf.tsx) or portal (/portal/documents) touch.
+function ProfitCard({ items }: { items: LineItem[] }) {
+  const { revenue, cost, profit, margin, incomplete } = computeProfit(items);
+  return (
+    <div className="rounded-xl border border-gold/30 bg-gold/5 p-4">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-gold">
+        Profit — internal only, not visible to the customer
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-g300">Revenue (Better)</div>
+          <div className="font-display text-lg font-extrabold">{formatPrice(revenue)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-g300">Cost</div>
+          <div className="font-display text-lg font-extrabold">{formatPrice(cost)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-g300">Profit</div>
+          <div className="font-display text-lg font-extrabold text-gold">{formatPrice(profit)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-g300">Margin</div>
+          <div className="font-display text-lg font-extrabold text-gold">{margin.toFixed(1)}%</div>
+        </div>
+      </div>
+      {incomplete && (
+        <p className="mt-2 text-xs text-g300">
+          One or more line items have no cost on file — add it in the Cost column below (or on the
+          price book item) for a complete number. Unpriced items count as $0 cost here, so this
+          understates true cost until filled in.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default async function DocumentPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const canSeeProfit = (await headers()).get("x-staff-role") === "owner";
 
   const { data: doc, error } = await supabase
     .from("documents")
@@ -169,7 +235,15 @@ export default async function DocumentPage({
         </div>
       )}
 
-      <LineItemsEditor documentId={doc.id} status={doc.status} items={lineData.items} pricingMode={lineData.pricing_mode} />
+      {canSeeProfit && <ProfitCard items={lineData.items} />}
+
+      <LineItemsEditor
+        documentId={doc.id}
+        status={doc.status}
+        items={lineData.items}
+        pricingMode={lineData.pricing_mode}
+        canSeeProfit={canSeeProfit}
+      />
 
       <details className="rounded-xl border border-white/8 bg-white/3 p-4">
         <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-g300">

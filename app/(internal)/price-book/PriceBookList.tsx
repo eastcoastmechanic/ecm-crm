@@ -27,9 +27,18 @@ export type PriceBookItem = {
   description: string | null;
   unit_price: number | null;
   labor_hours: number | null;
+  unit_cost: number | null;
 };
 
-function EditPriceBookItemForm({ item, onDone }: { item: PriceBookItem; onDone: () => void }) {
+function EditPriceBookItemForm({
+  item,
+  canSeeProfit,
+  onDone,
+}: {
+  item: PriceBookItem;
+  canSeeProfit: boolean;
+  onDone: () => void;
+}) {
   return (
     <form
       action={async (formData) => {
@@ -82,6 +91,19 @@ function EditPriceBookItemForm({ item, onDone }: { item: PriceBookItem; onDone: 
           className={inputClass}
         />
       </label>
+      {canSeeProfit && (
+        <label className="flex flex-col gap-1 text-xs text-gold" title="Internal only — never shown to the customer">
+          Cost
+          <input
+            name="unit_cost"
+            type="number"
+            step="0.01"
+            min="0"
+            defaultValue={item.unit_cost ?? ""}
+            className={inputClass}
+          />
+        </label>
+      )}
       <div className="flex items-center gap-2 sm:col-span-2">
         <SubmitButton className={`${buttonClass} w-fit`} pendingText="Saving…">
           Save
@@ -94,7 +116,13 @@ function EditPriceBookItemForm({ item, onDone }: { item: PriceBookItem; onDone: 
   );
 }
 
-export default function PriceBookList({ items }: { items: PriceBookItem[] }) {
+export default function PriceBookList({
+  items,
+  canSeeProfit = false,
+}: {
+  items: PriceBookItem[];
+  canSeeProfit?: boolean;
+}) {
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -141,7 +169,7 @@ export default function PriceBookList({ items }: { items: PriceBookItem[] }) {
         {filtered.map((item) =>
           editingId === item.id ? (
             <div key={item.id} className="py-3">
-              <EditPriceBookItemForm item={item} onDone={() => setEditingId(null)} />
+              <EditPriceBookItemForm item={item} canSeeProfit={canSeeProfit} onDone={() => setEditingId(null)} />
             </div>
           ) : (
             <div key={item.id} className="flex items-start justify-between gap-3 py-3">
@@ -153,6 +181,14 @@ export default function PriceBookList({ items }: { items: PriceBookItem[] }) {
                     .join(" · ")}
                 </div>
                 {item.description && <div className={itemSubClass}>{item.description}</div>}
+                {canSeeProfit && item.unit_cost !== null && (
+                  <div className="text-xs text-gold">
+                    Cost {formatPrice(item.unit_cost)}
+                    {item.unit_price !== null && item.unit_price > 0
+                      ? ` · ${(((item.unit_price - item.unit_cost) / item.unit_price) * 100).toFixed(0)}% margin`
+                      : ""}
+                  </div>
+                )}
                 {errors[item.id] && <p className={`mt-1 ${errorClass}`}>{errors[item.id]}</p>}
               </div>
               <div className="flex flex-shrink-0 flex-col items-end gap-1">

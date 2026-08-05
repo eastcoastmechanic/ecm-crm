@@ -15,6 +15,7 @@ type LineItem = {
   better: number | null;
   best: number | null;
   notes: string | null;
+  cost?: number | null;
 };
 
 let nextRowId = 1;
@@ -26,11 +27,13 @@ export default function LineItemsEditor({
   status,
   items,
   pricingMode = "tiered",
+  canSeeProfit = false,
 }: {
   documentId: string;
   status: string;
   items: LineItem[];
   pricingMode?: "tiered" | "flat";
+  canSeeProfit?: boolean;
 }) {
   const isFlat = pricingMode === "flat";
   const [rows, setRows] = useState(() =>
@@ -55,6 +58,7 @@ export default function LineItemsEditor({
         better: null,
         best: null,
         notes: null,
+        cost: null,
       },
     ]);
   }
@@ -83,6 +87,11 @@ export default function LineItemsEditor({
                   <th className="px-3 py-2">Better</th>
                   <th className="px-3 py-2">Best</th>
                 </>
+              )}
+              {canSeeProfit && (
+                <th className="px-3 py-2 text-gold" title="Internal only — never shown to the customer">
+                  Cost
+                </th>
               )}
               <th className="px-3 py-2"></th>
             </tr>
@@ -181,6 +190,18 @@ export default function LineItemsEditor({
                       />
                     </td>
                   </>
+                )}
+                {canSeeProfit && (
+                  <td className="px-3 py-2 align-top">
+                    <input
+                      type="number"
+                      step="0.01"
+                      name={`cost_${i}`}
+                      defaultValue={item.cost ?? ""}
+                      placeholder="Cost"
+                      className={`${numberInputClass} border-gold/30`}
+                    />
+                  </td>
                 )}
                 <td className="px-3 py-2 align-top">
                   <button
