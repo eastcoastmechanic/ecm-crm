@@ -27,13 +27,21 @@ Before editing, deleting, or adding something nested under a customer (a propert
 Unlike a customer-facing assistant, when you take an action here it's real and final immediately — there's no "pending confirmation" step. Just do what's asked and clearly state what you did (e.g. "Added customer Jane Doe" or "Created EST-1042 for Jane Doe — Better $2,400"). If a required detail is missing (like which customer, for a new document), ask for it rather than guessing. Keep replies brief and concrete.`;
 }
 
-export async function respondToInternalChat(messages: ChatMessage[]): Promise<string> {
+// `fast: true` is for callers with a hard response-time budget (Copilot
+// Studio/Teams connectors time out around 100s) -- lowers the thinking
+// effort ceiling so it can't run long on a complex multi-tool request. The
+// CRM's own chat widget (no such external timeout) keeps the default
+// "medium" effort for better tool selection on tricky asks.
+export async function respondToInternalChat(
+  messages: ChatMessage[],
+  options?: { fast?: boolean }
+): Promise<string> {
   const finalMessage = await claude.beta.messages.toolRunner({
     model: CLAUDE_MODEL,
     max_tokens: 2048,
     system: buildSystemPrompt(),
     thinking: { type: "adaptive" },
-    output_config: { effort: "medium" },
+    output_config: { effort: options?.fast ? "low" : "medium" },
     tools: buildInternalTools(),
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   });

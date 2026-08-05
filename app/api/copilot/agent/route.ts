@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const reply = await respondToInternalChat(messages);
+    const reply = await respondToInternalChat(messages, { fast: true });
     return NextResponse.json({ reply });
   } catch (err) {
     console.error("Copilot assistant error:", err);
