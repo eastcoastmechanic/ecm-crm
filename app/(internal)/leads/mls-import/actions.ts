@@ -74,7 +74,7 @@ export async function importMlsCsv(formData: FormData) {
   if (yearBuiltCol === -1) throw new Error('CSV must have a "year_built" (or similar) column');
 
   const currentYear = new Date().getFullYear();
-  const candidates: { address: string; ownerName: string | null; age: number }[] = [];
+  const candidates: { address: string; town: string | null; fullAddress: string; ownerName: string | null; age: number }[] = [];
 
   for (const row of rows.slice(1)) {
     const address = row[addressCol]?.trim();
@@ -88,21 +88,29 @@ export async function importMlsCsv(formData: FormData) {
     const fullAddress = city ? `${address}, ${city}` : address;
     const ownerName = ownerCol !== -1 ? row[ownerCol]?.trim() || null : null;
 
-    candidates.push({ address: fullAddress, ownerName, age });
+    candidates.push({ address, town: city || null, fullAddress, ownerName, age });
   }
 
   const { data: existingLeads } = await supabase
     .from("leads")
     .select("contact_info")
     .eq("source", "mls_import");
-  const alreadyLeaded = new Set((existingLeads ?? []).map((l) => l.contact_info));
-
-  const newCandidates = candidates.filter((c) => !alreadyLeaded.has(c.address));
+  // Tracks both rows already in the DB from a prior import and rows we insert
+  // during this run -- MLS exports commonly repeat the same property across
+  // multiple rows (status changes, price history), so a duplicate can appear
+  // within a single upload, not just across separate uploads.
+  const seenAddresses = new Set((existingLeads ?? []).map((l) => l.contact_info));
 
   let inserted = 0;
+  let skipped = 0;
   const errors: string[] = [];
 
-  for (const candidate of newCandidates) {
+  for (const candidate of candidates) {
+    if (seenAddresses.has(candidate.fullAddress)) {
+      skipped++;
+      continue;
+    }
+
     let draftMessage: string;
     try {
       const response = await claude.messages.parse({
@@ -112,7 +120,7 @@ export async function importMlsCsv(formData: FormData) {
         messages: [
           {
             role: "user",
-            content: `Property: ${candidate.address}\nApproximate home age: ${candidate.age} years\nOwner name (if known): ${candidate.ownerName ?? "unknown — address as Current Resident"}`,
+            content: `Property: ${candidate.fullAddress}\nApproximate home age: ${candidate.age} years\nOwner name (if known): ${candidate.ownerName ?? "unknown — address as Current Resident"}`,
           },
         ],
         output_config: { format: zodOutputFormat(MailerSchema) },
@@ -120,7 +128,7 @@ export async function importMlsCsv(formData: FormData) {
       draftMessage = response.parsed_output?.draft_message ?? "";
       if (!draftMessage) throw new Error("empty draft");
     } catch (err) {
-      errors.push(`${candidate.address}: ${err instanceof Error ? err.message : "draft failed"}`);
+      errors.push(`${candidate.fullAddress}: ${err instanceof Error ? err.message : "draft failed"}`);
       continue;
     }
 
@@ -128,24 +136,32 @@ export async function importMlsCsv(formData: FormData) {
       source: "mls_import",
       status: "new",
       contact_name: candidate.ownerName,
-      contact_info: candidate.address,
+      contact_info: candidate.fullAddress,
+      address: candidate.address,
+      town: candidate.town,
       summary: `Home sold recently, approx. ${candidate.age} years old — likely candidate for HVAC checkup/replacement.`,
       channel: "mail",
       draft_message: draftMessage,
       auto_sendable: false,
     });
     if (error) {
-      errors.push(`${candidate.address}: ${error.message}`);
+      if (error.message.toLowerCase().includes("duplicate key")) {
+        skipped++;
+      } else {
+        errors.push(`${candidate.fullAddress}: ${error.message}`);
+      }
       continue;
     }
+    seenAddresses.add(candidate.fullAddress);
     inserted++;
   }
 
   revalidatePath("/leads");
 
+  const params = new URLSearchParams({ imported: String(inserted), skipped: String(skipped) });
   if (errors.length > 0) {
-    throw new Error(`Imported ${inserted} lead(s), ${errors.length} error(s): ${errors.slice(0, 3).join("; ")}`);
+    params.set("errors", String(errors.length));
+    params.set("errorDetail", errors.slice(0, 3).join("; "));
   }
-
-  redirect("/leads");
+  redirect(`/leads/mls-import?${params.toString()}`);
 }

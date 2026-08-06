@@ -8,6 +8,7 @@ import {
   sendLeadOutreach,
   addManualLead,
   setLeadStage,
+  deleteLead,
 } from "./actions";
 import SubmitButton from "../SubmitButton";
 import {
@@ -78,6 +79,15 @@ function leadPhone(lead: Lead) {
 
 function leadEmail(lead: Lead) {
   return lead.customers?.email ?? (lead.contact_info?.includes("@") ? lead.contact_info : null);
+}
+
+// Older/MLS-sourced leads only ever set contact_info (a freeform string —
+// often a full address), not the dedicated address column added later.
+// Fall back to it whenever it isn't obviously an email.
+function leadAddress(lead: Lead) {
+  if (lead.address) return lead.address;
+  if (lead.contact_info && !lead.contact_info.includes("@")) return lead.contact_info;
+  return null;
 }
 
 function AddLeadModal({ onClose }: { onClose: () => void }) {
@@ -156,13 +166,42 @@ function StatCard({ label, value, color }: { label: string; value: number; color
   );
 }
 
-function LeadCard({ lead, onStatusChange }: { lead: Lead; onStatusChange: (id: string, status: string) => void }) {
+function LeadCard({
+  lead,
+  onStatusChange,
+  onDelete,
+}: {
+  lead: Lead;
+  onStatusChange: (id: string, status: string) => void;
+  onDelete: (id: string) => void;
+}) {
   const isEmergency = lead.urgency_score >= 8;
   const phone = leadPhone(lead);
   const email = leadEmail(lead);
+  const address = leadAddress(lead);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function handleDelete() {
+    if (!window.confirm(`Delete this lead (${leadName(lead)})? This cannot be undone.`)) return;
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      const result = await deleteLead(lead.id);
+      if (result.error) {
+        setDeleteError(result.error);
+        setDeleting(false);
+      } else {
+        onDelete(lead.id);
+      }
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete lead");
+      setDeleting(false);
+    }
+  }
 
   const draftValue = drafts[lead.id] ?? lead.draft_message ?? "";
 
@@ -206,7 +245,7 @@ function LeadCard({ lead, onStatusChange }: { lead: Lead; onStatusChange: (id: s
               </span>
             </div>
             <div className={itemSubClass}>
-              {[lead.address, lead.town].filter(Boolean).join(" · ")}
+              {[address, lead.town && lead.town !== address ? lead.town : null].filter(Boolean).join(" · ")}
               {lead.created_at && ` · ${new Date(lead.created_at).toLocaleDateString()}`}
               {lead.source_url && (
                 <>
@@ -226,18 +265,30 @@ function LeadCard({ lead, onStatusChange }: { lead: Lead; onStatusChange: (id: s
           </div>
         </div>
 
-        <select
-          value={lead.status}
-          onChange={(e) => onStatusChange(lead.id, e.target.value)}
-          className={`h-fit rounded-lg border-none px-2.5 py-1.5 text-[11px] font-semibold ${statusClass[lead.status] ?? "bg-white/8 text-g300"}`}
-        >
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        <div className="flex shrink-0 items-center gap-2">
+          <select
+            value={lead.status}
+            onChange={(e) => onStatusChange(lead.id, e.target.value)}
+            className={`h-fit rounded-lg border-none px-2.5 py-1.5 text-[11px] font-semibold ${statusClass[lead.status] ?? "bg-white/8 text-g300"}`}
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Delete lead"
+            className="rounded-lg p-1.5 text-base opacity-60 transition-opacity hover:opacity-100 disabled:opacity-30"
+          >
+            🗑️
+          </button>
+        </div>
       </div>
+      {deleteError && <p className={errorClass}>{deleteError}</p>}
 
       <div className="flex flex-wrap gap-2">
         {phone && (
@@ -310,21 +361,24 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [localStatus, setLocalStatus] = useState<Record<string, string>>({});
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+
+  const liveLeads = useMemo(() => leads.filter((l) => !deletedIds.has(l.id)), [leads, deletedIds]);
 
   const stats = useMemo(
     () => ({
-      total: leads.length,
-      emergency: leads.filter((l) => l.urgency_score >= 8).length,
-      new: leads.filter((l) => l.status === "new").length,
-      contacted: leads.filter((l) => l.status === "contacted").length,
-      won: leads.filter((l) => l.status === "won" || l.status === "sent").length,
+      total: liveLeads.length,
+      emergency: liveLeads.filter((l) => l.urgency_score >= 8).length,
+      new: liveLeads.filter((l) => l.status === "new").length,
+      contacted: liveLeads.filter((l) => l.status === "contacted").length,
+      won: liveLeads.filter((l) => l.status === "won" || l.status === "sent").length,
     }),
-    [leads]
+    [liveLeads]
   );
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return leads
+    return liveLeads
       .map((l) => (localStatus[l.id] ? { ...l, status: localStatus[l.id] } : l))
       .filter((lead) => {
         if (statusFilter !== "all" && lead.status !== statusFilter) return false;
@@ -335,7 +389,7 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
           .some((field) => field!.toLowerCase().includes(query));
       })
       .sort((a, b) => b.urgency_score - a.urgency_score);
-  }, [leads, search, town, statusFilter, localStatus]);
+  }, [liveLeads, search, town, statusFilter, localStatus]);
 
   function handleStatusChange(id: string, status: string) {
     setLocalStatus((prev) => ({ ...prev, [id]: status }));
@@ -343,6 +397,10 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
     fd.set("id", id);
     fd.set("status", status);
     setLeadStage(fd);
+  }
+
+  function handleDelete(id: string) {
+    setDeletedIds((prev) => new Set(prev).add(id));
   }
 
   return (
@@ -395,7 +453,7 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
       <div className="flex flex-col gap-3">
         {filtered.length === 0 && <p className={subTextClass}>No leads match.</p>}
         {filtered.map((lead) => (
-          <LeadCard key={lead.id} lead={lead} onStatusChange={handleStatusChange} />
+          <LeadCard key={lead.id} lead={lead} onStatusChange={handleStatusChange} onDelete={handleDelete} />
         ))}
       </div>
 

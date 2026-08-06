@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { importMlsCsv } from "./actions";
 import SubmitButton from "../../SubmitButton";
-import { headingClass, subTextClass, buttonClass, inputClass } from "../../ui";
+import { headingClass, subTextClass, buttonClass, inputClass, errorClass } from "../../ui";
 
-export default function MlsImportPage() {
+export default async function MlsImportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ imported?: string; skipped?: string; errors?: string; errorDetail?: string }>;
+}) {
+  const { imported, skipped, errors, errorDetail } = await searchParams;
+  const hasResult = imported !== undefined;
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -16,6 +23,20 @@ export default function MlsImportPage() {
           &quot;new to the neighborhood&quot; mailer for you to print and send.
         </p>
       </div>
+
+      {hasResult && (
+        <div className="flex flex-col gap-1 rounded-xl border border-white/8 bg-white/3 p-4 text-sm">
+          <p className="text-white">
+            Imported <span className="font-bold text-accent">{imported}</span> new lead(s)
+            {Number(skipped) > 0 && <> — {skipped} already imported previously, skipped</>}.
+          </p>
+          {errors && (
+            <p className={errorClass}>
+              {errors} row(s) failed: {errorDetail}
+            </p>
+          )}
+        </div>
+      )}
 
       <form action={importMlsCsv} className="flex flex-col gap-4 rounded-xl border border-white/8 bg-white/3 p-4">
         <label className="flex flex-col gap-1 text-xs text-g300">

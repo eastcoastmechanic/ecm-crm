@@ -82,6 +82,14 @@ export async function setLeadStage(formData: FormData) {
   revalidatePath("/leads");
 }
 
+export async function deleteLead(id: string): Promise<{ error?: string }> {
+  const { error } = await supabase.from("leads").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/leads");
+  return {};
+}
+
 export async function sendLeadOutreach(formData: FormData) {
   const id = formData.get("id") as string;
   const draft_message = (formData.get("draft_message") as string) ?? "";
