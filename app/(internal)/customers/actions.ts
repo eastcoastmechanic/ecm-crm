@@ -105,7 +105,7 @@ export async function deleteCustomer(id: string): Promise<{ error?: string }> {
   await supabase.from("ai_conversations").delete().eq("customer_id", id);
 
   // Unlink rather than delete — these reference this customer without belonging to them.
-  await supabase.from("leads").update({ converted_customer_id: null }).eq("converted_customer_id", id);
+  await supabase.from("leads").update({ customer_id: null }).eq("customer_id", id);
   await supabase.from("customers").update({ referred_by_customer_id: null }).eq("referred_by_customer_id", id);
   await supabase.from("tasks").update({ customer_id: null }).eq("customer_id", id);
 

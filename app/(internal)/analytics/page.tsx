@@ -45,7 +45,7 @@ export default async function AnalyticsPage() {
   for (const lead of leads ?? []) {
     const entry = leadsBySource.get(lead.source) ?? { total: 0, converted: 0 };
     entry.total++;
-    if (lead.status === "sent" || lead.status === "contacted") entry.converted++;
+    if (["sent", "contacted", "quoted", "won"].includes(lead.status)) entry.converted++;
     leadsBySource.set(lead.source, entry);
   }
 

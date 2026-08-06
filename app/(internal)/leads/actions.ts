@@ -39,6 +39,49 @@ export async function dismissLead(formData: FormData) {
   revalidatePath("/leads");
 }
 
+export async function addManualLead(formData: FormData) {
+  const contact_name = (formData.get("contact_name") as string)?.trim();
+  const phone_number = (formData.get("phone_number") as string)?.trim() || null;
+  const email = (formData.get("email") as string)?.trim() || null;
+  const town = (formData.get("town") as string)?.trim() || null;
+  const address = (formData.get("address") as string)?.trim() || null;
+  const summary = (formData.get("summary") as string)?.trim() || null;
+  const urgency_score = Number(formData.get("urgency_score")) || 5;
+
+  if (!contact_name) throw new Error("Name is required");
+
+  const { error } = await supabase.from("leads").insert({
+    source: "manual",
+    status: "new",
+    channel: "none",
+    contact_name,
+    phone_number,
+    contact_info: email,
+    town,
+    address,
+    summary,
+    urgency_score,
+    auto_sendable: false,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/leads");
+}
+
+export async function setLeadStage(formData: FormData) {
+  const id = formData.get("id") as string;
+  const status = formData.get("status") as string;
+
+  const update: Record<string, unknown> = { status };
+  if (status === "contacted") update.contacted_at = new Date().toISOString();
+  if (status === "lost") update.dismissed_at = new Date().toISOString();
+
+  const { error } = await supabase.from("leads").update(update).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/leads");
+}
+
 export async function sendLeadOutreach(formData: FormData) {
   const id = formData.get("id") as string;
   const draft_message = (formData.get("draft_message") as string) ?? "";
