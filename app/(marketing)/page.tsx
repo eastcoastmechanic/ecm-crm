@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Icon } from "./icons";
 import { SERVICES } from "./services-data";
 import Reveal from "./Reveal";
+import Reviews from "./Reviews";
 
 const PROCESS = ["Consultation", "Estimate", "Installation", "Inspection", "Guarantee"];
 
@@ -227,6 +228,8 @@ export default function MarketingHome() {
           </Reveal>
         </div>
       </section>
+
+      <Reviews />
 
       {/* AI callout */}
       <section className="mx-auto w-full max-w-6xl px-6 py-16">
