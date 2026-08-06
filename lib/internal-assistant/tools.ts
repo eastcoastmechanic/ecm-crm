@@ -14,6 +14,45 @@ function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
+// Deliberately separate from buildDocumentTool: a quick sell-price lookup
+// against the real price book, with no document created and no ~70s Claude
+// pricing call -- "how much is X" shouldn't require generating a whole
+// estimate. Sell price only, no unit_cost -- the chat pipeline has no staff
+// role plumbed through it to gate that the way the rest of the app does.
+const searchPriceBookTool = betaZodTool({
+  name: "search_price_book",
+  description:
+    "Look up real sell prices from the price book for a quick question like 'how much is a Daikin mini-split' or 'what do we charge for a water heater'. Returns matching line items with their good/better/best (or flat) pricing. Use this instead of create_estimate/invoice/proposal when the tech just wants a price, not a document.",
+  inputSchema: z.object({
+    query: z.string().describe("Search term — an item name, category, or brand (e.g. 'mini-split', 'Daikin', 'water heater')"),
+  }),
+  run: async ({ query }) => {
+    const { data, error } = await supabase
+      .from("price_book_items")
+      .select("category, name, tier, unit_price")
+      .or(`name.ilike.%${query}%,category.ilike.%${query}%`)
+      .order("category", { ascending: true })
+      .order("name", { ascending: true })
+      .limit(20);
+    if (error) return `Price book search failed: ${error.message}`;
+    if (!data || data.length === 0) return `No price book items match "${query}".`;
+
+    const grouped = new Map<string, { tier: string | null; unit_price: number | null }[]>();
+    for (const row of data) {
+      if (!grouped.has(row.name)) grouped.set(row.name, []);
+      grouped.get(row.name)!.push({ tier: row.tier, unit_price: row.unit_price });
+    }
+
+    const lines = [...grouped.entries()].map(([name, rows]) => {
+      const priced = rows
+        .map((r) => (r.unit_price === null ? null : r.tier ? `${r.tier}=${formatMoney(r.unit_price)}` : formatMoney(r.unit_price)))
+        .filter(Boolean);
+      return `${name}: ${priced.join(", ")}`;
+    });
+    return lines.join("\n");
+  },
+});
+
 const addCustomerTool = betaZodTool({
   name: "add_customer",
   description: "Add a new customer to the CRM.",
@@ -625,6 +664,7 @@ export function buildInternalTools(options?: { fast?: boolean }) {
     deleteEquipmentTool,
     listDocumentsTool,
     deleteDocumentTool,
+    searchPriceBookTool,
     updateWarrantyTool,
     createWarrantyTool,
     createMassSaveRebateTool,
