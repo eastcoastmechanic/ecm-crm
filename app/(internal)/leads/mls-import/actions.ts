@@ -54,7 +54,15 @@ const MailerSchema = z.object({
   draft_message: z.string(),
 });
 
-const SYSTEM_PROMPT = `You are a direct-mail copywriter for East Coast Mechanical (ECM), an HVAC & plumbing contractor. Write a short, warm "new to the neighborhood" mailer for a home that recently sold and is old enough that its HVAC system may need attention soon. Address it to "Current Resident" unless a specific name is given. Mention the home's approximate age in a friendly, non-alarmist way and offer a complimentary HVAC system check. Keep it brief — this is a postcard/letter, not an email.`;
+// Deliberately drives the response to eastcoastmechanical.org/book (a
+// self-serve form the homeowner fills out themselves, with its own SMS
+// consent checkbox) or a phone call -- not something ECM sources their
+// number for. Whoever responds is opting in themselves, which is what
+// makes any later text/call to them TCPA-safe, unlike a number pulled
+// from a people-search site.
+const SYSTEM_PROMPT = `You are a direct-mail copywriter for East Coast Mechanical (ECM), an HVAC & plumbing contractor. Write a short, warm "new to the neighborhood" mailer for a home that recently sold and is old enough that its HVAC system may need attention soon. Address it to "Current Resident" unless a specific name is given. Mention the home's approximate age in a friendly, non-alarmist way and offer a complimentary HVAC system check.
+
+End with a clear call to action driving them to respond themselves -- either "Book your free check online at eastcoastmechanical.org/book" or "Call us at (774) 343-6369" (use one or both). Do not imply ECM already has their phone number or email, and don't ask them to reply by mail. Keep it brief — this is a postcard/letter, not an email.`;
 
 export async function importMlsCsv(formData: FormData) {
   const file = formData.get("csv") as File | null;
