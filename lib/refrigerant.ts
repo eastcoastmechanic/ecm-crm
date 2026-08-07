@@ -4,7 +4,7 @@
 
 export type RefrigerantType = "R-410A" | "R-22" | "R-32" | "R-454B";
 
-const PT_TABLES: Record<RefrigerantType, [number, number][]> = {
+export const PT_TABLES: Record<RefrigerantType, [number, number][]> = {
   "R-410A": [
     [50, -23], [60, -16], [70, -10], [80, -4], [90, 2], [100, 7], [110, 12],
     [120, 17], [130, 22], [140, 26], [150, 30], [160, 34], [170, 37], [180, 41],

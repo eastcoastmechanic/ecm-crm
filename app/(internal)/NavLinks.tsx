@@ -15,6 +15,7 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 
 const navEntries: NavEntry[] = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/tech-hub", label: "Tech Hub" },
   {
     label: "Customers",
     items: [
@@ -52,7 +53,7 @@ const navEntries: NavEntry[] = [
 
 // A logged-in "tech" role gets a reduced nav (their own jobs only); the
 // shared Basic-Auth password and "owner"/"office" staff roles get everything.
-const TECH_VISIBLE_PATHS = ["/dashboard", "/jobs"];
+const TECH_VISIBLE_PATHS = ["/dashboard", "/tech-hub", "/jobs"];
 
 function pillClass(active: boolean) {
   return `shrink-0 rounded-md px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${

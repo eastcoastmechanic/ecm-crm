@@ -36,6 +36,7 @@ type Job = {
   customers: { name: string | null } | null;
   properties: { address: string | null } | null;
   diagnostics: { id: string }[] | null;
+  install_reports: { id: string }[] | null;
   photos: { url: string; caption: string | null }[] | null;
 };
 
@@ -394,6 +395,15 @@ export default function JobsView({
                 ) : (
                   <Link href={`/diagnostics/new?job_id=${job.id}`} className={buttonSecondaryClass}>
                     + Report
+                  </Link>
+                )}
+                {job.install_reports && job.install_reports.length > 0 ? (
+                  <Link href={`/tech-hub/install-report/${job.install_reports[0].id}`} className={buttonSecondaryClass}>
+                    View Install
+                  </Link>
+                ) : (
+                  <Link href={`/tech-hub/install-report/new?job_id=${job.id}`} className={buttonSecondaryClass}>
+                    + Install
                   </Link>
                 )}
                 {!job.on_way_at && (job.status === "scheduled" || job.status === "in_progress") && (
