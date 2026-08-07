@@ -314,6 +314,83 @@ ${input.rawRequest}`;
   return results;
 }
 
+export type DirectLineItem = {
+  category: string;
+  description: string;
+  price_book_item_name: string | null;
+  qty: number;
+  unit: string;
+  unit_price: number;
+  notes: string | null;
+  cost?: number | null;
+};
+
+export type CreateInvoiceDirectResult = { documentId: string; docNumber: string; total: number };
+
+/**
+ * Creates a real, flat-priced invoice from already-confirmed line items
+ * (e.g. a service report's actual_parts_used + a labor line) without a
+ * Claude call -- the prices are already real price book/labor-rate numbers,
+ * so there's nothing left for the AI to price. Kept separate from
+ * generateDocumentForCustomer, which owns the "ask Claude what this job
+ * needs" path; this owns the "I already know exactly what was used" path.
+ */
+export async function createInvoiceDirect(input: {
+  customerId: string;
+  propertyId: string | null;
+  items: DirectLineItem[];
+}): Promise<CreateInvoiceDirectResult> {
+  if (input.items.length === 0) throw new Error("Add at least one line item before creating an invoice");
+
+  const total = Math.round(input.items.reduce((sum, item) => sum + item.unit_price * item.qty, 0) * 100) / 100;
+
+  const itemsForStorage = input.items.map((item) => ({
+    category: item.category,
+    description: item.description,
+    price_book_item_name: item.price_book_item_name,
+    qty: item.qty,
+    unit: item.unit,
+    good: item.unit_price,
+    better: item.unit_price,
+    best: item.unit_price,
+    notes: item.notes,
+    cost: item.cost ?? null,
+  }));
+
+  const docNumber = await nextDocNumber("invoice");
+
+  const { data: document, error } = await supabase
+    .from("documents")
+    .insert({
+      doc_number: docNumber,
+      type: "invoice",
+      customer_id: input.customerId,
+      property_id: input.propertyId,
+      status: "draft",
+      line_items: {
+        items: itemsForStorage,
+        brand: { good: null, better: null, best: null },
+        mass_save_eligible: false,
+        mass_save_note: null,
+        totals: { good: total, better: total, best: total },
+        option_label: null,
+        pricing_mode: "flat",
+      },
+      subtotal: total,
+      tax: 0,
+      total,
+      ai_generated: false,
+      raw_request: null,
+      photos: [],
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  return { documentId: document.id, docNumber, total };
+}
+
 export type StartDocumentGenerationResult = {
   customerName: string;
   propertyAddress: string | null;

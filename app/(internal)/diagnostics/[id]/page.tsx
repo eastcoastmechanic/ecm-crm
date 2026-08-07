@@ -5,6 +5,7 @@ import { fetchAllPriceBookItems } from "@/lib/price-book";
 import { sendServiceReportEmail } from "./actions";
 import AssignCustomerForm from "./AssignCustomerForm";
 import PartsUsedForm from "./PartsUsedForm";
+import FinishReportForm from "./FinishReportForm";
 import SubmitButton from "../../SubmitButton";
 import { headingClass, subTextClass, itemSubClass, buttonClass, buttonSecondaryClass } from "../../ui";
 
@@ -51,7 +52,7 @@ export default async function DiagnosticPage({
   const { data: diagnostic, error } = await supabase
     .from("diagnostics")
     .select(
-      "*, equipment(type, brand, model, serial_number, properties(address, customers(name, email))), jobs(id, scheduled_at, status, customers(name, email), properties(address))"
+      "*, equipment(type, brand, model, serial_number, properties(address, customers(name, email))), jobs(id, scheduled_at, status, customers(name, email), properties(address)), invoice:documents!invoice_document_id(doc_number, status, total)"
     )
     .eq("id", id)
     .single();
@@ -265,6 +266,27 @@ export default async function DiagnosticPage({
           items above where a match was found. Saving deducts matching truck inventory on hand.
         </p>
         <PartsUsedForm diagnosticId={id} priceBookOptions={priceBookOptions} initialRows={partsInitialRows} />
+      </section>
+
+      <section className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/3 p-4">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Time &amp; Finish</h2>
+        {diagnostic.completed_at ? (
+          <div className="flex flex-col gap-1">
+            <p className={subTextClass}>
+              Finished {new Date(diagnostic.completed_at).toLocaleString()}
+              {diagnostic.tracked_hours !== null ? ` · ${diagnostic.tracked_hours} hrs tracked` : ""}
+            </p>
+            {diagnostic.invoice ? (
+              <Link href={`/documents/${diagnostic.invoice_document_id}`} className="text-sm underline">
+                View {diagnostic.invoice.doc_number} — ${diagnostic.invoice.total} ({diagnostic.invoice.status})
+              </Link>
+            ) : (
+              <p className={itemSubClass}>No invoice was created for this report.</p>
+            )}
+          </div>
+        ) : (
+          <FinishReportForm diagnosticId={id} />
+        )}
       </section>
 
       <details className="rounded-xl border border-white/8 bg-white/3 p-4">

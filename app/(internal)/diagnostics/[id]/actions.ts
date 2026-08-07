@@ -6,6 +6,7 @@ import { getServiceReportForPdf } from "@/lib/service-reports";
 import { renderServiceReportPdf } from "@/lib/service-report-pdf";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
+import { createInvoiceDirect, type DirectLineItem } from "@/lib/document-generation";
 
 export async function assignCustomer(formData: FormData) {
   const diagnosticId = formData.get("diagnostic_id") as string;
@@ -124,6 +125,101 @@ export async function recordPartsUsed(formData: FormData) {
 
   revalidatePath(`/diagnostics/${diagnosticId}`);
   revalidatePath("/inventory");
+}
+
+function parseLocalDateTime(value: FormDataEntryValue | null): string | null {
+  if (!value || typeof value !== "string") return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+export async function finishServiceReport(formData: FormData) {
+  const diagnosticId = formData.get("diagnostic_id") as string;
+  const timeStartedAt = parseLocalDateTime(formData.get("time_started_at"));
+  const timeEndedAt = parseLocalDateTime(formData.get("time_ended_at"));
+
+  const trackedHours =
+    timeStartedAt && timeEndedAt
+      ? Math.max(0, Math.round(((new Date(timeEndedAt).getTime() - new Date(timeStartedAt).getTime()) / 3600000) * 100) / 100)
+      : null;
+
+  const { data: diagnostic, error: fetchError } = await supabase
+    .from("diagnostics")
+    .select("*, equipment(properties(id, customer_id)), jobs(customer_id, property_id, document_id)")
+    .eq("id", diagnosticId)
+    .single();
+  if (fetchError || !diagnostic) throw new Error(fetchError?.message ?? "Service report not found");
+
+  const customerId = diagnostic.equipment?.properties?.customer_id ?? diagnostic.jobs?.customer_id ?? null;
+  const propertyId = diagnostic.equipment?.properties?.id ?? diagnostic.jobs?.property_id ?? null;
+
+  const createInvoice = formData.get("create_invoice") === "on";
+  let invoiceDocumentId: string | null = diagnostic.invoice_document_id ?? null;
+
+  if (createInvoice && !invoiceDocumentId) {
+    if (!customerId) throw new Error("Assign a customer before creating an invoice");
+
+    const actualPartsUsed = (diagnostic.actual_parts_used ?? []) as {
+      price_book_item_name: string;
+      qty: number;
+      unit_price: number | null;
+    }[];
+
+    const items: DirectLineItem[] = actualPartsUsed
+      .filter((p) => p.unit_price !== null)
+      .map((p) => ({
+        category: "Parts",
+        description: p.price_book_item_name,
+        price_book_item_name: p.price_book_item_name,
+        qty: p.qty,
+        unit: "EA",
+        unit_price: p.unit_price as number,
+        notes: null,
+      }));
+
+    const hourlyRate = Number(process.env.HOURLY_LABOR_RATE) || null;
+    if (trackedHours && hourlyRate) {
+      items.push({
+        category: "Labor",
+        description: "Labor",
+        price_book_item_name: null,
+        qty: trackedHours,
+        unit: "HR",
+        unit_price: hourlyRate,
+        notes: "Auto-added from service report time tracking",
+      });
+    }
+
+    if (items.length === 0) {
+      throw new Error(
+        "Nothing to invoice yet — save parts used and/or track time (with an hourly rate configured) first"
+      );
+    }
+
+    const result = await createInvoiceDirect({ customerId, propertyId, items });
+    invoiceDocumentId = result.documentId;
+
+    if (diagnostic.job_id && !diagnostic.jobs?.document_id) {
+      await supabase.from("jobs").update({ document_id: invoiceDocumentId }).eq("id", diagnostic.job_id);
+    }
+  }
+
+  const { error } = await supabase
+    .from("diagnostics")
+    .update({
+      time_started_at: timeStartedAt,
+      time_ended_at: timeEndedAt,
+      tracked_hours: trackedHours,
+      completed_at: new Date().toISOString(),
+      invoice_document_id: invoiceDocumentId,
+    })
+    .eq("id", diagnosticId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/diagnostics/${diagnosticId}`);
+  revalidatePath("/diagnostics");
+  revalidatePath("/documents");
+  revalidatePath("/jobs");
 }
 
 export async function sendServiceReportEmail(formData: FormData) {
