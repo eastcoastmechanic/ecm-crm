@@ -2,7 +2,23 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-type Message = { role: "user" | "assistant"; content: string };
+type Attachment = { name: string; mediaType: string; base64: string };
+type Message = { role: "user" | "assistant"; content: string; attachments?: Attachment[] };
+
+const MAX_ATTACHMENT_BYTES = 32 * 1024 * 1024;
+
+function readFileAsAttachment(file: File): Promise<Attachment> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.slice(result.indexOf(",") + 1);
+      resolve({ name: file.name, mediaType: file.type || "application/octet-stream", base64 });
+    };
+    reader.onerror = () => reject(new Error("Could not read that file"));
+    reader.readAsDataURL(file);
+  });
+}
 
 type SpeechRecognitionResultLike = { 0: { transcript: string } };
 type SpeechRecognitionEventLike = { results: ArrayLike<SpeechRecognitionResultLike> };
@@ -35,8 +51,11 @@ export default function ChatWidget() {
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [listening, setListening] = useState(false);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [attachError, setAttachError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const micSupported = useSyncExternalStore(
     subscribeNoop,
@@ -49,11 +68,13 @@ export default function ChatWidget() {
   }, [messages, pending]);
 
   async function sendText(text: string) {
-    if (!text.trim() || pending) return;
+    if ((!text.trim() && !attachment) || pending) return;
 
-    const nextMessages = [...messages, { role: "user" as const, content: text.trim() }];
+    const userMessage: Message = { role: "user", content: text.trim(), attachments: attachment ? [attachment] : undefined };
+    const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setInput("");
+    setAttachment(null);
     setPending(true);
 
     try {
@@ -75,6 +96,22 @@ export default function ChatWidget() {
   function sendMessage(e: React.FormEvent) {
     e.preventDefault();
     sendText(input);
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAttachError("");
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setAttachError("That file's too large (32MB max, ~100 pages for a PDF).");
+      return;
+    }
+    try {
+      setAttachment(await readFileAsAttachment(file));
+    } catch {
+      setAttachError("Could not read that file.");
+    }
   }
 
   function startVoiceCommand() {
@@ -136,6 +173,11 @@ export default function ChatWidget() {
                     : "self-start bg-white/6 text-white"
                 }`}
               >
+                {m.attachments?.map((a) => (
+                  <div key={a.name} className="mb-1 text-xs opacity-80">
+                    📎 {a.name}
+                  </div>
+                ))}
                 {m.content}
               </div>
             ))}
@@ -149,7 +191,35 @@ export default function ChatWidget() {
             )}
           </div>
 
-          <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-white/8 p-3">
+          <div className="border-t border-white/8 px-3 pt-2">
+            {attachment && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-white/6 px-2.5 py-1.5 text-xs text-g300">
+                <span className="truncate">📎 {attachment.name}</span>
+                <button type="button" onClick={() => setAttachment(null)} aria-label="Remove attachment" className="shrink-0 text-g300 hover:text-white">
+                  ✕
+                </button>
+              </div>
+            )}
+            {attachError && <div className="mb-2 text-xs text-accent">{attachError}</div>}
+          </div>
+          <form onSubmit={sendMessage} className="flex items-center gap-2 border-t border-white/8 p-3 pt-0">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,image/*"
+              onChange={handleFileSelected}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={pending}
+              aria-label="Attach a plan PDF or photo"
+              title="Attach a plan PDF or photo"
+              className="shrink-0 rounded-lg border border-white/8 bg-white/4 px-2.5 py-2 text-sm text-g300 transition-colors hover:bg-white/8 disabled:opacity-50"
+            >
+              📎
+            </button>
             {micSupported && (
               <button
                 type="button"
@@ -172,7 +242,7 @@ export default function ChatWidget() {
             />
             <button
               type="submit"
-              disabled={pending || !input.trim()}
+              disabled={pending || (!input.trim() && !attachment)}
               className="rounded-lg bg-gradient-to-br from-accent to-accent-2 px-3 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               Send

@@ -516,10 +516,14 @@ const createMassSaveRebateTool = betaZodTool({
   },
 });
 
-function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boolean) {
+function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boolean, attachmentFiles?: File[]) {
   return betaZodTool({
     name: `create_${type}`,
     description: `Generate a real ${type} using the price book and Claude, for an existing or brand-new customer. Creates an actual draft ${type} in the CRM. By default it's priced good/better/best (three tiers); pass pricingMode "flat" if the tech/customer wants one straight price per line instead of a tiered choice.${
+      attachmentFiles?.length
+        ? " A PDF plan set and/or photos are attached to this conversation and will be passed through automatically to ground pricing/scope -- no need to describe every detail already visible on the plans."
+        : ""
+    }${
       fast
         ? " Runs in the background and returns immediately without a price -- real price-book pricing takes about a minute, so tell the tech to check the CRM shortly rather than expecting the number in this reply."
         : ""
@@ -557,6 +561,7 @@ function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boo
             rawRequest: jobDescription,
             pricingMode,
             fast,
+            photos: attachmentFiles,
           });
           return `Generating the ${type} for ${resolvedName}${
             propertyAddress ? ` at ${propertyAddress}` : ""
@@ -572,6 +577,7 @@ function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boo
           rawRequest: jobDescription,
           pricingMode,
           fast,
+          photos: attachmentFiles,
         });
         const lines = results.map((r) =>
           r.pricingMode === "flat"
@@ -647,8 +653,9 @@ const completeTaskTool = betaZodTool({
   },
 });
 
-export function buildInternalTools(options?: { fast?: boolean }) {
+export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?: File[] }) {
   const fast = options?.fast;
+  const attachmentFiles = options?.attachmentFiles;
   return [
     addCustomerTool,
     findCustomerTool,
@@ -668,9 +675,9 @@ export function buildInternalTools(options?: { fast?: boolean }) {
     updateWarrantyTool,
     createWarrantyTool,
     createMassSaveRebateTool,
-    buildDocumentTool("estimate", fast),
-    buildDocumentTool("invoice", fast),
-    buildDocumentTool("proposal", fast),
+    buildDocumentTool("estimate", fast, attachmentFiles),
+    buildDocumentTool("invoice", fast, attachmentFiles),
+    buildDocumentTool("proposal", fast, attachmentFiles),
     addTaskTool,
     listOpenTasksTool,
     completeTaskTool,

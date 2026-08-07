@@ -21,8 +21,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Conversation is too long — start a new chat." }, { status: 400 });
   }
   const last = messages[messages.length - 1];
-  if (!last?.content || last.content.length > MAX_MESSAGE_LENGTH) {
-    return NextResponse.json({ error: "Message must be between 1 and 2000 characters" }, { status: 400 });
+  if (last?.content && last.content.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json({ error: "Message must be under 2000 characters" }, { status: 400 });
+  }
+  if (!last?.content && !last?.attachments?.length) {
+    return NextResponse.json({ error: "Message is empty" }, { status: 400 });
+  }
+  if (last?.attachments && last.attachments.length > 3) {
+    return NextResponse.json({ error: "Attach at most 3 files at a time" }, { status: 400 });
   }
 
   try {
