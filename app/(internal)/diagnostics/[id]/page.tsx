@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { fetchAllPriceBookItems } from "@/lib/price-book";
 import { sendServiceReportEmail } from "./actions";
 import AssignCustomerForm from "./AssignCustomerForm";
+import PartsUsedForm from "./PartsUsedForm";
 import SubmitButton from "../../SubmitButton";
 import { headingClass, subTextClass, itemSubClass, buttonClass, buttonSecondaryClass } from "../../ui";
 
@@ -59,6 +61,40 @@ export default async function DiagnosticPage({
   const readings = diagnostic.readings as Readings;
   const lineItems = (diagnostic.suggested_line_items ?? []) as SuggestedLineItem[];
   const photos = (diagnostic.photos ?? []) as { url: string; caption: string | null }[];
+  const actualPartsUsed = (diagnostic.actual_parts_used ?? []) as {
+    price_book_item_name: string;
+    qty: number;
+    unit_price: number | null;
+  }[];
+
+  const priceBookRows = await fetchAllPriceBookItems<{
+    id: string;
+    name: string;
+    category: string | null;
+    tier: string | null;
+    unit_price: number | null;
+  }>(supabase, "id, name, category, tier, unit_price");
+
+  // One representative row per distinct part -- tiers are separate rows for
+  // the same physical item, and "parts used" doesn't care which tier.
+  const priceBookByName = new Map<string, { id: string; name: string; category: string | null; unit_price: number | null }>();
+  for (const row of priceBookRows) {
+    const existing = priceBookByName.get(row.name);
+    if (!existing || row.tier === "better") {
+      priceBookByName.set(row.name, { id: row.id, name: row.name, category: row.category, unit_price: row.unit_price });
+    }
+  }
+  const priceBookOptions = Array.from(priceBookByName.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+  const partsInitialRows = actualPartsUsed.length
+    ? actualPartsUsed.map((p) => ({ name: p.price_book_item_name, qty: p.qty, unitPrice: p.unit_price }))
+    : lineItems
+        .filter((li) => li.price_book_item_name && priceBookByName.has(li.price_book_item_name))
+        .map((li) => ({
+          name: li.price_book_item_name as string,
+          qty: li.qty || 1,
+          unitPrice: priceBookByName.get(li.price_book_item_name as string)?.unit_price ?? null,
+        }));
 
   const displayCustomerName = diagnostic.equipment?.properties?.customers?.name ?? diagnostic.jobs?.customers?.name;
   const displayAddress = diagnostic.equipment?.properties?.address ?? diagnostic.jobs?.properties?.address;
@@ -221,6 +257,15 @@ export default async function DiagnosticPage({
           </div>
         </section>
       )}
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Parts Used</h2>
+        <p className={itemSubClass}>
+          Confirm the real parts used, resolved against the price book — pre-filled from the suggested line
+          items above where a match was found. Saving deducts matching truck inventory on hand.
+        </p>
+        <PartsUsedForm diagnosticId={id} priceBookOptions={priceBookOptions} initialRows={partsInitialRows} />
+      </section>
 
       <details className="rounded-xl border border-white/8 bg-white/3 p-4">
         <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-g300">

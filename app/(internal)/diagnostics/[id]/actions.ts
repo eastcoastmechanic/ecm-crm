@@ -71,6 +71,61 @@ export async function assignCustomer(formData: FormData) {
   revalidatePath("/equipment");
 }
 
+export async function recordPartsUsed(formData: FormData) {
+  const diagnosticId = formData.get("diagnostic_id") as string;
+  const count = Number(formData.get("item_count")) || 0;
+
+  const parts: { price_book_item_name: string; qty: number; unit_price: number | null }[] = [];
+  for (let i = 0; i < count; i++) {
+    const name = (formData.get(`name_${i}`) as string)?.trim();
+    const qty = Number(formData.get(`qty_${i}`));
+    if (!name || !qty) continue;
+    const unitPriceRaw = formData.get(`unit_price_${i}`) as string;
+    parts.push({
+      price_book_item_name: name,
+      qty,
+      unit_price: unitPriceRaw ? Number(unitPriceRaw) : null,
+    });
+  }
+
+  const { error } = await supabase
+    .from("diagnostics")
+    .update({ actual_parts_used: parts })
+    .eq("id", diagnosticId);
+  if (error) throw new Error(error.message);
+
+  // Best-effort inventory deduction -- matched by price book item name since
+  // tiers (good/better/best) are separate rows for the same physical part,
+  // and inventory only tracks one row per part regardless of which tier id
+  // it was originally added under.
+  for (const part of parts) {
+    const { data: matchingItems } = await supabase
+      .from("price_book_items")
+      .select("id")
+      .eq("name", part.price_book_item_name);
+    const ids = (matchingItems ?? []).map((r) => r.id);
+    if (ids.length === 0) continue;
+
+    const { data: invRow } = await supabase
+      .from("inventory_items")
+      .select("id, qty_on_hand")
+      .in("price_book_item_id", ids)
+      .limit(1)
+      .maybeSingle();
+
+    if (invRow) {
+      const newQty = Math.max(0, invRow.qty_on_hand - part.qty);
+      await supabase
+        .from("inventory_items")
+        .update({ qty_on_hand: newQty, updated_at: new Date().toISOString() })
+        .eq("id", invRow.id);
+    }
+  }
+
+  revalidatePath(`/diagnostics/${diagnosticId}`);
+  revalidatePath("/inventory");
+}
+
 export async function sendServiceReportEmail(formData: FormData) {
   const id = formData.get("id") as string;
 
