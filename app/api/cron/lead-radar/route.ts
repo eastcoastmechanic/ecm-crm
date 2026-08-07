@@ -29,5 +29,7 @@ export async function GET(request: Request) {
     results.agingEquipment = { inserted: 0, errors: [err instanceof Error ? err.message : "sweep threw"] };
   }
 
+  console.log("[cron/lead-radar]", JSON.stringify(results));
+
   return NextResponse.json(results);
 }
