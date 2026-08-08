@@ -234,7 +234,7 @@ export default function MarketingHome() {
       {/* AI callout */}
       <section className="mx-auto w-full max-w-6xl px-6 py-16">
         <Reveal>
-          <div className="relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/10 via-transparent to-gold/10 p-8 sm:p-12">
+          <div className="relative overflow-hidden rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/10 via-transparent to-highlight/10 p-8 sm:p-12">
             <span className="rounded-full border border-accent/30 bg-navy/60 px-3 py-1 text-xs font-bold uppercase tracking-wide text-accent">
               Meet Your New Front Desk
             </span>

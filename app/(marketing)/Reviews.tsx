@@ -12,7 +12,7 @@ function displayName(fullName: string | null): string {
 
 function Stars({ rating }: { rating: number }) {
   return (
-    <div aria-label={`${rating} out of 5 stars`} className="text-gold">
+    <div aria-label={`${rating} out of 5 stars`} className="text-highlight">
       {"★".repeat(rating)}
       <span className="text-white/15">{"★".repeat(5 - rating)}</span>
     </div>

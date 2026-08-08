@@ -11,6 +11,12 @@
   --brand: #38b7e1;
   --accent: #e8502a;
   --accent-2: #c43d20;
+  /* Customer-facing highlight — the periwinkle from the logo's snowflake.
+     Replaces gold on the marketing site, the portal, and generated PDFs. */
+  --highlight: #558ae7;
+  /* Still used throughout the internal CRM (profit/cost markers, job and
+     lead statuses). Deliberately kept: it reads as "staff-only" there, and
+     it never reaches a customer. */
   --gold: #f5a623;
   --off: #f4f6fa;
   --g100: #e2e8f0;
@@ -28,6 +34,7 @@
   --color-brand: var(--brand);
   --color-accent: var(--accent);
   --color-accent-2: var(--accent-2);
+  --color-highlight: var(--highlight);
   --color-gold: var(--gold);
   --color-off: var(--off);
   --color-g100: var(--g100);

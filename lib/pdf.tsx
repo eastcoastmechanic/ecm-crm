@@ -46,7 +46,7 @@ const colors = {
   blue: "#1e3a5f",
   accent: "#e8502a",
   accent2: "#c43d20",
-  gold: "#f5a623",
+  highlight: "#558ae7",
   // Cyan sampled from the logo gradient (public/logo.png).
   brand: "#38b7e1",
   off: "#f4f6fa",
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     fontFamily: BODY_FONT,
     fontWeight: 700,
-    color: colors.gold,
+    color: colors.highlight,
     letterSpacing: 1.5,
     marginBottom: 3,
   },
@@ -216,14 +216,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   tierCardTopBlue: { borderTopWidth: 3, borderTopColor: colors.blue },
-  tierCardTopGold: { borderTopWidth: 3, borderTopColor: colors.gold },
+  tierCardTopHighlight: { borderTopWidth: 3, borderTopColor: colors.highlight },
   tierCardBetter: {
     backgroundColor: colors.navy,
     paddingTop: 8,
   },
   ribbon: {
     alignSelf: "center",
-    backgroundColor: colors.gold,
+    backgroundColor: colors.highlight,
     color: colors.navy,
     fontSize: 6.5,
     fontFamily: BODY_FONT,
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   thPrice: {
-    color: colors.gold,
+    color: colors.highlight,
   },
   td: {
     fontSize: 8.5,
@@ -456,7 +456,7 @@ export function DocumentPdf({ doc, logo }: { doc: PdfDocumentData; logo: string 
                   <Text style={{ ...styles.tierBrand, ...styles.tierBrandLight }}>{doc.brand.better}</Text>
                 )}
               </View>
-              <View style={{ ...styles.tierCard, ...styles.tierCardTopGold }}>
+              <View style={{ ...styles.tierCard, ...styles.tierCardTopHighlight }}>
                 <Text style={styles.tierLabel}>BEST</Text>
                 <Text style={styles.tierPrice}>{formatPrice(doc.totals.best)}</Text>
                 {doc.brand.best && <Text style={styles.tierBrand}>{doc.brand.best}</Text>}
