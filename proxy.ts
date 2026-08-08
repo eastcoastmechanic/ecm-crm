@@ -94,7 +94,7 @@ async function checkStaffSession(
   return { role: staff?.role ?? null, response };
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   if (isInternalPath(request.nextUrl.pathname)) {
     if (hasValidBasicAuth(request)) return NextResponse.next();
 
