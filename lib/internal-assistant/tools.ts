@@ -248,8 +248,15 @@ const addEquipmentTool = betaZodTool({
     refrigerantType: z.string().optional(),
     installDate: z.string().optional().describe("YYYY-MM-DD"),
     warrantyExpiration: z.string().optional().describe("YYYY-MM-DD"),
+    barcode: z.string().optional().describe("Code printed under the barcode on the rating plate, no asterisks"),
+    nameplate: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe(
+        "Remaining rating-plate data: manufacture_date, voltage, phase, refrigerant_charge, btu_input, btu_output, seer, ahri_number"
+      ),
   }),
-  run: async ({ propertyId, type, brand, model, serialNumber, refrigerantType, installDate, warrantyExpiration }) => {
+  run: async ({ propertyId, type, brand, model, serialNumber, refrigerantType, installDate, warrantyExpiration, barcode, nameplate }) => {
     const fd = new FormData();
     fd.set("property_id", propertyId);
     fd.set("type", type);
@@ -259,6 +266,8 @@ const addEquipmentTool = betaZodTool({
     if (refrigerantType) fd.set("refrigerant_type", refrigerantType);
     if (installDate) fd.set("install_date", installDate);
     if (warrantyExpiration) fd.set("warranty_expiration", warrantyExpiration);
+    if (barcode) fd.set("barcode", barcode);
+    if (nameplate) fd.set("nameplate", JSON.stringify(nameplate));
     try {
       await addEquipment(fd);
       return `Added equipment "${type}${brand ? ` — ${brand}` : ""}".`;
@@ -280,11 +289,18 @@ const updateEquipmentTool = betaZodTool({
     refrigerantType: z.string().optional(),
     installDate: z.string().optional().describe("YYYY-MM-DD"),
     warrantyExpiration: z.string().optional().describe("YYYY-MM-DD"),
+    barcode: z.string().optional().describe("Code printed under the barcode on the rating plate, no asterisks"),
+    nameplate: z
+      .record(z.string(), z.string())
+      .optional()
+      .describe(
+        "Remaining rating-plate data: manufacture_date, voltage, phase, refrigerant_charge, btu_input, btu_output, seer, ahri_number"
+      ),
   }),
-  run: async ({ equipmentId, type, brand, model, serialNumber, refrigerantType, installDate, warrantyExpiration }) => {
+  run: async ({ equipmentId, type, brand, model, serialNumber, refrigerantType, installDate, warrantyExpiration, barcode, nameplate }) => {
     const { data: existing, error: fetchError } = await supabase
       .from("equipment")
-      .select("property_id, type, brand, model, serial_number, refrigerant_type, install_date, warranty_expiration")
+      .select("property_id, type, brand, model, serial_number, refrigerant_type, install_date, warranty_expiration, barcode, nameplate")
       .eq("id", equipmentId)
       .single();
     if (fetchError || !existing) return `Equipment not found: ${fetchError?.message ?? equipmentId}`;
@@ -299,6 +315,11 @@ const updateEquipmentTool = betaZodTool({
     fd.set("refrigerant_type", refrigerantType ?? existing.refrigerant_type ?? "");
     fd.set("install_date", installDate ?? existing.install_date ?? "");
     fd.set("warranty_expiration", warrantyExpiration ?? existing.warranty_expiration ?? "");
+    fd.set("barcode", barcode ?? existing.barcode ?? "");
+    // Merge rather than replace: a second photo of the same plate shouldn't
+    // wipe fields that were legible the first time round.
+    const mergedNameplate = { ...(existing.nameplate ?? {}), ...(nameplate ?? {}) };
+    fd.set("nameplate", Object.keys(mergedNameplate).length ? JSON.stringify(mergedNameplate) : "");
 
     try {
       await updateEquipment(fd);
