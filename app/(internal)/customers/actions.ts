@@ -63,6 +63,11 @@ export async function updateCustomer(formData: FormData) {
 
   revalidatePath(`/customers/${id}`);
   revalidatePath("/customers");
+  // Documents render the customer's name/email and gate "Send to Customer" on
+  // that email, and this form is reachable from a document's own header — so
+  // without this the page you just edited from would keep showing the stale
+  // value (and keep hiding the send button) until a hard reload.
+  revalidatePath("/documents", "layout");
 }
 
 // Deletes a customer and everything hanging off it — properties, equipment,
