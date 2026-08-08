@@ -1,4 +1,5 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
+import { COMPANY_SLOGAN } from "./brand";
 
 export type AssessmentItem = {
   equipment_id: string | null;
@@ -136,7 +137,7 @@ export function AssessmentReportPdf({ doc }: { doc: AssessmentReportPdfData }) {
         <View style={styles.header} fixed>
           <View>
             <Text style={styles.companyName}>East Coast Mechanical</Text>
-            <Text style={styles.companyTag}>HVAC &amp; PLUMBING</Text>
+            <Text style={styles.companyTag}>{COMPANY_SLOGAN}</Text>
           </View>
           <View>
             <Text style={styles.docTitle}>{doc.doc_number ?? ""} — Condition Assessment</Text>

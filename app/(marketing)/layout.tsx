@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import ChatWidget from "./ChatWidget";
+import { COMPANY_SLOGAN } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: "East Coast Mechanical | Heating, Cooling & Air Quality",
@@ -64,6 +65,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <Image src="/logo.png" alt="ECM logo" width={32} height={32} />
               <span className="font-display text-sm font-bold">East Coast Mechanical</span>
             </div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-gold">{COMPANY_SLOGAN}</p>
             <p className="text-sm text-g300">Serving the South Shore through the Cape and Islands.</p>
           </div>
           <div className="flex flex-col gap-1 text-sm text-g300">

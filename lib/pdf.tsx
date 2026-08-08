@@ -1,6 +1,7 @@
 import path from "path";
 import { readFile } from "fs/promises";
 import { Document, Page, View, Text, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
+import { COMPANY_SLOGAN } from "./brand";
 
 export type PdfLineItem = {
   category: string;
@@ -369,7 +370,7 @@ export function DocumentPdf({ doc, logo }: { doc: PdfDocumentData; logo: string 
             {logo && <Image src={logo} style={styles.logo} />}
             <View>
               <Text style={styles.companyName}>EAST COAST MECHANICAL</Text>
-              <Text style={styles.companyTag}>Heating  |  Cooling  |  Plumbing  |  Air Quality</Text>
+              <Text style={styles.companyTag}>{COMPANY_SLOGAN}</Text>
             </View>
           </View>
           <View>
