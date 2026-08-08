@@ -9,6 +9,7 @@ import { addProperty, updateProperty, deleteProperty } from "@/app/(internal)/pr
 import { addEquipment, updateEquipment, deleteEquipment } from "@/app/(internal)/equipment/actions";
 import { updateWarranty } from "@/app/(internal)/documents/[id]/actions";
 import { deleteDocument } from "@/app/(internal)/documents/actions";
+import { opsTools } from "./tools-ops";
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -702,5 +703,7 @@ export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?:
     addTaskTool,
     listOpenTasksTool,
     completeTaskTool,
+    // Jobs, leads, inventory, and sending — see tools-ops.ts.
+    ...opsTools,
   ];
 }
