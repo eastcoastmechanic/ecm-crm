@@ -63,7 +63,10 @@ let logoDataUri: string | null = null;
 async function getLogoDataUri(): Promise<string | null> {
   if (logoDataUri) return logoDataUri;
   try {
-    const buffer = await readFile(path.join(process.cwd(), "public", "logo.png"));
+    // logo-mark.png is logo.png with its dead margin trimmed off. The source
+    // file is 1280x1024 with the badge occupying only 698x582 of it, so at a
+    // 32pt box the mark rendered around 17pt and the wordmark was unreadable.
+    const buffer = await readFile(path.join(process.cwd(), "public", "logo-mark.png"));
     logoDataUri = `data:image/png;base64,${buffer.toString("base64")}`;
     return logoDataUri;
   } catch {
@@ -97,9 +100,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   logo: {
-    width: 32,
-    height: 32,
-    borderRadius: 4,
+    // 52x44 keeps the mark's own 1.18:1 ratio so it isn't squashed; the old
+    // 32x32 square both shrank and distorted it. No borderRadius — the badge
+    // is round with transparent corners, so rounding the box did nothing.
+    width: 52,
+    height: 44,
   },
   companyName: {
     color: colors.white,

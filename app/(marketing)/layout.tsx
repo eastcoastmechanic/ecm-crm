@@ -16,7 +16,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <header className="relative border-b border-white/6 bg-navy after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-gradient-to-r after:from-accent after:via-gold after:to-transparent">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-5 gap-y-2 px-6 py-3">
           <Link href="/" className="flex shrink-0 items-center gap-2.5">
-            <Image src="/logo.png" alt="ECM logo" width={44} height={44} className="shrink-0" />
+            <Image src="/logo-mark.png" alt="ECM logo" width={52} height={44} className="shrink-0" />
             <span className="whitespace-nowrap font-display text-base font-bold tracking-wide">
               East Coast Mechanical
             </span>
@@ -62,7 +62,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         <div className="mx-auto grid max-w-6xl gap-8 px-6 py-10 sm:grid-cols-4">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <Image src="/logo.png" alt="ECM logo" width={32} height={32} />
+              <Image src="/logo-mark.png" alt="ECM logo" width={38} height={32} />
               <span className="font-display text-sm font-bold">East Coast Mechanical</span>
             </div>
             <p className="text-[11px] font-bold uppercase tracking-wide text-brand">{COMPANY_SLOGAN}</p>
