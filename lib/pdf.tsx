@@ -2,6 +2,7 @@ import path from "path";
 import { readFile } from "fs/promises";
 import { Document, Page, View, Text, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { COMPANY_SLOGAN } from "./brand";
+import { registerBrandFonts, BODY_FONT, DISPLAY_FONT } from "./pdf-fonts";
 
 export type PdfLineItem = {
   category: string;
@@ -35,6 +36,7 @@ const typeLabel: Record<PdfDocumentData["type"], string> = {
 };
 
 Font.registerHyphenationCallback((word) => [word]);
+registerBrandFonts();
 
 // Same palette as app/globals.css, so a printed document reads as the same
 // brand as the website/CRM rather than a generic grey PDF.
@@ -45,6 +47,8 @@ const colors = {
   accent: "#e8502a",
   accent2: "#c43d20",
   gold: "#f5a623",
+  // Cyan sampled from the logo gradient (public/logo.png).
+  brand: "#38b7e1",
   off: "#f4f6fa",
   g100: "#e2e8f0",
   g300: "#94a3b8",
@@ -70,7 +74,7 @@ async function getLogoDataUri(): Promise<string | null> {
 
 const styles = StyleSheet.create({
   page: {
-    fontFamily: "Helvetica",
+    fontFamily: BODY_FONT,
     fontSize: 9,
     color: colors.g700,
     paddingBottom: 56,
@@ -99,13 +103,15 @@ const styles = StyleSheet.create({
   },
   companyName: {
     color: colors.white,
+    fontFamily: DISPLAY_FONT,
     fontSize: 16,
     fontWeight: 700,
     letterSpacing: 0.75,
   },
   companyTag: {
-    color: colors.gold,
+    color: colors.brand,
     fontSize: 8,
+    fontFamily: BODY_FONT,
     fontWeight: 600,
     letterSpacing: 0.3,
     marginTop: 3,
@@ -115,6 +121,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     color: colors.white,
     fontSize: 9,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     letterSpacing: 1,
     paddingHorizontal: 10,
@@ -124,6 +131,7 @@ const styles = StyleSheet.create({
   docNumber: {
     color: colors.white,
     fontSize: 12,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     textAlign: "right",
     marginTop: 5,
@@ -143,6 +151,7 @@ const styles = StyleSheet.create({
   },
   preparedFor: {
     fontSize: 7,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     color: colors.gold,
     letterSpacing: 1.5,
@@ -150,6 +159,7 @@ const styles = StyleSheet.create({
   },
   customerName: {
     fontSize: 12,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     color: colors.navy,
   },
@@ -175,6 +185,7 @@ const styles = StyleSheet.create({
   },
   massSaveTitle: {
     fontSize: 8,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     color: colors.green,
     letterSpacing: 0.5,
@@ -210,6 +221,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gold,
     color: colors.navy,
     fontSize: 6.5,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     letterSpacing: 1,
     paddingHorizontal: 7,
@@ -219,6 +231,7 @@ const styles = StyleSheet.create({
   },
   tierLabel: {
     fontSize: 7.5,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     color: colors.g500,
     letterSpacing: 1,
@@ -229,6 +242,7 @@ const styles = StyleSheet.create({
   },
   tierPrice: {
     fontSize: 16,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     color: colors.navy,
   },
@@ -275,6 +289,7 @@ const styles = StyleSheet.create({
   },
   th: {
     fontSize: 7,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     color: colors.white,
     letterSpacing: 0.5,
@@ -293,6 +308,7 @@ const styles = StyleSheet.create({
   colDescFlat: { width: "62%" },
   colPriceFlat: { width: "26%", textAlign: "right" },
   descTitle: {
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     color: colors.navy,
   },
@@ -318,12 +334,14 @@ const styles = StyleSheet.create({
   totalDueLabel: {
     color: colors.white,
     fontSize: 8,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     letterSpacing: 1,
   },
   totalDueAmount: {
     color: colors.white,
     fontSize: 14,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
   },
   closingNote: {
@@ -421,7 +439,10 @@ export function DocumentPdf({ doc, logo }: { doc: PdfDocumentData; logo: string 
                 {doc.brand.good && <Text style={styles.tierBrand}>{doc.brand.good}</Text>}
               </View>
               <View style={styles.tierCardBetter}>
-                <Text style={styles.ribbon}>★ RECOMMENDED</Text>
+                {/* No ★ here: neither DM Sans nor the standard PDF fonts carry
+                    U+2605, so it rendered as nothing and dragged a Helvetica
+                    fallback into every tiered document. */}
+                <Text style={styles.ribbon}>RECOMMENDED</Text>
                 <Text style={{ ...styles.tierLabel, ...styles.tierLabelLight }}>BETTER</Text>
                 <Text style={{ ...styles.tierPrice, ...styles.tierPriceLight }}>
                   {formatPrice(doc.totals.better)}

@@ -1,5 +1,6 @@
 import { Document, Page, View, Text, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { COMPANY_SLOGAN } from "./brand";
+import { registerBrandFonts, BODY_FONT, DISPLAY_FONT } from "./pdf-fonts";
 
 export type WarrantyReportItem = {
   equipment_label: string;
@@ -36,8 +37,12 @@ const CRAFTSMANSHIP_COVERAGE_TEXT =
 
 Font.registerHyphenationCallback((word) => [word]);
 
+registerBrandFonts();
+
 const colors = {
   navy: "#0a1628",
+  // Cyan from the logo gradient (public/logo.png) -- the tagline colour.
+  brand: "#38b7e1",
   accent: "#e8502a",
   g300: "#94a3b8",
   g700: "#334155",
@@ -56,7 +61,7 @@ function formatDate(value: string | null) {
 
 const styles = StyleSheet.create({
   page: {
-    fontFamily: "Helvetica",
+    fontFamily: BODY_FONT,
     fontSize: 9,
     color: colors.g700,
     paddingBottom: 48,
@@ -69,16 +74,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  companyName: { color: "#ffffff", fontSize: 16, fontWeight: 700 },
-  companyTag: { color: colors.g300, fontSize: 8, letterSpacing: 1, marginTop: 2 },
-  docTitle: { color: colors.accent, fontSize: 14, fontWeight: 700, textAlign: "right" },
+  companyName: { color: "#ffffff", fontSize: 16, fontWeight: 700, fontFamily: DISPLAY_FONT },
+  companyTag: { color: colors.brand, fontSize: 8, letterSpacing: 1, marginTop: 2 },
+  docTitle: { fontFamily: BODY_FONT, color: colors.accent, fontSize: 14, fontWeight: 700, textAlign: "right" },
   docMeta: { color: colors.g300, fontSize: 8, textAlign: "right", marginTop: 2 },
   body: { paddingHorizontal: 32, paddingTop: 20 },
   customerBlock: { marginBottom: 14 },
-  customerName: { fontSize: 11, fontWeight: 700, color: colors.navy },
+  customerName: { fontFamily: BODY_FONT, fontSize: 11, fontWeight: 700, color: colors.navy },
   customerSub: { fontSize: 9, color: colors.g700, marginTop: 2 },
   sectionLabel: {
     fontSize: 7.5,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     color: colors.g300,
     letterSpacing: 0.5,
@@ -91,7 +97,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 12,
   },
-  itemTitle: { fontSize: 11, fontWeight: 700, color: colors.navy },
+  itemTitle: { fontFamily: BODY_FONT, fontSize: 11, fontWeight: 700, color: colors.navy },
   itemSub: { fontSize: 8.5, color: colors.g300, marginTop: 1, marginBottom: 8 },
   subCard: {
     borderWidth: 1,
@@ -112,7 +118,7 @@ const styles = StyleSheet.create({
   coverageText: { fontSize: 8, color: colors.g700, marginTop: 5, lineHeight: 1.4 },
   signatureBlock: { marginTop: 16, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
   signatureLabel: { fontSize: 7.5, color: colors.g300, marginBottom: 2 },
-  signatureName: { fontSize: 10, fontWeight: 700, color: colors.navy },
+  signatureName: { fontFamily: BODY_FONT, fontSize: 10, fontWeight: 700, color: colors.navy },
   footer: {
     position: "absolute",
     bottom: 0,

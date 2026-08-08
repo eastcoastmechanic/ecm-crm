@@ -1,5 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { COMPANY_SLOGAN } from "./brand";
+import { registerBrandFonts, BODY_FONT, DISPLAY_FONT } from "./pdf-fonts";
 
 export type ServiceReportReadings = {
   outdoor_temp: number | null;
@@ -48,8 +49,12 @@ export type ServiceReportPdfData = {
 
 Font.registerHyphenationCallback((word) => [word]);
 
+registerBrandFonts();
+
 const colors = {
   navy: "#0a1628",
+  // Cyan from the logo gradient (public/logo.png) -- the tagline colour.
+  brand: "#38b7e1",
   accent: "#e8502a",
   g300: "#94a3b8",
   g700: "#334155",
@@ -58,7 +63,7 @@ const colors = {
 
 const styles = StyleSheet.create({
   page: {
-    fontFamily: "Helvetica",
+    fontFamily: BODY_FONT,
     fontSize: 9,
     color: colors.g700,
     paddingBottom: 48,
@@ -71,16 +76,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  companyName: { color: "#ffffff", fontSize: 16, fontWeight: 700 },
-  companyTag: { color: colors.g300, fontSize: 8, letterSpacing: 1, marginTop: 2 },
-  docTitle: { color: colors.accent, fontSize: 14, fontWeight: 700, textAlign: "right" },
+  companyName: { color: "#ffffff", fontSize: 16, fontWeight: 700, fontFamily: DISPLAY_FONT },
+  companyTag: { color: colors.brand, fontSize: 8, letterSpacing: 1, marginTop: 2 },
+  docTitle: { fontFamily: BODY_FONT, color: colors.accent, fontSize: 14, fontWeight: 700, textAlign: "right" },
   docMeta: { color: colors.g300, fontSize: 8, textAlign: "right", marginTop: 2 },
   body: { paddingHorizontal: 32, paddingTop: 20 },
   customerBlock: { marginBottom: 14 },
-  customerName: { fontSize: 11, fontWeight: 700, color: colors.navy },
+  customerName: { fontFamily: BODY_FONT, fontSize: 11, fontWeight: 700, color: colors.navy },
   customerSub: { fontSize: 9, color: colors.g700, marginTop: 2 },
   sectionLabel: {
     fontSize: 7.5,
+    fontFamily: BODY_FONT,
     fontWeight: 700,
     color: colors.g300,
     letterSpacing: 0.5,
@@ -111,7 +117,7 @@ const styles = StyleSheet.create({
     padding: 8,
     textAlign: "center",
   },
-  calloutValue: { fontSize: 13, fontWeight: 700, color: colors.navy, marginTop: 2 },
+  calloutValue: { fontFamily: BODY_FONT, fontSize: 13, fontWeight: 700, color: colors.navy, marginTop: 2 },
   readingsGrid: { flexDirection: "row", flexWrap: "wrap" },
   readingCell: { width: "50%", fontSize: 8.5, marginBottom: 3, color: colors.g700 },
   table: { borderWidth: 1, borderColor: colors.border, borderRadius: 4 },
@@ -128,7 +134,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     paddingVertical: 6,
   },
-  th: { fontSize: 7, fontWeight: 700, color: colors.g300, letterSpacing: 0.5, paddingHorizontal: 6 },
+  th: { fontFamily: BODY_FONT, fontSize: 7, fontWeight: 700, color: colors.g300, letterSpacing: 0.5, paddingHorizontal: 6 },
   td: { fontSize: 8.5, paddingHorizontal: 6 },
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   photo: { width: 150, height: 112, borderRadius: 4, objectFit: "cover" },
