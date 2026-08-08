@@ -6,6 +6,7 @@ import AssessmentDetail from "./AssessmentDetail";
 import WarrantyDetail from "./WarrantyDetail";
 import MassSaveRebateDetail from "./MassSaveRebateDetail";
 import LineItemsEditor from "./LineItemsEditor";
+import EditCustomerForm from "../../customers/[id]/EditCustomerForm";
 import SubmitButton from "../../SubmitButton";
 import { headingClass, subTextClass, buttonClass, buttonSecondaryClass } from "../../ui";
 
@@ -106,7 +107,12 @@ export default async function DocumentPage({
 
   const { data: doc, error } = await supabase
     .from("documents")
-    .select("*, customers(name, email, phone), properties(address)")
+    // Full customer record, not just the display fields: the header lets you
+    // edit the customer inline (e.g. adding a missing email so the document
+    // can actually be sent) without leaving the document.
+    .select(
+      "*, customers(id, name, email, phone, billing_address, notes, sms_consent), properties(address)"
+    )
     .eq("id", id)
     .single();
 
@@ -160,11 +166,18 @@ export default async function DocumentPage({
             </span>
           )}
           <p className={subTextClass}>
-            {doc.customers?.name}
+            {doc.customers?.id ? (
+              <a href={`/customers/${doc.customers.id}`} className="underline hover:text-white">
+                {doc.customers.name}
+              </a>
+            ) : (
+              doc.customers?.name
+            )}
             {doc.properties?.address ? ` · ${doc.properties.address}` : ""}
             {" · "}
             {new Date(doc.created_at).toLocaleDateString()}
           </p>
+          {doc.customers?.id && <EditCustomerForm customer={doc.customers} />}
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           <a
@@ -183,8 +196,8 @@ export default async function DocumentPage({
               </SubmitButton>
             </form>
           ) : (
-            <span className={subTextClass} title="Add an email to this customer to send documents">
-              No customer email on file
+            <span className={subTextClass}>
+              No customer email on file — use Edit to add one
             </span>
           )}
         </div>
