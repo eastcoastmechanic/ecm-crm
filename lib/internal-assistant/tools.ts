@@ -11,6 +11,7 @@ import { updateWarranty } from "@/app/(internal)/documents/[id]/actions";
 import { deleteDocument } from "@/app/(internal)/documents/actions";
 import { opsTools } from "./tools-ops";
 import { fieldTools } from "./tools-field";
+import { referenceTools } from "./tools-reference";
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -708,5 +709,7 @@ export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?:
     ...opsTools,
     // Service reports, install reports, and payment links -- see tools-field.ts.
     ...fieldTools,
+    // PT charts, superheat/subcooling, ECM's diagnostic guide -- tools-reference.ts.
+    ...referenceTools,
   ];
 }

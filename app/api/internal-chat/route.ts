@@ -31,8 +31,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Attach at most 3 files at a time" }, { status: 400 });
   }
 
+  // Hands-free callers (glasses, voice) can't sit through a 70-90s document
+  // generation with nothing to listen to, so they opt into the same fast path
+  // Teams/Copilot uses: reply immediately, generate in the background. The web
+  // chat widget leaves this off and waits, since it can show a spinner.
+  const fast = body?.fast === true;
+
   try {
-    const reply = await respondToInternalChat(messages);
+    const reply = await respondToInternalChat(messages, { fast });
     return NextResponse.json({ reply });
   } catch (err) {
     console.error("Internal chat error:", err);
