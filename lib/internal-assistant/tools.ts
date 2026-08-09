@@ -10,6 +10,7 @@ import { addEquipment, updateEquipment, deleteEquipment } from "@/app/(internal)
 import { updateWarranty } from "@/app/(internal)/documents/[id]/actions";
 import { deleteDocument } from "@/app/(internal)/documents/actions";
 import { opsTools } from "./tools-ops";
+import { fieldTools } from "./tools-field";
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -705,5 +706,7 @@ export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?:
     completeTaskTool,
     // Jobs, leads, inventory, and sending — see tools-ops.ts.
     ...opsTools,
+    // Service reports, install reports, and payment links -- see tools-field.ts.
+    ...fieldTools,
   ];
 }
