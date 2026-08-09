@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { GOOGLE_REVIEWS } from "@/lib/reviews";
 import Reveal from "./Reveal";
 
 // First name + last initial only — these are real customers, not staged
@@ -35,7 +36,26 @@ export default async function Reviews() {
     jobs: { customers: { name: string | null } | null } | null;
   }[];
 
-  if (reviews.length === 0) return null;
+  // Two sources, deliberately kept apart. Survey responses are private
+  // feedback tied to a real job, so they're shortened to "First L.". The
+  // Google ones were already published publicly by their authors under those
+  // names, and are labelled as such rather than passed off as survey results.
+  const surveyCards = reviews.map((r) => ({
+    rating: r.rating,
+    comment: r.comment,
+    name: displayName(r.jobs?.customers?.name ?? null),
+    fromGoogle: false,
+  }));
+
+  const googleCards = GOOGLE_REVIEWS.map((r) => ({
+    rating: r.rating,
+    comment: r.comment,
+    name: r.name,
+    fromGoogle: true,
+  }));
+
+  const cards = [...surveyCards, ...googleCards];
+  if (cards.length === 0) return null;
 
   return (
     <section id="reviews" className="border-y border-white/6 bg-white/2">
@@ -45,15 +65,18 @@ export default async function Reviews() {
             What Customers Say
           </h2>
           <p className="mt-2 max-w-xl text-sm text-g300">
-            Real feedback from real jobs, collected right after service.
+            Real feedback from real jobs — from our post-service survey and our Google reviews.
           </p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {reviews.map((r, i) => (
+          <div className="mt-8 grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {cards.map((r, i) => (
               <div key={i} className="flex flex-col gap-3 rounded-xl border border-white/8 bg-white/3 p-5">
                 <Stars rating={r.rating} />
-                <p className="text-sm text-g300">&ldquo;{r.comment}&rdquo;</p>
-                <div className="text-xs font-bold uppercase tracking-wide text-white">
-                  {displayName(r.jobs?.customers?.name ?? null)}
+                <p className="text-sm leading-relaxed text-g300">&ldquo;{r.comment}&rdquo;</p>
+                <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-1">
+                  <span className="text-xs font-bold uppercase tracking-wide text-white">{r.name}</span>
+                  {r.fromGoogle && (
+                    <span className="text-[10px] uppercase tracking-wide text-g500">via Google</span>
+                  )}
                 </div>
               </div>
             ))}
