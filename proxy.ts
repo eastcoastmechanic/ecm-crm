@@ -24,7 +24,7 @@ const INTERNAL_PATH_PREFIXES = [
   "/conversations",
 ];
 
-const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize"];
+const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize", "/api/ingest/readings"];
 
 function isInternalPath(pathname: string) {
   if (INTERNAL_API_PATHS.includes(pathname)) return true;
@@ -198,6 +198,7 @@ export const config = {
     "/conversations/:path*",
     "/conversations",
     "/api/internal-chat",
+    "/api/ingest/readings",
     "/api/dispatch/optimize",
   ],
 };
