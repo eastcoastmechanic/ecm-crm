@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { supabase } from "@/lib/supabase";
+import { signStoredPhotos } from "@/lib/photo-urls";
+import type { AssessmentItem } from "@/lib/assessment-report-pdf";
 import { sendDocumentEmail } from "./actions";
 import AssessmentDetail from "./AssessmentDetail";
 import WarrantyDetail from "./WarrantyDetail";
@@ -119,7 +121,23 @@ export default async function DocumentPage({
   if (error || !doc) notFound();
 
   if (doc.type === "assessment") {
-    return <AssessmentDetail doc={doc} hasEmail={!!doc.customers?.email} />;
+    // Assessment photos live in a private bucket and hang off each item, so
+    // they're signed here — AssessmentDetail is a client component and can't
+    // reach storage itself.
+    const lineItems = doc.line_items as { items: AssessmentItem[]; overall_summary: string };
+    const signedDoc = {
+      ...doc,
+      line_items: {
+        ...lineItems,
+        items: await Promise.all(
+          (lineItems?.items ?? []).map(async (item) => ({
+            ...item,
+            photos: await signStoredPhotos(item.photos ?? []),
+          }))
+        ),
+      },
+    };
+    return <AssessmentDetail doc={signedDoc} hasEmail={!!doc.customers?.email} />;
   }
 
   if (doc.type === "warranty") {

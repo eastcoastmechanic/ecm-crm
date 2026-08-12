@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { signStoredPhotos } from "@/lib/photo-urls";
 
 /**
  * Job documentation photos.
@@ -11,10 +12,6 @@ import { supabase } from "@/lib/supabase";
  */
 
 export const JOB_PHOTO_BUCKET = "job-photos";
-
-/** How long a rendered page's photo links stay valid. Long enough to load and
- *  look at, short enough that a copied URL is not a permanent leak. */
-const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 export type JobPhotoPhase = "arrival" | "during" | "completion";
 
@@ -76,34 +73,15 @@ export async function uploadJobPhotoFiles(
 /**
  * Turn stored entries into renderable ones.
  *
- * Signs the private ones in a single batch call and passes legacy public
- * entries through untouched. A photo that fails to sign comes back with a null
- * url rather than throwing — one broken object should not blank out the whole
- * job page.
+ * Delegates to the shared signer so job photos and every other photo in the
+ * CRM resolve the same way — a second implementation is how one of them
+ * quietly ends up public again. Entries written before the private bucket
+ * carry a public URL and are re-signed from it, so they keep rendering once
+ * their bucket is locked down too.
  */
 export async function resolveJobPhotos(photos: unknown): Promise<ResolvedJobPhoto[]> {
   if (!isJobPhotoArray(photos) || photos.length === 0) return [];
-
-  const paths = photos.map((p) => p?.path).filter((p): p is string => Boolean(p));
-  if (paths.length === 0) return photos as ResolvedJobPhoto[];
-
-  const signedByPath = new Map<string, string>();
-  const { data, error } = await supabase.storage
-    .from(JOB_PHOTO_BUCKET)
-    .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
-
-  if (!error && data) {
-    for (const item of data) {
-      // createSignedUrls reports per-object failures inline rather than
-      // rejecting the batch.
-      if (item.path && item.signedUrl) signedByPath.set(item.path, item.signedUrl);
-    }
-  }
-
-  return photos.map((photo) => {
-    if (!photo?.path) return photo as ResolvedJobPhoto;
-    return { ...photo, url: signedByPath.get(photo.path) ?? null };
-  });
+  return signStoredPhotos(photos as ResolvedJobPhoto[], { defaultBucket: JOB_PHOTO_BUCKET });
 }
 
 /** Append to a job's photo array. Reads first because jsonb has no push. */

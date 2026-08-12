@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { ServiceReportPdfData } from "@/lib/service-report-pdf";
+import { signStoredPhotos } from "@/lib/photo-urls";
 
 export async function getServiceReportForPdf(id: string): Promise<{
   data: ServiceReportPdfData | null;
@@ -39,7 +40,10 @@ export async function getServiceReportForPdf(id: string): Promise<{
       ai_diagnosis: diagnostic.ai_diagnosis,
       suggested_fix: diagnostic.suggested_fix,
       suggested_line_items: diagnostic.suggested_line_items ?? [],
-      photos: diagnostic.photos ?? [],
+      // Signed here rather than at render: the PDF fetches each src while it
+      // renders and embeds the bytes, so the signature only has to outlive
+      // this call, not the finished document.
+      photos: await signStoredPhotos(diagnostic.photos ?? []),
     },
     customerEmail: equipment?.properties?.customers?.email ?? null,
     error: null,

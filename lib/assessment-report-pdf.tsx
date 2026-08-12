@@ -9,7 +9,8 @@ export type AssessmentItem = {
   age_years: number | null;
   condition: string;
   observations: string;
-  photos: { url: string; caption: string | null }[];
+  // url is null when the object couldn't be signed (missing or revoked).
+  photos: { url: string | null; caption: string | null }[];
   condition_summary: string;
   recommendation: "no_action" | "monitor" | "repair" | "replace";
   estimated_remaining_life_years: number | null;
@@ -197,11 +198,15 @@ export function AssessmentReportPdf({ doc }: { doc: AssessmentReportPdfData }) {
 
               <Text style={styles.bodyText}>{item.condition_summary}</Text>
 
-              {item.photos.length > 0 && (
+              {item.photos.some((p) => p.url) && (
                 <View style={styles.photoRow}>
-                  {item.photos.map((photo, pi) => (
-                    <Image key={pi} src={photo.url} style={styles.photo} />
-                  ))}
+                  {item.photos.map((photo, pi) =>
+                    // A missing object must not take the whole PDF down with
+                    // it — @react-pdf throws on an unfetchable src.
+                    photo.url ? (
+                      <Image key={pi} src={photo.url} style={styles.photo} />
+                    ) : null
+                  )}
                 </View>
               )}
             </View>

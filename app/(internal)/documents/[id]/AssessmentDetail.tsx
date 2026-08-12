@@ -135,18 +135,20 @@ export default function AssessmentDetail({
               <p className={itemSubClass}>Tech notes: {item.observations}</p>
             )}
 
-            {item.photos.length > 0 && (
+            {item.photos.some((p) => p.url) && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {item.photos.map((photo, pi) => (
-                  <a key={pi} href={photo.url} target="_blank" rel="noopener noreferrer">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={photo.url}
-                      alt={photo.caption ?? "Equipment photo"}
-                      className="aspect-video w-full rounded-lg border border-white/8 object-cover"
-                    />
-                  </a>
-                ))}
+                {item.photos.map((photo, pi) =>
+                  photo.url ? (
+                    <a key={pi} href={photo.url} target="_blank" rel="noopener noreferrer">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photo.url}
+                        alt={photo.caption ?? "Equipment photo"}
+                        className="aspect-video w-full rounded-lg border border-white/8 object-cover"
+                      />
+                    </a>
+                  ) : null
+                )}
               </div>
             )}
           </section>

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { signStoredPhotos } from "@/lib/photo-urls";
 import { fetchAllPriceBookItems } from "@/lib/price-book";
 import { sendServiceReportEmail } from "./actions";
 import AssignCustomerForm from "./AssignCustomerForm";
@@ -61,7 +62,10 @@ export default async function DiagnosticPage({
 
   const readings = diagnostic.readings as Readings;
   const lineItems = (diagnostic.suggested_line_items ?? []) as SuggestedLineItem[];
-  const photos = (diagnostic.photos ?? []) as { url: string; caption: string | null }[];
+  // Bucket is private; sign server-side so the browser gets a fetchable URL.
+  const photos = (await signStoredPhotos(
+    (diagnostic.photos ?? []) as { url: string | null; caption: string | null }[]
+  )) as { url: string | null; caption: string | null }[];
   const actualPartsUsed = (diagnostic.actual_parts_used ?? []) as {
     price_book_item_name: string;
     qty: number;
@@ -184,16 +188,20 @@ export default async function DiagnosticPage({
         <section className="flex flex-col gap-2">
           <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Photos</h2>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {photos.map((photo, i) => (
-              <a key={i} href={photo.url} target="_blank" rel="noopener noreferrer">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photo.url}
-                  alt={photo.caption ?? "Service photo"}
-                  className="aspect-video w-full rounded-lg border border-white/8 object-cover"
-                />
-              </a>
-            ))}
+            {photos.map((photo, i) =>
+              // null means the object is gone or wouldn't sign; skip it rather
+              // than render a broken tile.
+              photo.url ? (
+                <a key={i} href={photo.url} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.url}
+                    alt={photo.caption ?? "Service photo"}
+                    className="aspect-video w-full rounded-lg border border-white/8 object-cover"
+                  />
+                </a>
+              ) : null
+            )}
           </div>
         </section>
       )}

@@ -31,7 +31,8 @@ export type ServiceReportLineItem = {
   notes: string | null;
 };
 
-export type ServiceReportPhoto = { url: string; caption: string | null };
+// url is null when the object couldn't be signed (missing or revoked).
+export type ServiceReportPhoto = { url: string | null; caption: string | null };
 
 export type ServiceReportPdfData = {
   doc_number: string | null;
@@ -268,13 +269,15 @@ export function ServiceReportPdf({ doc }: { doc: ServiceReportPdfData }) {
             </View>
           </View>
 
-          {doc.photos.length > 0 && (
+          {doc.photos.some((p) => p.url) && (
             <View style={{ marginBottom: 12 }} wrap={false}>
               <Text style={styles.sectionLabel}>PHOTOS</Text>
               <View style={styles.photoGrid}>
-                {doc.photos.map((photo, i) => (
-                  <Image key={i} src={photo.url} style={styles.photo} />
-                ))}
+                {doc.photos.map((photo, i) =>
+                  // A missing object must not take the whole report down with
+                  // it — @react-pdf throws on an unfetchable src.
+                  photo.url ? <Image key={i} src={photo.url} style={styles.photo} /> : null
+                )}
               </View>
             </View>
           )}
