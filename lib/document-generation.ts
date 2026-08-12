@@ -115,6 +115,9 @@ export type GenerateDocumentInput = {
   rawRequest: string;
   photos?: File[];
   pricingMode?: "tiered" | "flat";
+  // Job this document came off, if any. Sets jobs.document_id, which is what
+  // puts the job's arrival/completion photos on the finished document.
+  jobId?: string | null;
   // Callers with a hard response-time budget (Copilot Studio/Teams
   // connectors time out around 100s) -- trades some pricing judgment for
   // a much faster model, since this call alone (3 tiered pricing options
@@ -309,6 +312,24 @@ ${input.rawRequest}`;
     if (error) throw new Error(error.message);
 
     results.push({ documentId: document.id, docNumber, optionLabel: doc.option_label, totals, pricingMode });
+  }
+
+  // Tie the document back to the job it came off. jobs.document_id is what
+  // pulls the arrival/completion photos onto the finished estimate or invoice
+  // (lib/documents.ts), so without this the quote carries no evidence.
+  //
+  // Only the first result is linked: a job description with three options
+  // produces three documents, and jobs.document_id holds one. Linking the
+  // first keeps it deterministic rather than whichever finished last.
+  if (input.jobId && results.length > 0) {
+    const { error: linkError } = await supabase
+      .from("jobs")
+      .update({ document_id: results[0].documentId })
+      .eq("id", input.jobId);
+    // A failed link must not discard a document that was priced and saved.
+    if (linkError) {
+      console.error(`[generateDocumentForCustomer] couldn't link job ${input.jobId}:`, linkError);
+    }
   }
 
   return results;

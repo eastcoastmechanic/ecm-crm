@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { PdfDocumentData } from "@/lib/pdf";
+import { customerFacingJobPhotos, jobIdForDocument } from "@/lib/job-photos";
 
 export async function getDocumentForPdf(id: string): Promise<{
   data: PdfDocumentData | null;
@@ -55,6 +56,10 @@ export async function getDocumentForPdf(id: string): Promise<{
       mass_save_note: lineData.mass_save_note,
       totals: lineData.totals,
       pricing_mode: lineData.pricing_mode,
+      // If this document came out of a job, the arrival/completion photos go
+      // on it. That's what makes an invoice defensible: the customer sees the
+      // condition they paid to fix, next to the number.
+      photos: await customerFacingJobPhotos(await jobIdForDocument(id)),
     },
     customerEmail: doc.customers?.email ?? null,
     dueDate: doc.due_date,

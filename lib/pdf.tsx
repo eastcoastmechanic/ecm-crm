@@ -27,6 +27,10 @@ export type PdfDocumentData = {
   mass_save_note: string | null;
   totals: { good: number; better: number; best: number };
   pricing_mode?: "tiered" | "flat";
+  // Documentation photos from the linked job — the arrival/completion record
+  // that backs up what's being charged for. url is null when an object
+  // couldn't be signed. Absent on documents with no job.
+  photos?: { url: string | null; caption: string | null }[];
 };
 
 const typeLabel: Record<PdfDocumentData["type"], string> = {
@@ -355,6 +359,21 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: colors.g300,
   },
+  // Job documentation photos. Sized so three sit across the page — big enough
+  // that a customer can actually see the condition being described, which is
+  // the entire reason they're on the document.
+  photoSection: { marginTop: 22 },
+  photoSectionLabel: {
+    fontSize: 8,
+    fontWeight: 700,
+    letterSpacing: 0.8,
+    color: colors.g300,
+    marginBottom: 6,
+  },
+  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  photoCell: { width: 150 },
+  photo: { width: 150, height: 112, borderRadius: 4, objectFit: "cover" },
+  photoCaption: { marginTop: 3, fontSize: 7, color: colors.g300 },
   footer: {
     position: "absolute",
     bottom: 0,
@@ -517,6 +536,24 @@ export function DocumentPdf({ doc, logo }: { doc: PdfDocumentData; logo: string 
               <Text style={styles.totalDueAmount}>{formatPrice(doc.totals.better)}</Text>
             </View>
           </View>
+
+          {doc.photos?.some((p) => p.url) && (
+            <View style={styles.photoSection} wrap={false}>
+              <Text style={styles.photoSectionLabel}>JOB PHOTOS</Text>
+              <View style={styles.photoGrid}>
+                {doc.photos.map((photo, i) =>
+                  // A missing object must not take the document down with it —
+                  // @react-pdf throws on an unfetchable src.
+                  photo.url ? (
+                    <View key={i} style={styles.photoCell}>
+                      <Image src={photo.url} style={styles.photo} />
+                      {photo.caption && <Text style={styles.photoCaption}>{photo.caption}</Text>}
+                    </View>
+                  ) : null
+                )}
+              </View>
+            </View>
+          )}
 
           <Text style={styles.closingNote}>
             Thank you for the opportunity to earn your business. Questions? Call (774) 343-6369 or visit

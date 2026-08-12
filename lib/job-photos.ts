@@ -106,6 +106,47 @@ export async function appendJobPhotos(jobId: string, additions: JobPhoto[]): Pro
   return additions.length;
 }
 
+/**
+ * A job's photos, signed and ready to put in front of a customer.
+ *
+ * `during` shots are deliberately excluded by default: mid-repair photos are
+ * for the file, not for the invoice. Arrival and completion are the pair that
+ * tell the story — this is what it looked like, this is what you paid for.
+ */
+export async function customerFacingJobPhotos(
+  jobId: string | null | undefined,
+  opts: { includeDuring?: boolean } = {}
+): Promise<ResolvedJobPhoto[]> {
+  if (!jobId) return [];
+
+  const { data: job } = await supabase.from("jobs").select("photos").eq("id", jobId).single();
+  const photos = isJobPhotoArray(job?.photos) ? job.photos : [];
+  if (photos.length === 0) return [];
+
+  const wanted = photos.filter((p) => {
+    if (opts.includeDuring) return true;
+    // Entries from before phases existed have no phase; keep them, since the
+    // tech chose to attach them and there's no signal to drop them on.
+    return p.phase !== "during";
+  });
+
+  const resolved = await resolveJobPhotos(wanted);
+  // Arrival first, then undated/legacy, then completion — reads as a sequence.
+  const order: Record<string, number> = { arrival: 0, during: 1, completion: 2 };
+  return resolved.sort((a, b) => (order[a.phase ?? ""] ?? 1) - (order[b.phase ?? ""] ?? 1));
+}
+
+/** The job whose photos belong on a document, if the document is linked to one. */
+export async function jobIdForDocument(documentId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("jobs")
+    .select("id")
+    .eq("document_id", documentId)
+    .limit(1)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
 /** Which phases a job already has on file — drives the completion prompts. */
 export async function jobPhotoPhases(jobId: string): Promise<Set<JobPhotoPhase>> {
   const { data: job } = await supabase.from("jobs").select("photos").eq("id", jobId).single();

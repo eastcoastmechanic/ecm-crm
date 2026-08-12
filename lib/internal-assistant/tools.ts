@@ -559,12 +559,18 @@ function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boo
       email: z.string().optional(),
       address: z.string().optional().describe("Service address, if known"),
       jobDescription: z.string().describe("What the job involves, in enough detail to select price book items"),
+      jobId: z
+        .string()
+        .optional()
+        .describe(
+          "The job this quote is for, from list_jobs. Pass it whenever the tech is quoting from a job they're on — it links the document to the job so the arrival/completion photos appear on it."
+        ),
       pricingMode: z
         .enum(["tiered", "flat"])
         .optional()
         .describe("'tiered' (default) shows good/better/best per line; 'flat' shows one price per line, no tiers."),
     }),
-    run: async ({ customerId, customerName, phone, email, address, jobDescription, pricingMode }) => {
+    run: async ({ customerId, customerName, phone, email, address, jobDescription, jobId, pricingMode }) => {
       if (!customerId && !customerName) {
         return "Need either an existing customerId (use find_customer) or a customerName for a new customer.";
       }
@@ -586,6 +592,7 @@ function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boo
             pricingMode,
             fast,
             photos: attachmentFiles,
+            jobId,
           });
           return `Generating the ${type} for ${resolvedName}${
             propertyAddress ? ` at ${propertyAddress}` : ""
@@ -602,6 +609,7 @@ function buildDocumentTool(type: "estimate" | "invoice" | "proposal", fast?: boo
           pricingMode,
           fast,
           photos: attachmentFiles,
+          jobId,
         });
         const lines = results.map((r) =>
           r.pricingMode === "flat"

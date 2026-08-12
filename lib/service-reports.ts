@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import type { ServiceReportPdfData } from "@/lib/service-report-pdf";
 import { signStoredPhotos } from "@/lib/photo-urls";
+import { customerFacingJobPhotos } from "@/lib/job-photos";
 
 export async function getServiceReportForPdf(id: string): Promise<{
   data: ServiceReportPdfData | null;
@@ -43,7 +44,23 @@ export async function getServiceReportForPdf(id: string): Promise<{
       // Signed here rather than at render: the PDF fetches each src while it
       // renders and embeds the bytes, so the signature only has to outlive
       // this call, not the finished document.
-      photos: await signStoredPhotos(diagnostic.photos ?? []),
+      //
+      // Diagnostic photos are what the tech shot while diagnosing; job photos
+      // are the arrival/completion record. Both belong on the report a
+      // customer reads, so they're concatenated rather than kept apart —
+      // captions carry the distinction.
+      photos: [
+        ...(await signStoredPhotos(diagnostic.photos ?? [])).map((p) => ({
+          url: p.url ?? null,
+          caption: p.caption ?? null,
+        })),
+        ...(await customerFacingJobPhotos(diagnostic.job_id)).map((p) => ({
+          url: p.url,
+          caption: p.phase
+            ? `${p.phase === "arrival" ? "On arrival" : "Completed"}${p.caption ? ` — ${p.caption}` : ""}`
+            : p.caption,
+        })),
+      ],
     },
     customerEmail: equipment?.properties?.customers?.email ?? null,
     error: null,
