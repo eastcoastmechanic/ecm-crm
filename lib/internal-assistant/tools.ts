@@ -9,7 +9,7 @@ import { addProperty, updateProperty, deleteProperty } from "@/app/(internal)/pr
 import { addEquipment, updateEquipment, deleteEquipment } from "@/app/(internal)/equipment/actions";
 import { updateWarranty } from "@/app/(internal)/documents/[id]/actions";
 import { deleteDocument } from "@/app/(internal)/documents/actions";
-import { opsTools } from "./tools-ops";
+import { opsTools, buildJobPhotoTools } from "./tools-ops";
 import { fieldTools } from "./tools-field";
 import { referenceTools } from "./tools-reference";
 
@@ -707,6 +707,8 @@ export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?:
     completeTaskTool,
     // Jobs, leads, inventory, and sending — see tools-ops.ts.
     ...opsTools,
+    // Needs this message's attachments, so it's built per request.
+    ...buildJobPhotoTools(attachmentFiles),
     // Service reports, install reports, and payment links -- see tools-field.ts.
     ...fieldTools,
     // PT charts, superheat/subcooling, ECM's diagnostic guide -- tools-reference.ts.

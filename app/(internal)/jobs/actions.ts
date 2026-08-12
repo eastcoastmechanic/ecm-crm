@@ -6,6 +6,12 @@ import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { sendSMS } from "@/lib/sms";
 import { generateJobICS } from "@/lib/ics";
+import {
+  appendJobPhotos,
+  uploadJobPhotoFiles,
+  JOB_PHOTO_PHASES,
+  type JobPhotoPhase,
+} from "@/lib/job-photos";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
@@ -162,44 +168,22 @@ export async function rescheduleJob(jobId: string, newDate: string) {
   revalidatePath("/jobs");
 }
 
-async function uploadJobPhotos(files: File[]) {
-  const uploaded: { url: string; caption: string | null }[] = [];
-  for (const file of files) {
-    if (!file || file.size === 0) continue;
-    const path = `${crypto.randomUUID()}-${file.name}`;
-    const { error } = await supabase.storage.from("diagnostic-photos").upload(path, file, {
-      contentType: file.type,
-    });
-    if (error) throw new Error(`Failed to upload photo: ${error.message}`);
-    const { data: publicUrl } = supabase.storage.from("diagnostic-photos").getPublicUrl(path);
-    uploaded.push({ url: publicUrl.publicUrl, caption: null });
-  }
-  return uploaded;
-}
-
 export async function addJobPhotos(formData: FormData) {
   const jobId = formData.get("job_id") as string;
   const caption = (formData.get("caption") as string)?.trim() || null;
   const files = formData.getAll("photos") as File[];
 
-  const newPhotos = await uploadJobPhotos(files);
+  const rawPhase = formData.get("phase") as string | null;
+  const phase = JOB_PHOTO_PHASES.includes(rawPhase as JobPhotoPhase)
+    ? (rawPhase as JobPhotoPhase)
+    : undefined;
+
+  // Uploads go to the private job-photos bucket; the page mints signed URLs to
+  // display them. See lib/job-photos.ts.
+  const newPhotos = await uploadJobPhotoFiles(files, { phase, caption });
   if (newPhotos.length === 0) return;
-  if (caption) newPhotos.forEach((p) => (p.caption = caption));
 
-  const { data: job, error: fetchError } = await supabase
-    .from("jobs")
-    .select("photos")
-    .eq("id", jobId)
-    .single();
-  if (fetchError) throw new Error(fetchError.message);
-
-  const existing = (job.photos as { url: string; caption: string | null }[]) ?? [];
-
-  const { error } = await supabase
-    .from("jobs")
-    .update({ photos: [...existing, ...newPhotos] })
-    .eq("id", jobId);
-  if (error) throw new Error(error.message);
+  await appendJobPhotos(jobId, newPhotos);
 
   revalidatePath("/jobs");
 }

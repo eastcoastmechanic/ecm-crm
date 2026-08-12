@@ -5,6 +5,13 @@ import { updateJobStatus, rescheduleJob } from "@/app/(internal)/jobs/actions";
 import { setLeadStage, addManualLead, dismissLead } from "@/app/(internal)/leads/actions";
 import { adjustInventoryQty } from "@/app/(internal)/inventory/actions";
 import { sendDocumentEmail } from "@/app/(internal)/documents/[id]/actions";
+import {
+  appendJobPhotos,
+  uploadJobPhotoFiles,
+  jobPhotoPhases,
+  JOB_PHOTO_PHASES,
+  type JobPhotoPhase,
+} from "@/lib/job-photos";
 
 /**
  * Jobs, leads, inventory and document sending.
@@ -91,12 +98,48 @@ const updateJobStatusTool = betaZodTool({
     fd.set("status", status);
     try {
       await updateJobStatus(fd);
-      return `Job ${jobId} is now "${status}".`;
+
+      // Deliberately does not block the status change. A tech standing in a
+      // driveway needs to close the job; withholding that until they take a
+      // photo teaches them to route around the assistant. Naming the gap at
+      // the moment it appears is what builds the habit.
+      const nudge = await photoNudge(jobId, status);
+      return `Job ${jobId} is now "${status}".${nudge}`;
     } catch (err) {
       return `Failed to update job: ${err instanceof Error ? err.message : "unknown error"}`;
     }
   },
 });
+
+/**
+ * The documentation prompt, at the two transitions where it's worth asking.
+ *
+ * An arrival photo is what answers "it was already like that" months later,
+ * and a completion photo is what goes on the invoice and wins the callback
+ * argument. Neither gets taken reliably unless something asks.
+ */
+async function photoNudge(jobId: string, status: string): Promise<string> {
+  if (status !== "in_progress" && status !== "complete") return "";
+
+  let phases: Set<JobPhotoPhase>;
+  try {
+    phases = await jobPhotoPhases(jobId);
+  } catch {
+    // Never let a documentation reminder turn a successful status change into
+    // a failure.
+    return "";
+  }
+
+  if (status === "in_progress" && !phases.has("arrival")) {
+    return " No arrival photo on file — ask the tech to grab a shot of the unit before they start, so the condition on arrival is on record.";
+  }
+  if (status === "complete" && !phases.has("completion")) {
+    return phases.size === 0
+      ? " This job is closing with no photos at all. Ask the tech for a shot of the finished work before they leave the site — it's what backs up the invoice and any callback."
+      : " No completion photo on file. Ask the tech for a shot of the finished work before they leave the site.";
+  }
+  return "";
+}
 
 const rescheduleJobTool = betaZodTool({
   name: "reschedule_job",
@@ -272,11 +315,83 @@ const sendDocumentTool = betaZodTool({
   },
 });
 
+// ------------------------------------------------------- job documentation
+
+/**
+ * Files the photos already attached to this message onto a job.
+ *
+ * Built per-request rather than declared statically because it needs the
+ * attachments off the current message, the same way create_estimate does.
+ *
+ * The photo trail is the point of the feature: an arrival shot is what settles
+ * "that was already broken when I got here" six months later, so the phase tag
+ * matters more than the caption.
+ */
+function buildAttachJobPhotosTool(attachmentFiles?: File[]) {
+  return betaZodTool({
+    name: "attach_job_photos",
+    description:
+      "File the photo(s) attached to this message onto a job as documentation, tagged by when they were taken. Use this whenever the tech sends a jobsite photo that isn't a rating plate — before/after shots, damage, completed work, anything worth a record. Get the jobId from list_jobs. Rating plates go to add_equipment instead." +
+      (attachmentFiles?.length
+        ? ` ${attachmentFiles.length} photo(s) are attached to this message and will be filed automatically.`
+        : " No photos are attached to this message, so there is nothing to file right now."),
+    inputSchema: z.object({
+      jobId: z.string().describe("The job to document — from list_jobs"),
+      phase: z
+        .enum(JOB_PHOTO_PHASES as [JobPhotoPhase, ...JobPhotoPhase[]])
+        .describe(
+          "'arrival' for condition before work starts, 'during' for work in progress or a problem found, 'completion' for finished work"
+        ),
+      caption: z
+        .string()
+        .optional()
+        .describe("What the photo shows, in the tech's words — e.g. 'rusted-through secondary pan'"),
+    }),
+    run: async ({ jobId, phase, caption }) => {
+      if (!attachmentFiles?.length) {
+        return "No photos are attached to this message. Ask the tech to take the photo and send it again.";
+      }
+      try {
+        const uploaded = await uploadJobPhotoFiles(attachmentFiles, {
+          phase,
+          caption: caption ?? null,
+        });
+        const count = await appendJobPhotos(jobId, uploaded);
+        return `Filed ${count} ${phase} photo${count === 1 ? "" : "s"} to job ${jobId}${
+          caption ? ` — "${caption}"` : ""
+        }.`;
+      } catch (err) {
+        return `Failed to file photos: ${err instanceof Error ? err.message : "unknown error"}`;
+      }
+    },
+  });
+}
+
+const jobPhotoStatusTool = betaZodTool({
+  name: "job_photo_status",
+  description:
+    "Check which documentation photos a job already has (arrival / during / completion). Call this before marking a job complete so you know what's missing.",
+  inputSchema: z.object({ jobId: z.string() }),
+  run: async ({ jobId }) => {
+    try {
+      const phases = await jobPhotoPhases(jobId);
+      if (phases.size === 0) return `Job ${jobId} has no documentation photos on file.`;
+      const missing = JOB_PHOTO_PHASES.filter((p) => !phases.has(p));
+      return `Job ${jobId} has: ${[...phases].join(", ")}.${
+        missing.length ? ` Missing: ${missing.join(", ")}.` : ""
+      }`;
+    } catch (err) {
+      return `Couldn't check photos: ${err instanceof Error ? err.message : "unknown error"}`;
+    }
+  },
+});
+
 export const opsTools = [
   listJobsTool,
   scheduleJobTool,
   updateJobStatusTool,
   rescheduleJobTool,
+  jobPhotoStatusTool,
   listLeadsTool,
   setLeadStageTool,
   addLeadTool,
@@ -284,3 +399,8 @@ export const opsTools = [
   adjustInventoryTool,
   sendDocumentTool,
 ];
+
+/** Needs the current message's attachments, so it can't live in opsTools. */
+export function buildJobPhotoTools(attachmentFiles?: File[]) {
+  return [buildAttachJobPhotosTool(attachmentFiles)];
+}

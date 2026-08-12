@@ -126,7 +126,12 @@ create table jobs (
   tracked_hours numeric(6,2),                      -- 0005
   reminder_sent_at timestamptz,                    -- 0005
   ics_sequence integer not null default 0,         -- 0005
-  created_via text not null default 'manual'       -- 0006: manual / ai_sms / ai_voice / portal
+  created_via text not null default 'manual',      -- 0006: manual / ai_sms / ai_voice / portal
+  -- Job documentation trail. Entries are { url, caption, phase, taken_at };
+  -- phase is 'arrival' | 'during' | 'completion'. Pre-0029 rows have only
+  -- { url, caption }. Verified present in production 2026-08-11 — this line
+  -- documents existing shape, it was not added by a numbered migration.
+  photos jsonb not null default '[]'
 );
 
 -- Wholesale distributor cost by brand/model. Internal/ECM-facing only —

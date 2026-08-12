@@ -37,7 +37,10 @@ type Job = {
   properties: { address: string | null } | null;
   diagnostics: { id: string }[] | null;
   install_reports: { id: string }[] | null;
-  photos: { url: string; caption: string | null }[] | null;
+  // url is signed server-side and is null when signing failed for that object.
+  photos:
+    | { url: string | null; caption: string | null; phase?: string | null }[]
+    | null;
 };
 
 function sameDate(a: Date, b: Date) {
@@ -438,15 +441,26 @@ export default function JobsView({
 
               {job.photos && job.photos.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {job.photos.map((photo, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={i}
-                      src={photo.url}
-                      alt={photo.caption ?? "Job photo"}
-                      className="h-16 w-16 rounded-lg object-cover"
-                    />
-                  ))}
+                  {job.photos.map((photo, i) =>
+                    photo.url ? (
+                      <div key={i} className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={photo.url}
+                          alt={photo.caption ?? "Job photo"}
+                          className="h-16 w-16 rounded-lg object-cover"
+                          title={
+                            [photo.phase, photo.caption].filter(Boolean).join(" — ") || undefined
+                          }
+                        />
+                        {photo.phase && (
+                          <span className="absolute bottom-0 left-0 right-0 rounded-b-lg bg-black/60 text-center text-[9px] uppercase tracking-wide text-white">
+                            {photo.phase}
+                          </span>
+                        )}
+                      </div>
+                    ) : null
+                  )}
                 </div>
               )}
               <form action={addJobPhotos} className="flex items-center gap-2">
@@ -459,7 +473,18 @@ export default function JobsView({
                   aria-label="Add before/after photos"
                   className="text-xs text-g300 file:mr-2 file:rounded file:border-0 file:bg-white/8 file:px-2 file:py-1 file:text-xs file:text-white"
                 />
+                <select
+                  name="phase"
+                  defaultValue="during"
+                  aria-label="When was this taken"
+                  className="rounded bg-white/8 px-2 py-1 text-xs text-white"
+                >
+                  <option value="arrival">On arrival</option>
+                  <option value="during">During</option>
+                  <option value="completion">Completed</option>
+                </select>
                 <SubmitButton className={buttonSecondaryClass} pendingText="Uploading…">
+
                   Add Photos
                 </SubmitButton>
               </form>

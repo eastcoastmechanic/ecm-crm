@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { resolveJobPhotos } from "@/lib/job-photos";
 import { createServiceCall } from "./actions";
 import JobsView from "./JobsView";
 import SubmitButton from "../SubmitButton";
@@ -16,6 +17,16 @@ export default async function JobsPage() {
       .is("completed_at", null)
       .order("due_at", { ascending: true, nullsFirst: false }),
   ]);
+
+  // Photos live in a private bucket, so the server signs them here rather than
+  // handing the client a path it cannot fetch. Legacy public-URL entries pass
+  // through untouched.
+  const jobsWithPhotos = await Promise.all(
+    (jobs ?? []).map(async (job) => ({
+      ...job,
+      photos: await resolveJobPhotos(job.photos),
+    }))
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -36,7 +47,7 @@ export default async function JobsPage() {
       {error && <p className={errorClass}>Error loading jobs: {error.message}</p>}
 
       <JobsView
-        jobs={jobs ?? []}
+        jobs={jobsWithPhotos}
         tasks={tasks ?? []}
         hourlyRate={Number(process.env.HOURLY_LABOR_RATE) || null}
       />
