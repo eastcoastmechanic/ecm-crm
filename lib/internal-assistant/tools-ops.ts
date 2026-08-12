@@ -315,6 +315,45 @@ const sendDocumentTool = betaZodTool({
   },
 });
 
+const jobTimeTool = betaZodTool({
+  name: "job_time_on_site",
+  description:
+    "Report the time breakdown for a job — drive time, time on site, and the tracked hours used for costing. Use for 'how long was I at X', 'how long did that job take', or when checking what a job actually cost in labour.",
+  inputSchema: z.object({ jobId: z.string() }),
+  run: async ({ jobId }) => {
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("on_way_at, arrived_at, completed_at, tracked_hours, status")
+      .eq("id", jobId)
+      .single();
+    if (error) return `Couldn't read that job: ${error.message}`;
+
+    const hours = (from: string | null, to: string | null) =>
+      from && to
+        ? Math.round(((new Date(to).getTime() - new Date(from).getTime()) / 3600000) * 100) / 100
+        : null;
+
+    const drive = hours(data.on_way_at, data.arrived_at);
+    const onSite = hours(data.arrived_at, data.completed_at);
+
+    const parts: string[] = [];
+    if (drive !== null) parts.push(`drive ${drive}h`);
+    if (onSite !== null) parts.push(`on site ${onSite}h`);
+    if (data.tracked_hours != null) parts.push(`tracked ${data.tracked_hours}h`);
+
+    if (parts.length === 0) {
+      return `Job ${jobId} is "${data.status}" with no times stamped yet. Time on site starts when the job goes in_progress.`;
+    }
+    // Worth saying out loud: an old job's tracked hours include the drive, and
+    // quoting it as labour without that caveat overstates the cost.
+    const caveat =
+      !data.arrived_at && data.tracked_hours != null
+        ? " (no arrival time on this one, so tracked hours are measured from when the tech left and include the drive)"
+        : "";
+    return `Job ${jobId}: ${parts.join(", ")}.${caveat}`;
+  },
+});
+
 // ------------------------------------------------------- job documentation
 
 /**
@@ -391,6 +430,7 @@ export const opsTools = [
   scheduleJobTool,
   updateJobStatusTool,
   rescheduleJobTool,
+  jobTimeTool,
   jobPhotoStatusTool,
   listLeadsTool,
   setLeadStageTool,
