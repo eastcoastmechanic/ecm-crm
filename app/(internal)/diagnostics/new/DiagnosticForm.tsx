@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { REFRIGERANT_TYPES } from "@/lib/refrigerant";
 import { generateDiagnosis, scanReadingPhoto, type ScannedReadings } from "./actions";
+import { downscaleFileInput, downscaleImage, totalBytes } from "@/lib/downscale-image";
 import SubmitButton from "../../SubmitButton";
 import { buttonClass, errorClass, inputClass } from "../../ui";
 
@@ -26,6 +27,7 @@ export default function DiagnosticForm({
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [equipmentId, setEquipmentId] = useState("");
+  const [photoNote, setPhotoNote] = useState<string | null>(null);
 
   async function handleScan(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -35,7 +37,9 @@ export default function DiagnosticForm({
     setScanError(null);
     try {
       const formData = new FormData();
-      formData.set("photo", file);
+      // Same 4.5MB platform cap as the photo upload below — a full-resolution
+      // gauge photo alone can exceed it.
+      formData.set("photo", await downscaleImage(file));
       const result = await scanReadingPhoto(formData);
       setExtracted(result);
     } catch (err) {
@@ -270,7 +274,26 @@ export default function DiagnosticForm({
           capture="environment"
           aria-label="Photos"
           className={inputClass}
+          onChange={async (e) => {
+            // Shrink before submit, not after. Vercel truncates request
+            // bodies over 4.5MB and the multipart parser then fails with
+            // "Unexpected end of form" — which reads like a broken form
+            // rather than an oversized photo.
+            const input = e.currentTarget;
+            setPhotoNote("Preparing photos…");
+            await downscaleFileInput(input);
+            const count = input.files?.length ?? 0;
+            const mb = totalBytes(input) / (1024 * 1024);
+            setPhotoNote(
+              count === 0
+                ? null
+                : `${count} photo${count === 1 ? "" : "s"} ready (${mb.toFixed(1)} MB)${
+                    mb > 4 ? " — still large, consider fewer photos" : ""
+                  }`
+            );
+          }}
         />
+        {photoNote && <p className="text-xs text-g300">{photoNote}</p>}
       </section>
 
       <SubmitButton className={`${buttonClass} w-fit`} pendingText="Generating…">
