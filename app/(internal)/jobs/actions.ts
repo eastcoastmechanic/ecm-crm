@@ -112,7 +112,7 @@ export async function updateJobStatus(formData: FormData) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
-    .select("status, completed_at, on_way_at")
+    .select("status, completed_at, on_way_at, arrived_at")
     .eq("id", id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
@@ -120,10 +120,21 @@ export async function updateJobStatus(formData: FormData) {
   const completed_at =
     status === "complete" ? existing.completed_at ?? new Date().toISOString() : existing.completed_at;
 
+  // Going in_progress means the tech is on site and working. Stamped once, so
+  // bouncing the status around doesn't restart the clock.
+  const arrived_at =
+    status === "in_progress" ? existing.arrived_at ?? new Date().toISOString() : existing.arrived_at;
+
+  // Measure from arrival when we have it, and fall back to on_way_at for jobs
+  // that predate arrived_at. Anything measured from on_way_at includes the
+  // drive, which overstates labour on anything out past Fall River — but
+  // silently re-basing old jobs would move numbers someone has already costed.
+  const clockStart = arrived_at ?? existing.on_way_at;
+
   const tracked_hours =
-    status === "complete" && existing.on_way_at && !existing.completed_at
+    status === "complete" && clockStart && !existing.completed_at
       ? Math.round(
-          ((new Date(completed_at!).getTime() - new Date(existing.on_way_at).getTime()) / 3600000) * 100
+          ((new Date(completed_at!).getTime() - new Date(clockStart).getTime()) / 3600000) * 100
         ) / 100
       : undefined;
 
@@ -132,6 +143,7 @@ export async function updateJobStatus(formData: FormData) {
     .update({
       status,
       completed_at,
+      ...(arrived_at !== existing.arrived_at ? { arrived_at } : {}),
       ...(tracked_hours !== undefined ? { tracked_hours } : {}),
     })
     .eq("id", id);

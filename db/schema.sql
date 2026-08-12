@@ -122,7 +122,8 @@ create table jobs (
   notes text,                                     -- 0003
   completed_at timestamptz,                       -- 0004
   follow_up_sent_at timestamptz,                   -- 0004
-  on_way_at timestamptz,                           -- 0005
+  on_way_at timestamptz,                           -- 0005: left for the job
+  arrived_at timestamptz,                          -- 0031: reached the site
   tracked_hours numeric(6,2),                      -- 0005
   reminder_sent_at timestamptz,                    -- 0005
   ics_sequence integer not null default 0,         -- 0005
