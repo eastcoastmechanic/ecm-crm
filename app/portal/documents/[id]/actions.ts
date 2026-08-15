@@ -94,3 +94,47 @@ export async function approveEstimate(formData: FormData) {
 
   redirect(`/portal/documents/${documentId}?approved=1`);
 }
+
+export async function signContract(formData: FormData) {
+  const documentId = formData.get("document_id") as string;
+  const signatureData = formData.get("signature_data") as string;
+  const agreed = formData.get("agreed") === "on";
+  const supabase = await createPortalServerClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/portal/login");
+
+  if (!signatureData) throw new Error("A signature is required to sign this contract");
+  if (!agreed) throw new Error("You must confirm you've read and agree to the contract terms");
+
+  const { data: doc, error } = await supabase
+    .from("documents")
+    .select("id, type, status")
+    .eq("id", documentId)
+    .single();
+
+  if (error || !doc) throw new Error("Contract not found");
+  if (doc.type !== "contract") throw new Error("Only contracts can be signed here");
+  if (doc.status !== "sent") throw new Error("This contract can't be signed right now");
+
+  const requestHeaders = await headers();
+  const signerIp = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  const signerUserAgent = requestHeaders.get("user-agent");
+
+  const { error: updateError } = await supabase
+    .from("documents")
+    .update({
+      status: "signed",
+      signed_at: new Date().toISOString(),
+      signature_data: signatureData,
+      signer_ip: signerIp,
+      signer_user_agent: signerUserAgent,
+    })
+    .eq("id", documentId);
+
+  if (updateError) throw new Error(updateError.message);
+
+  redirect(`/portal/documents/${documentId}?signed=1`);
+}

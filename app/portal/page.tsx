@@ -16,12 +16,14 @@ const typeLabel: Record<string, string> = {
   estimate: "Estimate",
   invoice: "Invoice",
   proposal: "Proposal",
+  contract: "Contract",
 };
 
 const statusClass: Record<string, string> = {
   sent: "bg-blue/40 text-white",
   approved: "bg-green-l text-green",
   paid: "bg-green text-white",
+  signed: "bg-green-l text-green",
 };
 
 function formatPrice(value: number | null) {

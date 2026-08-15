@@ -7,6 +7,7 @@ import { sendDocumentEmail } from "./actions";
 import AssessmentDetail from "./AssessmentDetail";
 import WarrantyDetail from "./WarrantyDetail";
 import MassSaveRebateDetail from "./MassSaveRebateDetail";
+import ContractDetail from "./ContractDetail";
 import LineItemsEditor from "./LineItemsEditor";
 import EditCustomerForm from "../../customers/[id]/EditCustomerForm";
 import SubmitButton from "../../SubmitButton";
@@ -148,6 +149,10 @@ export default async function DocumentPage({
     return <MassSaveRebateDetail doc={doc} />;
   }
 
+  if (doc.type === "contract") {
+    return <ContractDetail doc={doc} hasEmail={!!doc.customers?.email} />;
+  }
+
   const rawLineData = doc.line_items as {
     items?: LineItem[];
     brand?: { good: string | null; better: string | null; best: string | null };
@@ -198,6 +203,11 @@ export default async function DocumentPage({
           {doc.customers?.id && <EditCustomerForm customer={doc.customers} />}
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
+          {doc.type === "estimate" && doc.status === "approved" && (
+            <a href={`/documents/contract/new?from=${doc.id}`} className={buttonSecondaryClass}>
+              Create Contract
+            </a>
+          )}
           <a
             href={`/documents/${doc.id}/pdf`}
             target="_blank"

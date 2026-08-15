@@ -8,6 +8,8 @@ import { getWarrantyReportForPdf } from "@/lib/warranty-reports";
 import { renderWarrantyReportPdf } from "@/lib/warranty-report-pdf";
 import { getMassSaveRebateFillData } from "@/lib/mass-save-reports";
 import { fillMassSaveRebateForm } from "@/lib/mass-save-pdf-fill";
+import { getContractForPdf } from "@/lib/contract-reports";
+import { renderContractPdf } from "@/lib/contract-pdf";
 
 export async function GET(
   _request: Request,
@@ -55,6 +57,20 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${docNumber ?? "mass-save-rebate"}.pdf"`,
+      },
+    });
+  }
+
+  if (docType?.type === "contract") {
+    const { data, error } = await getContractForPdf(id);
+    if (error || !data) {
+      return NextResponse.json({ error: error ?? "Contract not found" }, { status: 404 });
+    }
+    const pdfBuffer = await renderContractPdf(data);
+    return new NextResponse(new Uint8Array(pdfBuffer), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${data.doc_number ?? "contract"}.pdf"`,
       },
     });
   }

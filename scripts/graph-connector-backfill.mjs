@@ -36,7 +36,8 @@ async function main() {
         address: c.billing_address ?? "",
       },
     });
-    ok ? pushed++ : failed++;
+    if (ok) pushed++;
+    else failed++;
   }
 
   console.log("Jobs...");
@@ -59,7 +60,8 @@ async function main() {
         scheduledAt: j.scheduled_at ?? null,
       },
     });
-    ok ? pushed++ : failed++;
+    if (ok) pushed++;
+    else failed++;
   }
 
   console.log("Documents...");
@@ -83,7 +85,8 @@ async function main() {
         total: d.total ?? null,
       },
     });
-    ok ? pushed++ : failed++;
+    if (ok) pushed++;
+    else failed++;
   }
 
   console.log(`\nDone. ${pushed} items pushed, ${failed} failed.`);

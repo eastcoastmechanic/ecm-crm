@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { createCheckoutSession } from "./actions";
 import SignaturePad from "./SignaturePad";
+import ContractView from "./ContractView";
 import SubmitButton from "../../../(internal)/SubmitButton";
 import { buttonClass, headingClass, subTextClass } from "../../../(internal)/ui";
 
@@ -55,6 +56,10 @@ export default async function PortalDocumentPage({
     .single();
 
   if (error || !doc) notFound();
+
+  if (doc.type === "contract") {
+    return <ContractView doc={doc} />;
+  }
 
   const lineData = doc.line_items as {
     items: LineItem[];
