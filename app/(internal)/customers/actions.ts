@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { idsWhere, idsWhereIn, unique, cascadeUnlinkEquipment, cascadeUnlinkJobs, cascadeUnlinkDocuments } from "@/lib/cascade-delete";
+import { syncCustomerToGraph, deleteCustomerFromGraph, deleteJobFromGraph, deleteDocumentFromGraph } from "@/lib/graph-connector";
 
 export async function addCustomer(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
@@ -17,20 +18,26 @@ export async function addCustomer(formData: FormData) {
     throw new Error("Name is required");
   }
 
-  const { error } = await supabase.from("customers").insert({
-    name,
-    email: email || null,
-    phone: phone || null,
-    billing_address: billing_address || null,
-    notes: notes || null,
-    sms_consent,
-    sms_consent_at: sms_consent ? new Date().toISOString() : null,
-    referred_by_customer_id: referred_by_customer_id || null,
-  });
+  const { data: customer, error } = await supabase
+    .from("customers")
+    .insert({
+      name,
+      email: email || null,
+      phone: phone || null,
+      billing_address: billing_address || null,
+      notes: notes || null,
+      sms_consent,
+      sms_consent_at: sms_consent ? new Date().toISOString() : null,
+      referred_by_customer_id: referred_by_customer_id || null,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     throw new Error(error.message);
   }
+
+  if (customer) await syncCustomerToGraph(customer.id);
 
   revalidatePath("/customers");
 }
@@ -60,6 +67,8 @@ export async function updateCustomer(formData: FormData) {
     .eq("id", id);
 
   if (error) throw new Error(error.message);
+
+  await syncCustomerToGraph(id);
 
   revalidatePath(`/customers/${id}`);
   revalidatePath("/customers");
@@ -101,6 +110,12 @@ export async function deleteCustomer(id: string): Promise<{ error?: string }> {
   ]);
   await cascadeUnlinkDocuments(documentIds);
   if (documentIds.length) await supabase.from("documents").delete().in("id", documentIds);
+
+  await Promise.all([
+    deleteCustomerFromGraph(id),
+    ...jobIds.map(deleteJobFromGraph),
+    ...documentIds.map(deleteDocumentFromGraph),
+  ]);
 
   await supabase.from("service_contracts").delete().eq("customer_id", id);
   if (propertyIds.length) await supabase.from("service_contracts").delete().in("property_id", propertyIds);

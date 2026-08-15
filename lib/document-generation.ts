@@ -6,6 +6,7 @@ import { claude, CLAUDE_MODEL, CLAUDE_MODEL_BALANCED } from "@/lib/claude";
 import { fetchAllPriceBookItems, formatPriceBookForPrompt, type PriceBookRowWithCost } from "@/lib/price-book";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { buildFileContentBlocks } from "@/lib/vision-extract";
+import { syncDocumentToGraph } from "@/lib/graph-connector";
 
 const LineItemSchema = z.object({
   category: z.string(),
@@ -311,6 +312,8 @@ ${input.rawRequest}`;
 
     if (error) throw new Error(error.message);
 
+    await syncDocumentToGraph(document.id);
+
     results.push({ documentId: document.id, docNumber, optionLabel: doc.option_label, totals, pricingMode });
   }
 
@@ -408,6 +411,8 @@ export async function createInvoiceDirect(input: {
     .single();
 
   if (error) throw new Error(error.message);
+
+  await syncDocumentToGraph(document.id);
 
   return { documentId: document.id, docNumber, total };
 }

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
+import { syncDocumentToGraph } from "@/lib/graph-connector";
 
 const CRAFTSMANSHIP_WARRANTY_YEARS = 1;
 
@@ -170,6 +171,8 @@ export async function createWarrantyForCustomer(
     .single();
 
   if (error) throw new Error(error.message);
+
+  await syncDocumentToGraph(document.id);
 
   return { documentId: document.id, docNumber: doc_number };
 }

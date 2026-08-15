@@ -12,6 +12,7 @@ import {
   JOB_PHOTO_PHASES,
   type JobPhotoPhase,
 } from "@/lib/job-photos";
+import { syncJobToGraph } from "@/lib/graph-connector";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
@@ -154,6 +155,8 @@ export async function updateJobStatus(formData: FormData) {
     await sendScheduleNotifications(id);
   }
 
+  await syncJobToGraph(id);
+
   revalidatePath("/jobs");
 }
 
@@ -176,6 +179,7 @@ export async function rescheduleJob(jobId: string, newDate: string) {
   if (error) throw new Error(error.message);
 
   await sendScheduleNotifications(jobId);
+  await syncJobToGraph(jobId);
 
   revalidatePath("/jobs");
 }

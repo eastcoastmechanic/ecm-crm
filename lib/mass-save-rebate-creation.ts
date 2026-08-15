@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { syncDocumentToGraph } from "@/lib/graph-connector";
 
 export type MassSaveEquipmentInput = {
   equipmentId?: string | null;
@@ -137,6 +138,8 @@ export async function createMassSaveRebateForCustomer(
     .single();
 
   if (error) throw new Error(error.message);
+
+  await syncDocumentToGraph(document.id);
 
   return { documentId: document.id };
 }
