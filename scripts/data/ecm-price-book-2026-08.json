@@ -1,0 +1,4187 @@
+[
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "ENTRA",
+    "model": "RXC09AXVJU / FTXC09AXVJU",
+    "desc": "Entra wall-mount heat pump, R-32",
+    "tons": 0.75,
+    "seer": 18,
+    "price": 846.72
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "ENTRA",
+    "model": "RXC12AXVJU / FTXC12AXVJU",
+    "desc": "Entra wall-mount heat pump, R-32",
+    "tons": 1,
+    "seer": 18,
+    "price": 941.28
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "ENTRA",
+    "model": "RXC18AXVJU / FTXC18AXVJU",
+    "desc": "Entra wall-mount heat pump, R-32",
+    "tons": 1.5,
+    "seer": 18,
+    "price": 1232.64
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "ENTRA",
+    "model": "RXC24AXVJU / FTXC24AXVJU",
+    "desc": "Entra wall-mount heat pump, R-32",
+    "tons": 2,
+    "seer": 18,
+    "price": 1473.6
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "OTERRA",
+    "model": "RXF09BVJU* / FTXF09BVJU*",
+    "desc": "Oterra 21 SEER2 wall-mount heat pump",
+    "tons": 0.75,
+    "seer": 21,
+    "price": 1118.88
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "OTERRA",
+    "model": "RXF12BVJU* / FTXF12BVJU*",
+    "desc": "Oterra 21 SEER2 wall-mount heat pump",
+    "tons": 1,
+    "seer": 21,
+    "price": 1344.48
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "OTERRA",
+    "model": "RXF18BVJU* / FTXF18BVJU*",
+    "desc": "Oterra 21 SEER2 wall-mount heat pump",
+    "tons": 1.5,
+    "seer": 21,
+    "price": 1992.48
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "OTERRA",
+    "model": "RXF24BVJU* / FTXF24BVJU*",
+    "desc": "Oterra 21 SEER2 wall-mount heat pump",
+    "tons": 2,
+    "seer": 21,
+    "price": 2092.8
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "OTERRA 115V",
+    "model": "RXQ09ASBU9 / FTXQ09ASBU9",
+    "desc": "Oterra 115V wall-mount heat pump",
+    "tons": 0.75,
+    "seer": 20,
+    "price": 896.16
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "OTERRA 115V",
+    "model": "RXQ12ASBU9 / FTXQ12ASBU9",
+    "desc": "Oterra 115V wall-mount heat pump",
+    "tons": 1,
+    "seer": 20,
+    "price": 1005.6
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Floor Mount)",
+    "model": "RXP09AVJU9 / FVXV09AVJUT9",
+    "desc": "Aurora floor-mount heat pump, textured panel",
+    "tons": 0.75,
+    "seer": 19.5,
+    "price": 2044.8
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Floor Mount)",
+    "model": "RXP09AVJU9 / FVXV09AVJUW9",
+    "desc": "Aurora floor-mount heat pump, white panel",
+    "tons": 0.75,
+    "seer": 19.5,
+    "price": 2024.64
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Floor Mount)",
+    "model": "RXP12AVJU9 / FVXV12AVJUT9",
+    "desc": "Aurora floor-mount heat pump, textured panel",
+    "tons": 1,
+    "seer": 19.5,
+    "price": 2214.24
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Floor Mount)",
+    "model": "RXP12AVJU9 / FVXV12AVJUW9",
+    "desc": "Aurora floor-mount heat pump, white panel",
+    "tons": 1,
+    "seer": 19.5,
+    "price": 2191.2
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Floor Mount)",
+    "model": "RXP15AVJU9 / FVXV15AVJUT9",
+    "desc": "Aurora floor-mount heat pump, textured panel",
+    "tons": 1.25,
+    "seer": 19.5,
+    "price": 2905.44
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Floor Mount)",
+    "model": "RXP15AVJU9 / FVXV15AVJUW9",
+    "desc": "Aurora floor-mount heat pump, white panel",
+    "tons": 1.25,
+    "seer": 19.5,
+    "price": 2880.48
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Floor Mount)",
+    "model": "RXP18AVJU9 / FVXV18AVJUT9",
+    "desc": "Aurora floor-mount heat pump, textured panel",
+    "tons": 1.5,
+    "seer": 19.5,
+    "price": 3310.56
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Floor Mount)",
+    "model": "RXP18AVJU9 / FVXV18AVJUW9",
+    "desc": "Aurora floor-mount heat pump, white panel",
+    "tons": 1.5,
+    "seer": 19.5,
+    "price": 3282.72
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Horizontal Ducted)",
+    "model": "RXP09AVJU9 / FDMA09AVJU9",
+    "desc": "Aurora medium-static ducted heat pump",
+    "tons": 0.75,
+    "seer": 16,
+    "price": 2057.28
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Horizontal Ducted)",
+    "model": "RXP12AVJU9 / FDMA12AVJU9",
+    "desc": "Aurora medium-static ducted heat pump",
+    "tons": 1,
+    "seer": 16,
+    "price": 2230.08
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Horizontal Ducted)",
+    "model": "RXP15AVJU9 / FDMA15AVJU9",
+    "desc": "Aurora medium-static ducted heat pump",
+    "tons": 1.25,
+    "seer": 18,
+    "price": 2843.52
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Horizontal Ducted)",
+    "model": "RXP18AVJU9 / FDMA18AVJU9",
+    "desc": "Aurora medium-static ducted heat pump",
+    "tons": 1.5,
+    "seer": 18,
+    "price": 3286.56
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Horizontal Ducted)",
+    "model": "RXP24AVJU9 / FDMA24AVJU9",
+    "desc": "Aurora medium-static ducted heat pump",
+    "tons": 2,
+    "seer": 18.3,
+    "price": 3796.32
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Wall Mount)",
+    "model": "RXT09AVJU9 / FTXV09AVJU9",
+    "desc": "Aurora wall-mount heat pump, cold-climate",
+    "tons": 0.75,
+    "seer": 21,
+    "price": 1539.84
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Wall Mount)",
+    "model": "RXT12AVJU9 / FTXV12AVJU9",
+    "desc": "Aurora wall-mount heat pump, cold-climate",
+    "tons": 1,
+    "seer": 20,
+    "price": 1632
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Wall Mount)",
+    "model": "RXT15AVJU9 / FTXV15AVJU9",
+    "desc": "Aurora wall-mount heat pump, cold-climate",
+    "tons": 1.25,
+    "seer": 21,
+    "price": 2287.68
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Wall Mount)",
+    "model": "RXT18AVJU9 / FTXV18AVJU9",
+    "desc": "Aurora wall-mount heat pump, cold-climate",
+    "tons": 1.5,
+    "seer": 21,
+    "price": 2616.48
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "AURORA (Wall Mount)",
+    "model": "RXT24AVJU9 / FTXV24AVJU9",
+    "desc": "Aurora wall-mount heat pump, cold-climate",
+    "tons": 2,
+    "seer": 21,
+    "price": 2859.84
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "ATMOSPHERA",
+    "model": "RXM09WVJU9 / FTXM09WVJU9",
+    "desc": "Atmosphera slim wall-mount heat pump",
+    "tons": 0.75,
+    "seer": 27.4,
+    "price": 1513.44
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "ATMOSPHERA",
+    "model": "RXM12WVJU9 / FTXM12WVJU9",
+    "desc": "Atmosphera slim wall-mount heat pump",
+    "tons": 1,
+    "seer": 25.2,
+    "price": 1774.56
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "ATMOSPHERA",
+    "model": "RXM18WVJU9 / FTXM18WVJU9",
+    "desc": "Atmosphera slim wall-mount heat pump",
+    "tons": 1.5,
+    "seer": 22.7,
+    "price": 2700.96
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "ATMOSPHERA",
+    "model": "RXM24WVJU9 / FTXM24WVJU9",
+    "desc": "Atmosphera slim wall-mount heat pump",
+    "tons": 2,
+    "seer": 22,
+    "price": 3055.2
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "POLARA",
+    "model": "RXV30AVJU9 / FTXV30AVJU9",
+    "desc": "Polara high-capacity wall-mount heat pump",
+    "tons": 2.5,
+    "seer": 19,
+    "price": 2923.2
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "POLARA",
+    "model": "RXV36AVJU9 / FTXV36AVJU9",
+    "desc": "Polara high-capacity wall-mount heat pump",
+    "tons": 3,
+    "seer": 18,
+    "price": 3761.28
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ducted AHU)",
+    "model": "RZA18AAVJU / FBA18AAVJU",
+    "desc": "SkyAir commercial-duty heat pump, ducted AHU",
+    "tons": 1.5,
+    "seer": 16.3,
+    "price": 3947.52
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ducted AHU)",
+    "model": "RZA24AAVJU / FBA24AAVJU",
+    "desc": "SkyAir commercial-duty heat pump, ducted AHU",
+    "tons": 2,
+    "seer": 16.2,
+    "price": 4622.88
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ducted AHU)",
+    "model": "RZA30AAVJU / FBA30AAVJU",
+    "desc": "SkyAir commercial-duty heat pump, ducted AHU",
+    "tons": 2.5,
+    "seer": 16.5,
+    "price": 5646.24
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ducted AHU)",
+    "model": "RZA36AAVJU / FBA36AAVJU",
+    "desc": "SkyAir commercial-duty heat pump, ducted AHU",
+    "tons": 3,
+    "seer": 16.9,
+    "price": 6284.64
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ducted AHU)",
+    "model": "RZA42AAVJU / FBA42AAVJU",
+    "desc": "SkyAir commercial-duty heat pump, ducted AHU",
+    "tons": 3.5,
+    "seer": 15.6,
+    "price": 7201.92
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ducted AHU)",
+    "model": "RZA48AAVJU / FBA48AAVJU",
+    "desc": "SkyAir commercial-duty heat pump, ducted AHU",
+    "tons": 4,
+    "seer": 15.3,
+    "price": 7778.4
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ceiling Cassette)",
+    "model": "RZA18AAVJU / FCA18AAVJU",
+    "desc": "SkyAir heat pump, 4-way ceiling cassette",
+    "tons": 1.5,
+    "seer": 19.5,
+    "price": 4141.92
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ceiling Cassette)",
+    "model": "RZA24AAVJU / FCA24AAVJU",
+    "desc": "SkyAir heat pump, 4-way ceiling cassette",
+    "tons": 2,
+    "seer": 19.6,
+    "price": 5061.12
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ceiling Cassette)",
+    "model": "RZA30AAVJU / FCA30AAVJU",
+    "desc": "SkyAir heat pump, 4-way ceiling cassette",
+    "tons": 2.5,
+    "seer": 21,
+    "price": 6026.88
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ceiling Cassette)",
+    "model": "RZA36AAVJU / FCA36AAVJU",
+    "desc": "SkyAir heat pump, 4-way ceiling cassette",
+    "tons": 3,
+    "seer": 20,
+    "price": 6868.8
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ceiling Cassette)",
+    "model": "RZA42AAVJU / FCA42AAVJU",
+    "desc": "SkyAir heat pump, 4-way ceiling cassette",
+    "tons": 3.5,
+    "seer": 18.9,
+    "price": 7831.68
+  },
+  {
+    "cat": "Daikin Single-Zone",
+    "series": "SkyAir (Ceiling Cassette)",
+    "model": "RZA48AAVJU / FCA48AAVJU",
+    "desc": "SkyAir heat pump, 4-way ceiling cassette",
+    "tons": 4,
+    "seer": 18,
+    "price": 8460.48
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "RA 2-5 Zone",
+    "model": "2MXM18AVJU9",
+    "desc": "2-zone multi-split condenser",
+    "tons": 1.5,
+    "seer": 18.5,
+    "price": 1730.88
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "RA 2-5 Zone",
+    "model": "3MXM24AVJU9",
+    "desc": "3-zone multi-split condenser",
+    "tons": 2,
+    "seer": 18.5,
+    "price": 2481.12
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "RA 2-5 Zone",
+    "model": "4MXM36AVJU9",
+    "desc": "4-zone multi-split condenser",
+    "tons": 3,
+    "seer": 17.6,
+    "price": 2956.8
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "RA 2-5 Zone",
+    "model": "5MXM48AVJU9",
+    "desc": "5-zone multi-split condenser",
+    "tons": 4,
+    "seer": 17.25,
+    "price": 3965.28
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "AURORA RA Multi-Split",
+    "model": "2MXT18AVJU9",
+    "desc": "2-zone Aurora multi-split condenser",
+    "tons": 1.5,
+    "seer": 16,
+    "price": 2272.32
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "AURORA RA Multi-Split",
+    "model": "3MXT24AVJU9",
+    "desc": "3-zone Aurora multi-split condenser",
+    "tons": 2,
+    "seer": 16,
+    "price": 2962.08
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "AURORA RA Multi-Split",
+    "model": "4MXT36AVJU9",
+    "desc": "4-zone Aurora multi-split condenser",
+    "tons": 3,
+    "seer": 16,
+    "price": 3622.08
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "AURORA RA Multi-Split",
+    "model": "5MXT40AVJU9",
+    "desc": "5-zone Aurora multi-split condenser",
+    "tons": 3.3,
+    "seer": 15.9,
+    "price": 3997.92
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "AURORA RA Multi-Split H",
+    "model": "2MXTH18AVJU9",
+    "desc": "2-zone Aurora multi-split, cold-climate",
+    "tons": 1.5,
+    "price": 2457.12
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "AURORA RA Multi-Split H",
+    "model": "3MXTH24AVJU9",
+    "desc": "3-zone Aurora multi-split, cold-climate",
+    "tons": 2,
+    "price": 3080.64
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "AURORA RA Multi-Split H",
+    "model": "4MXTH36AVJU9",
+    "desc": "4-zone Aurora multi-split, cold-climate",
+    "tons": 3,
+    "price": 3767.04
+  },
+  {
+    "cat": "Daikin Multi-Zone Outdoor",
+    "series": "AURORA RA Multi-Split H",
+    "model": "5MXTH40AVJU9",
+    "desc": "5-zone Aurora multi-split, cold-climate",
+    "tons": 3.3,
+    "price": 4157.76
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Wall Mount",
+    "model": "FFQ / FTXS-class 9k",
+    "desc": "Multi-zone wall-mount indoor, 9,000 BTU",
+    "tons": 0.75,
+    "price": 486.72,
+    "model2": "FTXV09AVJU9"
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Aurora Floor Mount",
+    "model": "FVXV09AVJUT9",
+    "desc": "Aurora floor-mount indoor, 9,000 BTU, textured",
+    "tons": 0.75,
+    "price": 1032.48
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Aurora Floor Mount",
+    "model": "FVXV09AVJUW9",
+    "desc": "Aurora floor-mount indoor, 9,000 BTU, white",
+    "tons": 0.75,
+    "price": 1012.32
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Aurora Floor Mount",
+    "model": "FVXV12AVJUT9",
+    "desc": "Aurora floor-mount indoor, 12,000 BTU, textured",
+    "tons": 1,
+    "price": 1153.44
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Aurora Floor Mount",
+    "model": "FVXV12AVJUW9",
+    "desc": "Aurora floor-mount indoor, 12,000 BTU, white",
+    "tons": 1,
+    "price": 1130.4
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Aurora Floor Mount",
+    "model": "FVXV15AVJUT9",
+    "desc": "Aurora floor-mount indoor, 15,000 BTU, textured",
+    "tons": 1.25,
+    "price": 1268.64
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Aurora Floor Mount",
+    "model": "FVXV15AVJUW9",
+    "desc": "Aurora floor-mount indoor, 15,000 BTU, white",
+    "tons": 1.25,
+    "price": 1243.68
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Aurora Floor Mount",
+    "model": "FVXV18AVJUT9",
+    "desc": "Aurora floor-mount indoor, 18,000 BTU, textured",
+    "tons": 1.5,
+    "price": 1414.56
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Aurora Floor Mount",
+    "model": "FVXV18AVJUW9",
+    "desc": "Aurora floor-mount indoor, 18,000 BTU, white",
+    "tons": 1.5,
+    "price": 1386.72
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Multi-Zone Air Handler",
+    "model": "CMXV12AVJUA",
+    "desc": "Ducted multi-zone air handler, 12,000 BTU",
+    "tons": 1,
+    "price": 1262.88
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Multi-Zone Air Handler",
+    "model": "CMXV18AVJUA",
+    "desc": "Ducted multi-zone air handler, 18,000 BTU",
+    "tons": 1.5,
+    "price": 1356
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Multi-Zone Air Handler",
+    "model": "CMXV24AVJUA",
+    "desc": "Ducted multi-zone air handler, 24,000 BTU",
+    "tons": 2,
+    "price": 1453.44
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Wall Mount",
+    "model": "CTXV07AVJU9",
+    "desc": "Multi-zone wall-mount indoor, 7,000 BTU",
+    "tons": 0.6,
+    "price": 420.96
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Wall Mount (FTXV)",
+    "model": "FTXV09AVJU9",
+    "desc": "Multi-zone wall-mount indoor, 9,000 BTU",
+    "tons": 0.75,
+    "price": 486.72
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Wall Mount (FTXV)",
+    "model": "FTXV12AVJU9",
+    "desc": "Multi-zone wall-mount indoor, 12,000 BTU",
+    "tons": 1,
+    "price": 528.48
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Wall Mount (FTXV)",
+    "model": "FTXV15AVJU9",
+    "desc": "Multi-zone wall-mount indoor, 15,000 BTU",
+    "tons": 1.25,
+    "price": 585.12
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Wall Mount (FTXV)",
+    "model": "FTXV18AVJU9",
+    "desc": "Multi-zone wall-mount indoor, 18,000 BTU",
+    "tons": 1.5,
+    "price": 644.64
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Wall Mount (FTXV)",
+    "model": "FTXV24AVJU9",
+    "desc": "Multi-zone wall-mount indoor, 24,000 BTU",
+    "tons": 2,
+    "price": 728.64
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Horizontal Ducted",
+    "model": "FDMA09AVJU9",
+    "desc": "Medium-static horizontal ducted, 9,000 BTU",
+    "tons": 0.75,
+    "price": 1044.96
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Horizontal Ducted",
+    "model": "FDMA12AVJU9",
+    "desc": "Medium-static horizontal ducted, 12,000 BTU",
+    "tons": 1,
+    "price": 1169.28
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Horizontal Ducted",
+    "model": "FDMA15AVJU9",
+    "desc": "Medium-static horizontal ducted, 15,000 BTU",
+    "tons": 1.25,
+    "price": 1206.72
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Horizontal Ducted",
+    "model": "FDMA18AVJU9",
+    "desc": "Medium-static horizontal ducted, 18,000 BTU",
+    "tons": 1.5,
+    "price": 1390.56
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Horizontal Ducted",
+    "model": "FDMA24AVJU9",
+    "desc": "Medium-static horizontal ducted, 24,000 BTU",
+    "tons": 2,
+    "price": 1747.2
+  },
+  {
+    "cat": "Daikin Multi-Zone Indoor",
+    "series": "Concealed Ducted",
+    "model": "CDMA07AVJU9",
+    "desc": "Aurora concealed ducted unit, 7,000 BTU",
+    "tons": 0.6,
+    "price": 964.8
+  },
+  {
+    "cat": "Daikin Controls",
+    "series": "Thermostat",
+    "model": "DTST-LTE-LA-A",
+    "desc": "One Lite connected thermostat, built-in Wi-Fi, single/multi-zone",
+    "price": 267.91
+  },
+  {
+    "cat": "Daikin Controls",
+    "series": "Thermostat",
+    "model": "DTST-ONE-ADA-A",
+    "desc": "Smart Thermostat Update for VRV, Ductless & Aux Heat",
+    "price": 512.44
+  },
+  {
+    "cat": "Daikin Controls",
+    "series": "Thermostat",
+    "model": "DTST-TOU-ADA-A",
+    "desc": "Smart Thermostat Combo Pack",
+    "price": 421.2
+  },
+  {
+    "cat": "Daikin Controls",
+    "series": "Remote",
+    "model": "BRC1E73*",
+    "desc": "Wired remote controller",
+    "price": 270
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXT7C — up to 17.2 SEER2, 2-Stage Comm.",
+    "model": "GLXT7CA2410A*",
+    "desc": "Split system A/C condenser, R-32",
+    "tons": 2,
+    "seer": 17.2,
+    "price": 2190.83
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXT7C — up to 17.2 SEER2, 2-Stage Comm.",
+    "model": "GLXT7CA3610A*",
+    "desc": "Split system A/C condenser, R-32",
+    "tons": 3,
+    "seer": 17.2,
+    "price": 2567.57
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXT7C — up to 17.2 SEER2, 2-Stage Comm.",
+    "model": "GLXT7CA4810A*",
+    "desc": "Split system A/C condenser, R-32",
+    "tons": 4,
+    "seer": 17.2,
+    "price": 3141.68
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXT7C — up to 17.2 SEER2, 2-Stage Comm.",
+    "model": "GLXT7CA6010A*",
+    "desc": "Split system A/C condenser, R-32",
+    "tons": 5,
+    "seer": 17.2,
+    "price": 3588.86
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GXV6SS — up to 17.2 SEER2, Variable-Speed Comm.",
+    "model": "GXV6SS1810A*",
+    "desc": "Inverter side-discharge A/C condenser, R-32",
+    "tons": 1.5,
+    "seer": 17.2,
+    "price": 1650.97
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GXV6SS — up to 17.2 SEER2, Variable-Speed Comm.",
+    "model": "GXV6SS2410A*",
+    "desc": "Inverter side-discharge A/C condenser, R-32",
+    "tons": 2,
+    "seer": 17.2,
+    "price": 1729.09
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GXV6SS — up to 17.2 SEER2, Variable-Speed Comm.",
+    "model": "GXV6SS3010A*",
+    "desc": "Inverter side-discharge A/C condenser, R-32",
+    "tons": 2.5,
+    "seer": 17.2,
+    "price": 1824.92
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GXV6SS — up to 17.2 SEER2, Variable-Speed Comm.",
+    "model": "GXV6SS3610A*",
+    "desc": "Inverter side-discharge A/C condenser, R-32",
+    "tons": 3,
+    "seer": 17.2,
+    "price": 1921.57
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GXV6SS — up to 17.2 SEER2, Variable-Speed Comm.",
+    "model": "GXV6SS4210A*",
+    "desc": "Inverter side-discharge A/C condenser, R-32",
+    "tons": 3.5,
+    "seer": 17.2,
+    "price": 2076.19
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GXV6SS — up to 17.2 SEER2, Variable-Speed Comm.",
+    "model": "GXV6SS4810A*",
+    "desc": "Inverter side-discharge A/C condenser, R-32",
+    "tons": 4,
+    "seer": 17.2,
+    "price": 2230.82
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GXV6SS — up to 17.2 SEER2, Variable-Speed Comm.",
+    "model": "GXV6SS6010A*",
+    "desc": "Inverter side-discharge A/C condenser, R-32",
+    "tons": 5,
+    "seer": 17.2,
+    "price": 2589.2
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS5B — up to 16.5 SEER2, Single/Two-Stage",
+    "model": "GLXS5BA1810A*",
+    "desc": "High-efficiency single-phase A/C condenser, R-32",
+    "tons": 1.5,
+    "seer": 16.5,
+    "price": 1501.7
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS5B — up to 16.5 SEER2, Single/Two-Stage",
+    "model": "GLXS5BA2410A*",
+    "desc": "High-efficiency single-phase A/C condenser, R-32",
+    "tons": 2,
+    "seer": 16.5,
+    "price": 1620.89
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS5B — up to 16.5 SEER2, Single/Two-Stage",
+    "model": "GLXS5BA3010A*",
+    "desc": "High-efficiency single-phase A/C condenser, R-32",
+    "tons": 2.5,
+    "seer": 16.5,
+    "price": 1693.78
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS5B — up to 16.5 SEER2, Single/Two-Stage",
+    "model": "GLXS5BA3610A*",
+    "desc": "High-efficiency single-phase A/C condenser, R-32",
+    "tons": 3,
+    "seer": 16.5,
+    "price": 1901.8
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS5B — up to 16.5 SEER2, Single/Two-Stage",
+    "model": "GLXS5BA4210A*",
+    "desc": "High-efficiency single-phase A/C condenser, R-32",
+    "tons": 3.5,
+    "seer": 16.5,
+    "price": 2151.57
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS5B — up to 16.5 SEER2, Single/Two-Stage",
+    "model": "GLXS5BA4810A*",
+    "desc": "High-efficiency single-phase A/C condenser, R-32",
+    "tons": 4,
+    "seer": 16.5,
+    "price": 2326.95
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS5B — up to 16.5 SEER2, Single/Two-Stage",
+    "model": "GLXS5BA6010A*",
+    "desc": "High-efficiency single-phase A/C condenser, R-32",
+    "tons": 5,
+    "seer": 16.5,
+    "price": 2657.96
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLXS4BA1810A*",
+    "desc": "Single-stage split A/C condenser, R-32",
+    "tons": 1.5,
+    "seer": 15.2,
+    "price": 1248.92
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLXS4BA2410A*",
+    "desc": "Single-stage split A/C condenser, R-32",
+    "tons": 2,
+    "seer": 15.2,
+    "price": 1349.92
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLXS4BA3010A*",
+    "desc": "Single-stage split A/C condenser, R-32",
+    "tons": 2.5,
+    "seer": 15.2,
+    "price": 1408.71
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLXS4BA3610A*",
+    "desc": "Single-stage split A/C condenser, R-32",
+    "tons": 3,
+    "seer": 15.2,
+    "price": 1582.07
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLXS4BA4210A*",
+    "desc": "Single-stage split A/C condenser, R-32",
+    "tons": 3.5,
+    "seer": 15.2,
+    "price": 1790.1
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLXS4BA4810A*",
+    "desc": "Single-stage split A/C condenser, R-32",
+    "tons": 4,
+    "seer": 15.2,
+    "price": 1935.57
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLXS4BA6010A*",
+    "desc": "Single-stage split A/C condenser, R-32",
+    "tons": 5,
+    "seer": 15.2,
+    "price": 2209.92
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS3B — up to 15 SEER2, Entry Single Stage",
+    "model": "GLXS3BN1810A*",
+    "desc": "Entry-level split A/C condenser, R-32",
+    "tons": 1.5,
+    "seer": 15,
+    "price": 1106.47
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS3B — up to 15 SEER2, Entry Single Stage",
+    "model": "GLXS3BN2410A*",
+    "desc": "Entry-level split A/C condenser, R-32",
+    "tons": 2,
+    "seer": 15,
+    "price": 1195.41
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS3B — up to 15 SEER2, Entry Single Stage",
+    "model": "GLXS3BN3010A*",
+    "desc": "Entry-level split A/C condenser, R-32",
+    "tons": 2.5,
+    "seer": 15,
+    "price": 1246.66
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS3B — up to 15 SEER2, Entry Single Stage",
+    "model": "GLXS3BN3610A*",
+    "desc": "Entry-level split A/C condenser, R-32",
+    "tons": 3,
+    "seer": 15,
+    "price": 1401.93
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS3B — up to 15 SEER2, Entry Single Stage",
+    "model": "GLXS3BN4210A*",
+    "desc": "Entry-level split A/C condenser, R-32",
+    "tons": 3.5,
+    "seer": 15,
+    "price": 1585.84
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS3B — up to 15 SEER2, Entry Single Stage",
+    "model": "GLXS3BN4810A*",
+    "desc": "Entry-level split A/C condenser, R-32",
+    "tons": 4,
+    "seer": 15,
+    "price": 1715.48
+  },
+  {
+    "cat": "Goodman Air Conditioners",
+    "series": "GLXS3B — up to 15 SEER2, Entry Single Stage",
+    "model": "GLXS3BN6010A*",
+    "desc": "Entry-level split A/C condenser, R-32",
+    "tons": 5,
+    "seer": 15,
+    "price": 1958.18
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZT7C — up to 17.5 SEER2, 2-Stage Comm.",
+    "model": "GLZT7CA2410A*",
+    "desc": "Split heat pump condenser, R-32",
+    "tons": 2,
+    "seer": 17.5,
+    "price": 2987.71
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZT7C — up to 17.5 SEER2, 2-Stage Comm.",
+    "model": "GLZT7CA3610A*",
+    "desc": "Split heat pump condenser, R-32",
+    "tons": 3,
+    "seer": 17.5,
+    "price": 3395.57
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZT7C — up to 17.5 SEER2, 2-Stage Comm.",
+    "model": "GLZT7CA4810A*",
+    "desc": "Split heat pump condenser, R-32",
+    "tons": 4,
+    "seer": 17.5,
+    "price": 4140.05
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZT7C — up to 17.5 SEER2, 2-Stage Comm.",
+    "model": "GLZT7CA6010A*",
+    "desc": "Split heat pump condenser, R-32",
+    "tons": 5,
+    "seer": 17.5,
+    "price": 4734.64
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV7S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV7SA2410A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 2,
+    "seer": 19,
+    "price": 2361.29
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV7S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV7SA3610A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 3,
+    "seer": 19,
+    "price": 2936.31
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV7S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV7SA4210A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 3.5,
+    "seer": 19,
+    "price": 3068.38
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV7S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV7SA4810A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 4,
+    "seer": 19,
+    "price": 3328.51
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV7S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV7SA6010A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 5,
+    "seer": 18,
+    "price": 4595.33
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV6S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV6SA1810A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 1.5,
+    "seer": 19,
+    "price": 1964.25
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV6S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV6SA2410A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 2,
+    "seer": 18,
+    "price": 2043.98
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV6S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV6SA3010A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 2.5,
+    "seer": 17.5,
+    "price": 2235.65
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV6S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV6SA3610A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 3,
+    "seer": 16.6,
+    "price": 2431.35
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV6S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV6SA4210A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 3.5,
+    "seer": 17,
+    "price": 2656.85
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV6S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV6SA4810A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 4,
+    "seer": 17,
+    "price": 2881.54
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GZV6S — up to 19 SEER2, Variable-Speed Comm.",
+    "model": "GZV6SA6010A*",
+    "desc": "Inverter side-discharge heat pump condenser, R-32",
+    "tons": 5,
+    "seer": 16.6,
+    "price": 3323.68
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS5B — up to 16 SEER2, Single Stage",
+    "model": "GLZS5BA1810A*",
+    "desc": "Single-stage heat pump condenser, R-32",
+    "tons": 1.5,
+    "seer": 16,
+    "price": 1947.35
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS5B — up to 16 SEER2, Single Stage",
+    "model": "GLZS5BA2410A*",
+    "desc": "Single-stage heat pump condenser, R-32",
+    "tons": 2,
+    "seer": 16,
+    "price": 2012.64
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS5B — up to 16 SEER2, Single Stage",
+    "model": "GLZS5BA3010A*",
+    "desc": "Single-stage heat pump condenser, R-32",
+    "tons": 2.5,
+    "seer": 16,
+    "price": 2247.99
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS5B — up to 16 SEER2, Single Stage",
+    "model": "GLZS5BA3610A*",
+    "desc": "Single-stage heat pump condenser, R-32",
+    "tons": 3,
+    "seer": 16,
+    "price": 2468.92
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS5B — up to 16 SEER2, Single Stage",
+    "model": "GLZS5BA4210A*",
+    "desc": "Single-stage heat pump condenser, R-32",
+    "tons": 3.5,
+    "seer": 16,
+    "price": 2669.35
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS5B — up to 16 SEER2, Single Stage",
+    "model": "GLZS5BA4810A*",
+    "desc": "Single-stage heat pump condenser, R-32",
+    "tons": 4,
+    "seer": 16,
+    "price": 2921.4
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS5B — up to 16 SEER2, Single Stage",
+    "model": "GLZS5BA6010A*",
+    "desc": "Single-stage heat pump condenser, R-32",
+    "tons": 5,
+    "seer": 16,
+    "price": 3477.14
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLZS4BA1810A*",
+    "desc": "Entry single-stage heat pump condenser, R-32",
+    "tons": 1.5,
+    "seer": 15.2,
+    "price": 1547.4
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLZS4BA2410A*",
+    "desc": "Entry single-stage heat pump condenser, R-32",
+    "tons": 2,
+    "seer": 15.2,
+    "price": 1600.16
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLZS4BA3010A*",
+    "desc": "Entry single-stage heat pump condenser, R-32",
+    "tons": 2.5,
+    "seer": 14.5,
+    "price": 1848.89
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLZS4BA3610A*",
+    "desc": "Entry single-stage heat pump condenser, R-32",
+    "tons": 3,
+    "seer": 15,
+    "price": 2120.98
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLZS4BA4210A*",
+    "desc": "Entry single-stage heat pump condenser, R-32",
+    "tons": 3.5,
+    "seer": 15.2,
+    "price": 2292.83
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLZS4BA4810A*",
+    "desc": "Entry single-stage heat pump condenser, R-32",
+    "tons": 4,
+    "seer": 15.2,
+    "price": 2508.4
+  },
+  {
+    "cat": "Goodman Heat Pumps",
+    "series": "GLZS4B — up to 15.2 SEER2, Single Stage",
+    "model": "GLZS4BA6010A*",
+    "desc": "Entry single-stage heat pump condenser, R-32",
+    "tons": 5,
+    "seer": 14.5,
+    "price": 2935.76
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GDVM97 — 97% AFUE Modulating Downflow/Horiz.",
+    "model": "GDVM970603BNA*",
+    "desc": "60,000 BTU, 34-1/2\"x17-1/2\"x28-3/4\"",
+    "afue": 97,
+    "price": 2254.32
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GDVM97 — 97% AFUE Modulating Downflow/Horiz.",
+    "model": "GDVM970803BNA*",
+    "desc": "80,000 BTU, 34-1/2\"x17-1/2\"x28-3/4\"",
+    "afue": 97,
+    "price": 2572.32
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GDVM97 — 97% AFUE Modulating Downflow/Horiz.",
+    "model": "GDVM970804CNA*",
+    "desc": "80,000 BTU, 34-1/2\"x21\"x28-3/4\"",
+    "afue": 97,
+    "price": 2608.01
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GDVM97 — 97% AFUE Modulating Downflow/Horiz.",
+    "model": "GDVM971005CNA*",
+    "desc": "100,000 BTU, 34-1/2\"x21\"x28-3/4\"",
+    "afue": 97,
+    "price": 2720.76
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVM97 — 97% AFUE Modulating Upflow",
+    "model": "GRVM970603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 97,
+    "price": 2092.9
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVM97 — 97% AFUE Modulating Upflow",
+    "model": "GRVM970803BNA*",
+    "desc": "80,000 BTU",
+    "afue": 97,
+    "price": 2412.51
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVM97 — 97% AFUE Modulating Upflow",
+    "model": "GRVM970804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 97,
+    "price": 2446.58
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVM97 — 97% AFUE Modulating Upflow",
+    "model": "GRVM971005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 97,
+    "price": 2643.7
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVM97 — 97% AFUE Modulating Upflow",
+    "model": "GRVM971205DNA*",
+    "desc": "120,000 BTU",
+    "afue": 97,
+    "price": 2851.37
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9S96 — 96% AFUE Single-Stage Downflow/Horiz.",
+    "model": "GD9S960403BNA*",
+    "desc": "40,000 BTU",
+    "afue": 96,
+    "price": 1290.64
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9S96 — 96% AFUE Single-Stage Downflow/Horiz.",
+    "model": "GD9S960603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 96,
+    "price": 1342.27
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9S96 — 96% AFUE Single-Stage Downflow/Horiz.",
+    "model": "GD9S960804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 1548.77
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9S96 — 96% AFUE Single-Stage Downflow/Horiz.",
+    "model": "GD9S961005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 96,
+    "price": 1716.55
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9S96 — 96% AFUE Single-Stage Downflow/Horiz.",
+    "model": "GD9S961205DNA*",
+    "desc": "120,000 BTU",
+    "afue": 96,
+    "price": 1878.26
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T96 — 96% AFUE Two-Stage Downflow/Horiz.",
+    "model": "GD9T960403BNA*",
+    "desc": "40,000 BTU",
+    "afue": 96,
+    "price": 1425.78
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T96 — 96% AFUE Two-Stage Downflow/Horiz.",
+    "model": "GD9T960603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 96,
+    "price": 1519.92
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T96 — 96% AFUE Two-Stage Downflow/Horiz.",
+    "model": "GD9T960803BNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 1779.56
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T96 — 96% AFUE Two-Stage Downflow/Horiz.",
+    "model": "GD9T961005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 96,
+    "price": 1850.93
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GDVT96 — 96% AFUE 2-Stage Variable Downflow/Horiz.",
+    "model": "GDVT960403BNA*",
+    "desc": "40,000 BTU",
+    "afue": 96,
+    "price": 1930.66
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GDVT96 — 96% AFUE 2-Stage Variable Downflow/Horiz.",
+    "model": "GDVT960603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 96,
+    "price": 2006.1
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GDVT96 — 96% AFUE 2-Stage Variable Downflow/Horiz.",
+    "model": "GDVT960804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 2332.2
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GDVT96 — 96% AFUE 2-Stage Variable Downflow/Horiz.",
+    "model": "GDVT961005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 96,
+    "price": 2448.2
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GDVT96 — 96% AFUE 2-Stage Variable Downflow/Horiz.",
+    "model": "GDVT961205DNA*",
+    "desc": "120,000 BTU",
+    "afue": 96,
+    "price": 2550.41
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S96 — 96% AFUE Single-Stage Upflow",
+    "model": "GR9S960403ANA*",
+    "desc": "40,000 BTU",
+    "afue": 96,
+    "price": 1215.48
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S96 — 96% AFUE Single-Stage Upflow",
+    "model": "GR9S960603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 96,
+    "price": 1305.06
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S96 — 96% AFUE Single-Stage Upflow",
+    "model": "GR9S960803BNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 1380.23
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S96 — 96% AFUE Single-Stage Upflow",
+    "model": "GR9S960804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 1520.68
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S96 — 96% AFUE Single-Stage Upflow",
+    "model": "GR9S960805CNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 1590.52
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S96 — 96% AFUE Single-Stage Upflow",
+    "model": "GR9S961005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 96,
+    "price": 1655.82
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S96 — 96% AFUE Single-Stage Upflow",
+    "model": "GR9S961205DNA*",
+    "desc": "120,000 BTU",
+    "afue": 96,
+    "price": 1791.71
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T96 — 96% AFUE Two-Stage Upflow",
+    "model": "GR9T960303ANA*",
+    "desc": "30,000 BTU",
+    "afue": 96,
+    "price": 1257.24
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T96 — 96% AFUE Two-Stage Upflow",
+    "model": "GR9T960403ANA*",
+    "desc": "40,000 BTU",
+    "afue": 96,
+    "price": 1305.06
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T96 — 96% AFUE Two-Stage Upflow",
+    "model": "GR9T960603ANA*",
+    "desc": "60,000 BTU",
+    "afue": 96,
+    "price": 1361.25
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T96 — 96% AFUE Two-Stage Upflow",
+    "model": "GR9T960603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 96,
+    "price": 1402.24
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T96 — 96% AFUE Two-Stage Upflow",
+    "model": "GR9T960803BNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 1630.76
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T96 — 96% AFUE Two-Stage Upflow",
+    "model": "GR9T960804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 1683.15
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T96 — 96% AFUE Two-Stage Upflow",
+    "model": "GR9T961004CNA*",
+    "desc": "100,000 BTU",
+    "afue": 96,
+    "price": 1731.74
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T96 — 96% AFUE Two-Stage Upflow",
+    "model": "GR9T961005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 96,
+    "price": 1790.19
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T96 — 96% AFUE Two-Stage Upflow",
+    "model": "GR9T961205DNA*",
+    "desc": "120,000 BTU",
+    "afue": 96,
+    "price": 1827.39
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT96 — 96% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT960403BNA*",
+    "desc": "40,000 BTU",
+    "afue": 96,
+    "price": 1735.16
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT96 — 96% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT960603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 96,
+    "price": 1800.86
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT96 — 96% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT960803BNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 2169.15
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT96 — 96% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT960804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 96,
+    "price": 2192.67
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT96 — 96% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT961005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 96,
+    "price": 2381.68
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT96 — 96% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT961005DNA*",
+    "desc": "100,000 BTU",
+    "afue": 96,
+    "price": 2464.43
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT96 — 96% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT961205DNA*",
+    "desc": "120,000 BTU",
+    "afue": 96,
+    "price": 2485.52
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S92 — 92% AFUE Single-Stage Upflow",
+    "model": "GR9S920403ANA*",
+    "desc": "40,000 BTU",
+    "afue": 92,
+    "price": 1098.56
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S92 — 92% AFUE Single-Stage Upflow",
+    "model": "GR9S920603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 92,
+    "price": 1170.69
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S92 — 92% AFUE Single-Stage Upflow",
+    "model": "GR9S920803BNA*",
+    "desc": "80,000 BTU",
+    "afue": 92,
+    "price": 1279.25
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S92 — 92% AFUE Single-Stage Upflow",
+    "model": "GR9S920804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 92,
+    "price": 1362.76
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S92 — 92% AFUE Single-Stage Upflow",
+    "model": "GR9S920805CNA*",
+    "desc": "80,000 BTU",
+    "afue": 92,
+    "price": 1427.3
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S92 — 92% AFUE Single-Stage Upflow",
+    "model": "GR9S921004CNA*",
+    "desc": "100,000 BTU",
+    "afue": 92,
+    "price": 1481.96
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S92 — 92% AFUE Single-Stage Upflow",
+    "model": "GR9S921005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 92,
+    "price": 1520.68
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S92 — 92% AFUE Single-Stage Upflow",
+    "model": "GR9S921205DNA*",
+    "desc": "120,000 BTU",
+    "afue": 92,
+    "price": 1602.67
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9S80 — 80% AFUE Single-Stage Downflow/Horiz.",
+    "model": "GD9S800403ANA*",
+    "desc": "40,000 BTU",
+    "afue": 80,
+    "price": 826.77
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9S80 — 80% AFUE Single-Stage Downflow/Horiz.",
+    "model": "GD9S800603ANA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 875.36
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9S80 — 80% AFUE Single-Stage Downflow/Horiz.",
+    "model": "GD9S800804BNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1014.29
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9S80 — 80% AFUE Single-Stage Downflow/Horiz.",
+    "model": "GD9S801005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 80,
+    "price": 1136.52
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T80-X — 80% AFUE Two-Stage Downflow/Horiz., Low NOx",
+    "model": "GD9T800403AXA*",
+    "desc": "40,000 BTU",
+    "afue": 80,
+    "price": 951.28
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T80-X — 80% AFUE Two-Stage Downflow/Horiz., Low NOx",
+    "model": "GD9T800603AXA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 998.35
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T80-X — 80% AFUE Two-Stage Downflow/Horiz., Low NOx",
+    "model": "GD9T800603BXA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 1011.25
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T80-X — 80% AFUE Two-Stage Downflow/Horiz., Low NOx",
+    "model": "GD9T800804BXA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1094.77
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T80-X — 80% AFUE Two-Stage Downflow/Horiz., Low NOx",
+    "model": "GD9T800805CXA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1130.45
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GD9T80-X — 80% AFUE Two-Stage Downflow/Horiz., Low NOx",
+    "model": "GD9T801005CXA*",
+    "desc": "100,000 BTU",
+    "afue": 80,
+    "price": 1195.74
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S800403ANA*",
+    "desc": "40,000 BTU",
+    "afue": 80,
+    "price": 794.88
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S800603ANA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 848.79
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S800603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 860.93
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S800604BNA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 872.32
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S800803BNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 892.82
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S800804BNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 942.17
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S800804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 963.42
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S800805CNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 983.16
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S801005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 80,
+    "price": 1046.94
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9S80 — 80% AFUE Single-Stage Upflow",
+    "model": "GR9S801205DNA*",
+    "desc": "120,000 BTU",
+    "afue": 80,
+    "price": 1204.85
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T800403ANA*",
+    "desc": "40,000 BTU",
+    "afue": 80,
+    "price": 915.6
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T800603ANA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 970.26
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T800603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 983.16
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T800803BNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1015.81
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T800804BNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1054.53
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T800804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1075.03
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T800805CNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1087.93
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T801004CNA*",
+    "desc": "100,000 BTU",
+    "afue": 80,
+    "price": 1112.99
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T801005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 80,
+    "price": 1149.43
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GR9T80 — 80% AFUE Two-Stage Upflow",
+    "model": "GR9T801205DNA*",
+    "desc": "120,000 BTU",
+    "afue": 80,
+    "price": 1297.47
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT80 — 80% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT800603BNA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 1464.22
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT80 — 80% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT800604BNA*",
+    "desc": "60,000 BTU",
+    "afue": 80,
+    "price": 1597.25
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT80 — 80% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT800803BNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1632.95
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT80 — 80% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT800804CNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1674.32
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT80 — 80% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT800805CNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1717.31
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT80 — 80% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT800805DNA*",
+    "desc": "80,000 BTU",
+    "afue": 80,
+    "price": 1732.72
+  },
+  {
+    "cat": "Goodman Furnaces",
+    "series": "GRVT80 — 80% AFUE 2-Stage Variable Upflow",
+    "model": "GRVT801005CNA*",
+    "desc": "100,000 BTU",
+    "afue": 80,
+    "price": 1821.14
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 — Variable Speed Communicating",
+    "model": "AHVE24BP1300A*",
+    "desc": "Multi-position communicating air handler, R-32",
+    "tons": 2,
+    "price": 1451.58
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 — Variable Speed Communicating",
+    "model": "AHVE36CP1300A*",
+    "desc": "Multi-position communicating air handler, R-32",
+    "tons": 3,
+    "price": 1617.72
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 — Variable Speed Communicating",
+    "model": "AHVE42CP1300A*",
+    "desc": "Multi-position communicating air handler, R-32",
+    "tons": 3.5,
+    "price": 1678.56
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 — Variable Speed Communicating",
+    "model": "AHVE48CP1300A*",
+    "desc": "Multi-position communicating air handler, R-32",
+    "tons": 4,
+    "price": 1692.6
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 — Variable Speed Communicating",
+    "model": "AHVE48DP1300A*",
+    "desc": "Multi-position communicating air handler, R-32",
+    "tons": 4,
+    "price": 1700.4
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 — Variable Speed Communicating",
+    "model": "AHVE60DP1300A*",
+    "desc": "Multi-position communicating air handler, R-32",
+    "tons": 5,
+    "price": 1782.3
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 115V — Variable Speed Communicating",
+    "model": "AHVE24BP0300A*",
+    "desc": "Multi-position communicating air handler, 115V",
+    "tons": 2,
+    "price": 1451.58
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 115V — Variable Speed Communicating",
+    "model": "AHVE36CP0300A*",
+    "desc": "Multi-position communicating air handler, 115V",
+    "tons": 3,
+    "price": 1617.72
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 115V — Variable Speed Communicating",
+    "model": "AHVE42CP0300A*",
+    "desc": "Multi-position communicating air handler, 115V",
+    "tons": 3.5,
+    "price": 1678.56
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 115V — Variable Speed Communicating",
+    "model": "AHVE48CP0300A*",
+    "desc": "Multi-position communicating air handler, 115V",
+    "tons": 4,
+    "price": 1692.6
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 115V — Variable Speed Communicating",
+    "model": "AHVE48DP0300A*",
+    "desc": "Multi-position communicating air handler, 115V",
+    "tons": 4,
+    "price": 1700.4
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AHVE-R32 115V — Variable Speed Communicating",
+    "model": "AHVE60DP0300A*",
+    "desc": "Multi-position communicating air handler, 115V",
+    "tons": 5,
+    "price": 1782.3
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AMST-R32 — Multi-Speed, Internal TXV",
+    "model": "AMST24BU1300A*",
+    "desc": "Multi-position ECM air handler, internal TXV",
+    "tons": 2,
+    "price": 1083.75
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AMST-R32 — Multi-Speed, Internal TXV",
+    "model": "AMST30BU1300A*",
+    "desc": "Multi-position ECM air handler, internal TXV",
+    "tons": 2.5,
+    "price": 1128
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AMST-R32 — Multi-Speed, Internal TXV",
+    "model": "AMST36CU1300A*",
+    "desc": "Multi-position ECM air handler, internal TXV",
+    "tons": 3,
+    "price": 1229.25
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AMST-R32 — Multi-Speed, Internal TXV",
+    "model": "AMST42CU1300A*",
+    "desc": "Multi-position ECM air handler, internal TXV",
+    "tons": 3.5,
+    "price": 1272
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AMST-R32 — Multi-Speed, Internal TXV",
+    "model": "AMST48CU1300A*",
+    "desc": "Multi-position ECM air handler, internal TXV",
+    "tons": 4,
+    "price": 1311
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "AMST-R32 — Multi-Speed, Internal TXV",
+    "model": "AMST60DU1300A*",
+    "desc": "Multi-position ECM air handler, internal TXV",
+    "tons": 5,
+    "price": 1481.25
+  },
+  {
+    "cat": "Goodman Air Handlers",
+    "series": "MBVK HE — Modular Blower",
+    "model": "MBVK16CH1X00A*",
+    "desc": "High-efficiency modular blower, R-410A/R-32",
+    "tons": 4,
+    "price": 911.04
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA2418B3A*",
+    "desc": "18\" x 17.5\" x 21\"",
+    "tons": 2,
+    "price": 555.36
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA3022B3A*",
+    "desc": "22\" x 17.5\" x 21\"",
+    "tons": 2.5,
+    "price": 606.84
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA3022C3A*",
+    "desc": "22\" x 21\" x 21\"",
+    "tons": 2.5,
+    "price": 622.44
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA3626B3A*",
+    "desc": "26\" x 17.5\" x 21\"",
+    "tons": 3,
+    "price": 650.52
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA3626C3A*",
+    "desc": "26\" x 21\" x 21\"",
+    "tons": 3,
+    "price": 670.02
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA3626D3A*",
+    "desc": "26\" x 24.5\" x 21\"",
+    "tons": 3,
+    "price": 677.04
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA4830C3A*",
+    "desc": "30\" x 21\" x 21\"",
+    "tons": 4,
+    "price": 716.82
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA4830D3A*",
+    "desc": "30\" x 24.5\" x 21\"",
+    "tons": 4,
+    "price": 726.96
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA6030C3A*",
+    "desc": "30\" x 21\" x 21\"",
+    "tons": 5,
+    "price": 741
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPEA-R32 — Cased Up/Downflow, EEV",
+    "model": "CAPEA6030D3A*",
+    "desc": "30\" x 24.5\" x 21\"",
+    "tons": 5,
+    "price": 748.8
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA1818A3A*",
+    "desc": "18\" x 14\" x 21\"",
+    "tons": 1.5,
+    "price": 444.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA1818B3A*",
+    "desc": "18\" x 17.5\" x 21\"",
+    "tons": 1.5,
+    "price": 453.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA1818C3A*",
+    "desc": "18\" x 21\" x 21\"",
+    "tons": 1.5,
+    "price": 464.25
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA2422A3A*",
+    "desc": "22\" x 14\" x 21\"",
+    "tons": 2,
+    "price": 464.25
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA2422B3A*",
+    "desc": "22\" x 17.5\" x 21\"",
+    "tons": 2,
+    "price": 468.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA2422C3A*",
+    "desc": "22\" x 21\" x 21\"",
+    "tons": 2,
+    "price": 482.25
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA3022A3A*",
+    "desc": "22\" x 14\" x 21\"",
+    "tons": 2.5,
+    "price": 561.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA3022B3A*",
+    "desc": "22\" x 17.5\" x 21\"",
+    "tons": 2.5,
+    "price": 567
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA3022C3A*",
+    "desc": "22\" x 21\" x 21\"",
+    "tons": 2.5,
+    "price": 568.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA3022D3A*",
+    "desc": "22\" x 24.5\" x 21\"",
+    "tons": 2.5,
+    "price": 570.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA3626B3A*",
+    "desc": "26\" x 17.5\" x 21\"",
+    "tons": 3,
+    "price": 573.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA3626C3A*",
+    "desc": "26\" x 21\" x 21\"",
+    "tons": 3,
+    "price": 577.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA3626D3A*",
+    "desc": "26\" x 24.5\" x 21\"",
+    "tons": 3,
+    "price": 579
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA4226B3A*",
+    "desc": "26\" x 17.5\" x 21\"",
+    "tons": 3.5,
+    "price": 603
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA4226C3A*",
+    "desc": "26\" x 21\" x 21\"",
+    "tons": 3.5,
+    "price": 615.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA4226D3A*",
+    "desc": "26\" x 24.5\" x 21\"",
+    "tons": 3.5,
+    "price": 619.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA6030C3A*",
+    "desc": "30\" x 21\" x 21\"",
+    "tons": 4,
+    "price": 696
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPFA-R32 — Cased Up/Downflow",
+    "model": "CAPFA6030D3A*",
+    "desc": "30\" x 24.5\" x 21\"",
+    "tons": 5,
+    "price": 694.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA1818A3A*",
+    "desc": "18\" x 14\" x 21\"",
+    "tons": 1.5,
+    "price": 502.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA1818B3A*",
+    "desc": "18\" x 17-1/2\" x 21\"",
+    "tons": 1.5,
+    "price": 511.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA2422A3A*",
+    "desc": "22\" x 14\" x 21\"",
+    "tons": 2,
+    "price": 520.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA2422B3A*",
+    "desc": "22\" x 17-1/2\" x 21\"",
+    "tons": 2,
+    "price": 525.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA3022A3A*",
+    "desc": "22\" x 14\" x 21\"",
+    "tons": 2.5,
+    "price": 606.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA3022B3A*",
+    "desc": "22\" x 17-1/2\" x 21\"",
+    "tons": 2.5,
+    "price": 610.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA3022C3A*",
+    "desc": "22\" x 21\" x 21\"",
+    "tons": 2.5,
+    "price": 612
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA3026B3A*",
+    "desc": "26\" x 17-1/2\" x 21\"",
+    "tons": 2.5,
+    "price": 612.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA3026C3A*",
+    "desc": "26\" x 21\" x 21\"",
+    "tons": 2.5,
+    "price": 616.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA3626B3A*",
+    "desc": "26\" x 17-1/2\" x 21\"",
+    "tons": 3,
+    "price": 622.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA3626C3A*",
+    "desc": "26\" x 21\" x 21\"",
+    "tons": 3,
+    "price": 624.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA4230C3A*",
+    "desc": "30\" x 21\" x 21\"",
+    "tons": 3.5,
+    "price": 662.25
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA4230D3A*",
+    "desc": "30\" x 24-1/2\" x 21\"",
+    "tons": 3.5,
+    "price": 691.08
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA6030C3A*",
+    "desc": "30\" x 21\" x 21\"",
+    "tons": 5,
+    "price": 753.75
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CAPTA-R32 — Cased Up/Downflow, Factory TXV",
+    "model": "CAPTA6030D3A*",
+    "desc": "30\" x 24-1/2\" x 21\"",
+    "tons": 5,
+    "price": 758.25
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPEA-R32 — Cased Horizontal, EEV",
+    "model": "CHPEA2422B3A*",
+    "desc": "17.5\" x 22\" x 21\"",
+    "tons": 2,
+    "price": 513.24
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPEA-R32 — Cased Horizontal, EEV",
+    "model": "CHPEA3026B3A*",
+    "desc": "17.5\" x 26\" x 21\"",
+    "tons": 2.5,
+    "price": 513.24
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPEA-R32 — Cased Horizontal, EEV",
+    "model": "CHPEA3026C3A*",
+    "desc": "21\" x 26\" x 21\"",
+    "tons": 2.5,
+    "price": 517.92
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPEA-R32 — Cased Horizontal, EEV",
+    "model": "CHPEA3626B3A*",
+    "desc": "17.5\" x 26\" x 21\"",
+    "tons": 3,
+    "price": 563.94
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPEA-R32 — Cased Horizontal, EEV",
+    "model": "CHPEA3626C3A*",
+    "desc": "21\" x 26\" x 21\"",
+    "tons": 3,
+    "price": 590.46
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPEA-R32 — Cased Horizontal, EEV",
+    "model": "CHPEA4830C3A*",
+    "desc": "21\" x 30\" x 21\"",
+    "tons": 4,
+    "price": 647.4
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPEA-R32 — Cased Horizontal, EEV",
+    "model": "CHPEA4830D3A*",
+    "desc": "24.5\" x 30\" x 21\"",
+    "tons": 4,
+    "price": 653.64
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPEA-R32 — Cased Horizontal, EEV",
+    "model": "CHPEA6030C3A*",
+    "desc": "21\" x 30\" x 21\"",
+    "tons": 5,
+    "price": 659.88
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPEA-R32 — Cased Horizontal, EEV",
+    "model": "CHPEA6030D3A*",
+    "desc": "24.5\" x 30\" x 21\"",
+    "tons": 5,
+    "price": 665.34
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA1822B3A*",
+    "desc": "17-1/2\" x 22\" x 21\"",
+    "tons": 1.5,
+    "price": 554.25
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA2426B3A*",
+    "desc": "17-1/2\" x 26\" x 21\"",
+    "tons": 2,
+    "price": 568.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA2426C3A*",
+    "desc": "21\" x 26\" x 21\"",
+    "tons": 2,
+    "price": 578.25
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA3026B3A*",
+    "desc": "17-1/2\" x 26\" x 21\"",
+    "tons": 2.5,
+    "price": 587.25
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA3026C3A*",
+    "desc": "21\" x 26\" x 21\"",
+    "tons": 2.5,
+    "price": 598.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA3630B3A*",
+    "desc": "17-1/2\" x 30\" x 21\"",
+    "tons": 3,
+    "price": 615
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA3630C3A*",
+    "desc": "21\" x 30\" x 21\"",
+    "tons": 3,
+    "price": 625.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA4230C3A*",
+    "desc": "21\" x 30\" x 21\"",
+    "tons": 3.5,
+    "price": 688.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA4830C3A*",
+    "desc": "21\" x 30\" x 21\"",
+    "tons": 4,
+    "price": 712.5
+  },
+  {
+    "cat": "Goodman Evaporator Coils",
+    "series": "CHPTA-R32 — Cased Horizontal, Factory TXV",
+    "model": "CHPTA6030D3A*",
+    "desc": "24-1/2\" x 30\" x 21\"",
+    "tons": 5,
+    "price": 729.75
+  },
+  {
+    "cat": "Goodman Accessories",
+    "series": "R-32 Furnace Accessories",
+    "model": "0230K00044",
+    "desc": "Furnace Integration Kit for R-32 Systems",
+    "price": 70
+  },
+  {
+    "cat": "Goodman Accessories",
+    "series": "R-32 Zoning / Control Accessories",
+    "model": "0230K00007",
+    "desc": "Zoning & Accessory Control Kit",
+    "price": 69.2
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "480",
+    "desc": "4\" 80 R-6 Silver Flex",
+    "price": 34.5
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "580",
+    "desc": "5\" 80 R-6 Silver Flex",
+    "price": 40.09
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "680",
+    "desc": "6\" 80 R-6 Silver Flex",
+    "price": 44.48
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "780",
+    "desc": "7\" 80 R-6 Silver Flex",
+    "price": 49.73
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "880",
+    "desc": "8\" 80 R-6 Silver Flex",
+    "price": 53.87
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "980",
+    "desc": "9\" 80 R-6 Silver Flex",
+    "price": 61.09
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "1080",
+    "desc": "10\" 80 R-6 Silver Flex",
+    "price": 67.44
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "1280",
+    "desc": "12\" 80 R-6 Silver Flex",
+    "price": 84.04
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "1480",
+    "desc": "14\" 80 R-6 Silver Flex",
+    "price": 99.96
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "1680",
+    "desc": "16\" 80 R-6 Silver Flex",
+    "price": 116.07
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "1880",
+    "desc": "18\" 80 R-6 Silver Flex",
+    "price": 134.47
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QF Silver Jacket R6 Flex (25' bag)",
+    "model": "2080",
+    "desc": "20\" 80 R-6 Silver Flex",
+    "price": 162.36
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Silver Flex Anti-Microbial R8",
+    "model": "1488",
+    "desc": "14\" Silver Flex R8 Anti Microbial AMB Blue",
+    "price": 165.52
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QuietFlex UV Black Flex (25' bag)",
+    "model": "460",
+    "desc": "4\" 60 R-6 Black Flex",
+    "price": 31.29
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QuietFlex UV Black Flex (25' bag)",
+    "model": "565",
+    "desc": "5\" 65 R-8 Black Flex",
+    "price": 49.1
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QuietFlex UV Black Flex (25' bag)",
+    "model": "665",
+    "desc": "6\" 65 R-8 Black Flex",
+    "price": 52.45
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QuietFlex UV Black Flex (25' bag)",
+    "model": "765",
+    "desc": "7\" 65 R-8 Black Flex",
+    "price": 57.76
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QuietFlex UV Black Flex (25' bag)",
+    "model": "865",
+    "desc": "8\" 65 R-8 Black Flex",
+    "price": 64.33
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QuietFlex UV Black Flex (25' bag)",
+    "model": "1065",
+    "desc": "10\" 65 R-8 Black Flex",
+    "price": 78.12
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QuietFlex UV Black Flex (25' bag)",
+    "model": "1265",
+    "desc": "12\" 65 R-8 Black Flex",
+    "price": 95.93
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "QuietFlex UV Black Flex (25' bag)",
+    "model": "1860",
+    "desc": "18\" 60 R-6 Black Flex",
+    "price": 122.08
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Duct Install Accessories",
+    "model": "710-100-EW",
+    "desc": "1.75\"x100 black hanging strap",
+    "price": 6.77
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Duct Install Accessories",
+    "model": "B-503",
+    "desc": "2\" brush",
+    "price": 0.85
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Duct Install Accessories",
+    "model": "PP36-175",
+    "desc": "Ties 36\"",
+    "price": 14.13
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Duct Install Accessories",
+    "model": "PP48-175",
+    "desc": "Ties 48\"",
+    "price": 24.48
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Crown Metal Flexible Pipe",
+    "model": "112820-BB",
+    "desc": "3\"x8' A100UL StretchFit air duct",
+    "price": 8.64
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Crown Metal Flexible Pipe",
+    "model": "112821-BB",
+    "desc": "4\"x8' A100UL StretchFit air duct",
+    "price": 10.74
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Crown Metal Flexible Pipe",
+    "model": "112823-BB",
+    "desc": "6\"x8' A100UL StretchFit air duct",
+    "price": 17.54
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Tubing Insulation — KFlex Insultube",
+    "model": "6RX048038",
+    "desc": "3/8\" x 1/2\" x 6'",
+    "price": 5.59
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Tubing Insulation — KFlex Insultube",
+    "model": "6RX048048",
+    "desc": "1/2\" x 1/2\" x 6'",
+    "price": 5.97
+  },
+  {
+    "cat": "Parts: Ductwork & Insulation",
+    "series": "Tubing Insulation — KFlex Insultube",
+    "model": "6RX068038",
+    "desc": "3/8\" x 3/4\" x 6'",
+    "price": 8.41
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Silver Solder",
+    "model": "15SLD1LB",
+    "desc": "Silver solder, 15%",
+    "price": 319
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Silver Solder",
+    "model": "5SLD1LB",
+    "desc": "Silver solder, 5%",
+    "price": 117.57
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Leak Seal",
+    "model": "45308",
+    "desc": "0.5oz leak seal UV dye, ductless",
+    "price": 50.87
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Leak Seal",
+    "model": "45309",
+    "desc": "0.5oz leak seal, ductless",
+    "price": 46.4
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Leak Seal",
+    "model": "45316",
+    "desc": "1.5oz leak seal, universal",
+    "price": 47.15
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Leak Seal",
+    "model": "45318",
+    "desc": "1.5oz leak seal w/UV dye, universal",
+    "price": 51.43
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Line Flush",
+    "model": "82400",
+    "desc": "System lineset flush, pint",
+    "price": 62.05
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Line Flush",
+    "model": "82500",
+    "desc": "Flush kit",
+    "price": 174.5
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Condensate Safety",
+    "model": "83226",
+    "desc": "EZT226 overflow switch 3/4\" female",
+    "price": 27.02
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Locking Caps",
+    "model": "86682",
+    "desc": "R410a locking cap, 2pk",
+    "price": 32.26
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Locking Caps",
+    "model": "86683",
+    "desc": "R410a locking cap, 50pk",
+    "price": 587.48
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Vacuum Oil",
+    "model": "93092",
+    "desc": "93192 quart of vacuum oil",
+    "price": 12.19
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Vacuum Oil",
+    "model": "93096",
+    "desc": "Vacuum oil, gallons, cs/6",
+    "price": 42.79
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Safe-T-Switch",
+    "model": "97085",
+    "desc": "Safe-T-Switch SS1-Gen3",
+    "price": 28.63
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Safe-T-Switch",
+    "model": "97087",
+    "desc": "Safe-T-Switch SS2-Gen3",
+    "price": 25.45
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Safe-T-Switch",
+    "model": "97089",
+    "desc": "Safe-T-Switch SS3-Gen3",
+    "price": 14.31
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Safe-T-Switch",
+    "model": "SS2",
+    "desc": "Safe-T-Switch SS2",
+    "price": 20.93
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Condensate Switches",
+    "model": "CS-2",
+    "desc": "Pipe mounted elbow switch",
+    "price": 23.17
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Condensate Switches",
+    "model": "CS-3",
+    "desc": "Condensate switch clip",
+    "price": 14.05
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Coil Guard",
+    "model": "CG-AER",
+    "desc": "Clear coil guard",
+    "price": 43.26
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Driers",
+    "model": "PPDRI083S",
+    "desc": "Liquid drier 3/8 SWT 8cu",
+    "price": 14.67
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Driers",
+    "model": "PPDRI135S",
+    "desc": "Suction drier 5/8 SWT 13.5cu",
+    "price": 52.94
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Driers",
+    "model": "PPDRI139S",
+    "desc": "Suction drier 1-1/8 SWT 13.5cu",
+    "price": 83.72
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Driers",
+    "model": "PPDRI163S",
+    "desc": "Liquid drier 3/8 SWT 14.4cu",
+    "price": 18.21
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Sand Cloth",
+    "model": "SC-10",
+    "desc": "Sand cloth, 10yd",
+    "price": 6.27
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Sand Cloth",
+    "model": "SC-25",
+    "desc": "Sand cloth, 25yd",
+    "price": 12.2
+  },
+  {
+    "cat": "Parts: Install Accessories",
+    "series": "Valve Core",
+    "model": "VVC-1",
+    "desc": "Valve core, 6-pack",
+    "price": 3.25
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Google Nest",
+    "model": "GA05560-US",
+    "desc": "Nest Learning 4th gen, Pro, silver",
+    "price": 264
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Google Nest",
+    "model": "T3008US",
+    "desc": "Nest Learning Thermostat, US Gen3",
+    "price": 105.4
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Google Nest",
+    "model": "T4001ES",
+    "desc": "Nest E Series, US",
+    "price": 71.92
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "ProStat",
+    "model": "PSP1100",
+    "desc": "1H/1C non-programmable, LED",
+    "price": 24.13
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "ProStat",
+    "model": "PSP2270",
+    "desc": "2H/2C 7-day programmable Wi-Fi",
+    "price": 60.32
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "ProStat",
+    "model": "PSP4272RT",
+    "desc": "4H/2C 7-day programmable Wi-Fi",
+    "price": 124.93
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "ProStat",
+    "model": "PSP4273RT",
+    "desc": "4H/2C 7-day Wi-Fi + humidity/dehumidify",
+    "price": 137.18
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Honeywell",
+    "model": "TH1110U4000",
+    "desc": "FocusPro N100 non-programmable 1/1",
+    "price": 28.8
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Honeywell",
+    "model": "TH4110U2005",
+    "desc": "T4 Pro thermostat, trade",
+    "price": 42.51
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Honeywell",
+    "model": "TH6220U2000",
+    "desc": "T6 Pro multi-stage con/HP w/ sensor",
+    "price": 129.49
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Honeywell",
+    "model": "TH6220WF2006",
+    "desc": "T6 Lyric Pro Wi-Fi multi-stage",
+    "price": 178.99
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Honeywell",
+    "model": "TH6320WF2003",
+    "desc": "T6 Lyric Pro Wi-Fi multi-stage w/IAQ",
+    "price": 240.97
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Honeywell",
+    "model": "TH8321R1001",
+    "desc": "3H/2C RedLink programmable, 8000 series",
+    "price": 299.19
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Honeywell",
+    "model": "TH8321WF1001",
+    "desc": "Pro8000 Wi-Fi 3H/2C w/ventilation",
+    "price": 281.82
+  },
+  {
+    "cat": "Parts: Thermostats",
+    "series": "Honeywell",
+    "model": "TH9320WF5003",
+    "desc": "Wi-Fi 9000 color touchscreen",
+    "price": 167.18
+  },
+  {
+    "cat": "Parts: Zoning",
+    "series": "Honeywell Zoning",
+    "model": "ARD8TZ",
+    "desc": "8\" automatic round damper",
+    "price": 181.57
+  },
+  {
+    "cat": "Parts: Zoning",
+    "series": "Honeywell Zoning",
+    "model": "HZ311K",
+    "desc": "TrueZone system kit, HZ311, DATS, TRF",
+    "price": 235.41
+  },
+  {
+    "cat": "Parts: Zoning",
+    "series": "Honeywell Zoning",
+    "model": "HZ322K",
+    "desc": "TrueZone kit w/HZ322, DATS, TRF",
+    "price": 307.32
+  },
+  {
+    "cat": "Parts: Zoning",
+    "series": "Honeywell Zoning",
+    "model": "HZ432K",
+    "desc": "TrueZone kit w/HZ432, DATS, TRF",
+    "price": 548.47
+  },
+  {
+    "cat": "Parts: Zoning",
+    "series": "EWC Zoning",
+    "model": "BMPLUS-3000",
+    "desc": "EWC panel 2-3 zone, 3H/2C, 2H/2C",
+    "price": 271.92
+  },
+  {
+    "cat": "Parts: Zoning",
+    "series": "EWC Zoning",
+    "model": "UT-3000",
+    "desc": "2-3 zone communicating panel",
+    "price": 416.9
+  },
+  {
+    "cat": "Parts: Zoning",
+    "series": "EWC Zoning",
+    "model": "UZC-4",
+    "desc": "2-4 zone panel, 4H/2C",
+    "price": 493.14
+  },
+  {
+    "cat": "Parts: Zoning",
+    "series": "EWC Zoning",
+    "model": "SBD-10",
+    "desc": "10\" electronic zone bypass damper",
+    "price": 325.68
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "NoKink Connector",
+    "model": "66731",
+    "desc": "1/4\"x3ft NoKink connector",
+    "price": 106.79
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "NoKink Connector",
+    "model": "66733",
+    "desc": "3/8\"x3ft NoKink connector",
+    "price": 110.66
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "NoKink Connector",
+    "model": "66735",
+    "desc": "5/8\"x3ft NoKink connector",
+    "price": 142.25
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "NoKink Connector",
+    "model": "66737",
+    "desc": "1/2\"x3ft NoKink connector",
+    "price": 126.6
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "Condensate Pump",
+    "model": "83809",
+    "desc": "Aspen Mini Aqua Univolt 100-230V",
+    "price": 322.29
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "Condensate Pump",
+    "model": "83919",
+    "desc": "Aspen Maxi Orange Univolt 100-230V",
+    "price": 354.75
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "Condensate Pump",
+    "model": "83939",
+    "desc": "Aspen Mini White Univolt 100-230V",
+    "price": 320.83
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "Lineset Wall Duct Kit",
+    "model": "84005",
+    "desc": "Fortress 3.5\" white LDK 12' kit",
+    "price": 120.85
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "Lineset Wall Duct Kit",
+    "model": "84105",
+    "desc": "Fortress 4.5\" white LDK 12' kit",
+    "price": 141.55
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "Wall Brackets",
+    "model": "DACA-WB-3",
+    "desc": "Unit wall mount kit, 500lb cap",
+    "price": 172.62
+  },
+  {
+    "cat": "Parts: Ductless Install Accessories",
+    "series": "Power Wire",
+    "model": "PWEZ14450",
+    "desc": "14-4 EZ insulated power wire 600V, 50ft",
+    "price": 150.39
+  },
+  {
+    "cat": "Parts: Tape, Sealants & Fasteners",
+    "series": "Tape",
+    "model": "AF099-2.5SIL",
+    "desc": "Shurtape AF-99 UL181 2.5\" foil tape, 60yd",
+    "price": 19.59
+  },
+  {
+    "cat": "Parts: Tape, Sealants & Fasteners",
+    "series": "Tape",
+    "model": "PC857-2BPT",
+    "desc": "Shurtape PC-857 UL 2\" black tape",
+    "price": 24.2
+  },
+  {
+    "cat": "Parts: Tape, Sealants & Fasteners",
+    "series": "Sealants",
+    "model": "33316",
+    "desc": "Boss 3X expanding spray foam, 12oz",
+    "price": 9.23
+  },
+  {
+    "cat": "Parts: Tape, Sealants & Fasteners",
+    "series": "Sealants",
+    "model": "37000",
+    "desc": "Boss HVAC silicone sealant, clear",
+    "price": 7.49
+  },
+  {
+    "cat": "Parts: Tape, Sealants & Fasteners",
+    "series": "Sealants",
+    "model": "MGA-1",
+    "desc": "Web spray adhesive",
+    "price": 7.15
+  },
+  {
+    "cat": "Parts: Tape, Sealants & Fasteners",
+    "series": "Fasteners",
+    "model": "11075",
+    "desc": "8x1/2 drill point screw, 500/pk",
+    "price": 16.84
+  },
+  {
+    "cat": "Parts: Tape, Sealants & Fasteners",
+    "series": "Fasteners",
+    "model": "11084",
+    "desc": "8x3/4 taper point screw, 1000/pk",
+    "price": 34.2
+  },
+  {
+    "cat": "Parts: Tape, Sealants & Fasteners",
+    "series": "Unit Pads",
+    "model": "554-CR",
+    "desc": "Condenser tie-downs 4\", 4pk",
+    "price": 4.62
+  },
+  {
+    "cat": "Parts: Tape, Sealants & Fasteners",
+    "series": "Unit Pads",
+    "model": "556-CR",
+    "desc": "Condenser tie-downs 6\", 4pk",
+    "price": 6.07
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "Copper Fittings",
+    "model": "CFW01009",
+    "desc": "3/8 coupling",
+    "price": 0.45
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "Copper Fittings",
+    "model": "CFW01028",
+    "desc": "3/4 coupling",
+    "price": 1.88
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "Copper Fittings",
+    "model": "CFW01034",
+    "desc": "7/8 coupling",
+    "price": 2.22
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "Copper Fittings",
+    "model": "CFW01047",
+    "desc": "1-1/8 OD coupling, 1 ID",
+    "price": 3.54
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "Copper Fittings",
+    "model": "CFW02716",
+    "desc": "3/8 90 deg elbow",
+    "price": 1.33
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "Copper Fittings",
+    "model": "CFW02728",
+    "desc": "3/4 90 deg elbow",
+    "price": 4.2
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "Copper Fittings",
+    "model": "CFW02734",
+    "desc": "7/8 90 deg elbow",
+    "price": 4.65
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "PVC Products",
+    "model": "447-007BC",
+    "desc": "3/4\" cap PVC (slip)",
+    "price": 0.56
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "PVC Products",
+    "model": "DA3075P",
+    "desc": "P-trap PVC 3/4\"",
+    "price": 1.61
+  },
+  {
+    "cat": "Parts: Copper & PVC",
+    "series": "PVC Products",
+    "model": "DA3075R",
+    "desc": "R-trap PVC 3/4\"",
+    "price": 1.53
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Liquid Tight & Connectors",
+    "model": "750-12100",
+    "desc": "1/2\" x 100' liquid tight roll",
+    "price": 104.76
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Liquid Tight & Connectors",
+    "model": "750-NMLT50",
+    "desc": "1/2\" liquid tight straight connector",
+    "price": 2.23
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Liquid Tight & Connectors",
+    "model": "750-NMLT75",
+    "desc": "3/4\" liquid tight straight connector",
+    "price": 3.55
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Fuses",
+    "model": "82230",
+    "desc": "Fuse 3A, 5pc",
+    "price": 6.85
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Fuses",
+    "model": "82231",
+    "desc": "Fuse 5A, 5pc",
+    "price": 6.85
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Disconnects",
+    "model": "83615",
+    "desc": "Mars 60A non-fused disconnect",
+    "price": 19.74
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Crimp & Terminal Kits",
+    "model": "PP-25-000",
+    "desc": "Crimp tool & 3 die sets w/case",
+    "price": 140.68
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Crimp & Terminal Kits",
+    "model": "PP-25-002",
+    "desc": "Solderless terminal kit (450pc)",
+    "price": 63.34
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Crimp & Terminal Kits",
+    "model": "PP-25-010",
+    "desc": "22-8 AWG twist connector kit (375pc)",
+    "price": 29.44
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Cable Ties",
+    "model": "PP-CT0750ST-X-C",
+    "desc": "7.5\" 50lb cable tie, black",
+    "price": 4.94
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Cable Ties",
+    "model": "PP-CT1150ST-X-C",
+    "desc": "11.2\" 50lb cable tie, black",
+    "price": 7.48
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Wire Nuts / Connectors",
+    "model": "PP-WC-BLUE",
+    "desc": "22-14 wire connector, blue",
+    "price": 3.15
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Wire Nuts / Connectors",
+    "model": "PP-WC-RED",
+    "desc": "22-18 wire connector, red",
+    "price": 3.54
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Term Lok Kits",
+    "model": "TERMLOK35",
+    "desc": "Term Lok kit, 3.5 ton",
+    "price": 41.22
+  },
+  {
+    "cat": "Parts: Electrical",
+    "series": "Term Lok Kits",
+    "model": "TERMLOK5",
+    "desc": "Term Lock kit, 5 ton plus",
+    "price": 49.88
+  },
+  {
+    "cat": "Parts: Vacuum, Recovery & A2L",
+    "series": "Vacuum Pumps",
+    "model": "93600",
+    "desc": "Bullet 7 CFM vacuum pump",
+    "price": 572.67
+  },
+  {
+    "cat": "Parts: Vacuum, Recovery & A2L",
+    "series": "Vacuum Pumps",
+    "model": "NP2DLM",
+    "desc": "Cordless vacuum pump, 2 CFM",
+    "price": 677.95
+  },
+  {
+    "cat": "Parts: Vacuum, Recovery & A2L",
+    "series": "Vacuum Pumps",
+    "model": "NP4DLM",
+    "desc": "Cordless vacuum pump, 4 CFM",
+    "price": 1062.45
+  },
+  {
+    "cat": "Parts: Vacuum, Recovery & A2L",
+    "series": "Recovery & A2L Accessories",
+    "model": "NR7",
+    "desc": "Recovery unit, dual-cyl, pro series",
+    "price": 840
+  },
+  {
+    "cat": "Parts: Vacuum, Recovery & A2L",
+    "series": "Recovery & A2L Accessories",
+    "model": "NRDD",
+    "desc": "Recovery unit, dual-cyl, DC",
+    "price": 945
+  },
+  {
+    "cat": "Parts: Vacuum, Recovery & A2L",
+    "series": "Recovery & A2L Accessories",
+    "model": "NVR1",
+    "desc": "Valve core removal tool",
+    "price": 65.06
+  },
+  {
+    "cat": "Parts: Vacuum, Recovery & A2L",
+    "series": "Recovery & A2L Accessories",
+    "model": "QC-A2L-LH",
+    "desc": "A2L refrigerant adaptor 1/4\" FE SAE",
+    "price": 16.16
+  },
+  {
+    "cat": "Parts: Chemicals",
+    "series": "iFlo Line Cleaner",
+    "model": "IFLO36PRO",
+    "desc": "iFlo Pro formula, 36oz",
+    "price": 40.68
+  },
+  {
+    "cat": "Parts: Chemicals",
+    "series": "iFlo Line Cleaner",
+    "model": "IFLOPRO01",
+    "desc": "iFlo Pro 24V kit",
+    "price": 168.75
+  },
+  {
+    "cat": "Parts: Chemicals",
+    "series": "Cleaners",
+    "model": "4120-08",
+    "desc": "Alka-Brite Plus, 1 gal",
+    "price": 17.71
+  },
+  {
+    "cat": "Parts: Chemicals",
+    "series": "Cleaners",
+    "model": "4166-08",
+    "desc": "Evap-Fresh, 1 gal",
+    "price": 31.44
+  },
+  {
+    "cat": "Parts: Chemicals",
+    "series": "Cleaners",
+    "model": "FCA",
+    "desc": "Foaming coil cleaner aerosol, 19oz",
+    "price": 11.46
+  },
+  {
+    "cat": "Parts: Chemicals",
+    "series": "Cleaners",
+    "model": "PRO-BLUE",
+    "desc": "Coil cleaner, blue, 1 gal",
+    "price": 17.97
+  },
+  {
+    "cat": "Parts: Chemicals",
+    "series": "Cleaners",
+    "model": "RT800S",
+    "desc": "Viper pan and drain, 32oz",
+    "price": 16.09
+  },
+  {
+    "cat": "Parts: Chemicals",
+    "series": "Pan Treatment",
+    "model": "4296-60",
+    "desc": "Pan tabs treatment, 200ct",
+    "price": 26.19
+  },
+  {
+    "cat": "Parts: Chemicals",
+    "series": "Flush",
+    "model": "HLC007",
+    "desc": "Hilmor lineset cleaner",
+    "price": 453.83
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "ProParts Motors",
+    "model": "PP3403",
+    "desc": "1/6HP 208-230V 825RPM condenser motor",
+    "price": 88.46
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "ProParts Motors",
+    "model": "PP3463",
+    "desc": "1/6-1/2 multi-HP blower motor 115V — best value",
+    "price": 112.22
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "ProParts Motors",
+    "model": "PP3583",
+    "desc": "Furnace blower motor 1/4HP 115V",
+    "price": 86.55
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "ProParts Motors",
+    "model": "PP3730",
+    "desc": "1/2HP 208-230V 1075RPM condenser motor",
+    "price": 116.03
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "US Motors Replacement",
+    "model": "5470-ND",
+    "desc": "Direct drive blower, 1075 115V 3/4-1/5",
+    "price": 219.97
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "US Motors Replacement",
+    "model": "5462-ND",
+    "desc": "Condenser fan, 1075 208-230V 1/3-1/6",
+    "price": 174.01
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "Century Branded",
+    "model": "FD6000A",
+    "desc": "Multi-HP 1/2-1/6, 208/230 1075DD w/cap",
+    "price": 137.17
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "Century Branded",
+    "model": "ORM5458",
+    "desc": "1/3-1/6HP 208/230 1075 4-in-1 condenser",
+    "price": 93.78
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "Evergreen ECM Replacement",
+    "model": "6203X",
+    "desc": "Evergreen EM 1/3HP 208/230V X-13",
+    "price": 273.19
+  },
+  {
+    "cat": "Parts: Motors",
+    "series": "Evergreen ECM Replacement",
+    "model": "6205X",
+    "desc": "Evergreen EM 1/2HP 208/230V X-13",
+    "price": 303.15
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Hardstarts",
+    "model": "96503",
+    "desc": "TO-5 kickstart",
+    "price": 53.17
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Hardstarts",
+    "model": "ICM866U",
+    "desc": "Universal hardstart, 1/12 to 5HP",
+    "price": 59.92
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Hardstarts",
+    "model": "PPCS1",
+    "desc": "3-wire hard start, 1 to 3 ton",
+    "price": 37.56
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Softstarts",
+    "model": "5010-21",
+    "desc": "Nu-Start soft starter, 16-32 RLA",
+    "price": 322.84
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Transformers",
+    "model": "PPTRA24V40A",
+    "desc": "Transformer 24V 40A multi-tap",
+    "price": 19.26
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Transformers",
+    "model": "PPTRA24V75A",
+    "desc": "Transformer 24V 75A multi-tap",
+    "price": 67.06
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Surge Protectors",
+    "model": "96415",
+    "desc": "RSH-50 surge protector",
+    "price": 65.77
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Surge Protectors",
+    "model": "AG3000",
+    "desc": "Mars HVAC surge protection",
+    "price": 83.21
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Contactors",
+    "model": "PPCON1P30A24V",
+    "desc": "1P 30A 24V contactor",
+    "price": 10.88
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Contactors",
+    "model": "PPCON2P40A24V",
+    "desc": "2P 40A 24V contactor",
+    "price": 15.65
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Contactors",
+    "model": "PPCON3P40A24V",
+    "desc": "3P 40A 24V contactor",
+    "price": 27.55
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Sequencers",
+    "model": "B1256558",
+    "desc": "1P 5KW heat sequencer",
+    "price": 15.75
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Sequencers",
+    "model": "B1256559",
+    "desc": "2P 10KW heat sequencer, double stack",
+    "price": 20.84
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Relays",
+    "model": "B1370738",
+    "desc": "Time delay relay",
+    "price": 32.19
+  },
+  {
+    "cat": "Parts: Starts & Controls",
+    "series": "Relays",
+    "model": "PPRELDPDT24V",
+    "desc": "DPDT 24V relay",
+    "price": 21.02
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Oval Capacitors",
+    "model": "PPS5440OV",
+    "desc": "5 MFD / 440V oval capacitor",
+    "price": 1.87
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Oval Capacitors",
+    "model": "PPS10440OV",
+    "desc": "10 MFD / 440V oval capacitor",
+    "price": 2.44
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Oval Capacitors",
+    "model": "PPS20440OV",
+    "desc": "20 MFD / 440V oval capacitor",
+    "price": 5.82
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Oval Capacitors",
+    "model": "PPS35440OV",
+    "desc": "35 MFD / 440V oval capacitor",
+    "price": 8.24
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Oval Capacitors",
+    "model": "PPS50440OV",
+    "desc": "50 MFD / 440V oval capacitor",
+    "price": 11.24
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Round Dual Capacitors",
+    "model": "PPS530440RD",
+    "desc": "30/5 440V dual round capacitor",
+    "price": 5.98
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Round Dual Capacitors",
+    "model": "PPS540440RD",
+    "desc": "40/5 440V dual round capacitor",
+    "price": 7.15
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Round Dual Capacitors",
+    "model": "PPS550440RD",
+    "desc": "50/5 440V dual round capacitor",
+    "price": 7.95
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Round Dual Capacitors",
+    "model": "PPS560440RD",
+    "desc": "60/5 440V dual round capacitor",
+    "price": 8.64
+  },
+  {
+    "cat": "Parts: Capacitors",
+    "series": "Round Capacitors",
+    "model": "PPS7580440RD",
+    "desc": "80/7.5 440V round capacitor",
+    "price": 24.35
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Clean Comfort UV",
+    "model": "UC18S15-24",
+    "desc": "14\" single UV lamp",
+    "price": 109.89
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Clean Comfort Dehumidifiers",
+    "model": "DV090",
+    "desc": "90 pint/day ventilating dehumidifier",
+    "price": 1142.88
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Clean Comfort Dehumidifiers",
+    "model": "DV120",
+    "desc": "120 pint/day ventilating dehumidifier",
+    "price": 2107.27
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Clean Comfort ERV",
+    "model": "VE30100",
+    "desc": "ERV 30-100 CFM, top port, space saver",
+    "price": 856.56
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Clean Comfort HRV",
+    "model": "VH30160",
+    "desc": "HRV 30-160 CFM, side port",
+    "price": 921.91
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Clean Comfort HRV",
+    "model": "VH70220",
+    "desc": "HRV 70-220 CFM, side port",
+    "price": 1029.76
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "RGF REME UV",
+    "model": "REME-H",
+    "desc": "REME Halo cell, 9\", 24V",
+    "price": 340.6
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "RGF REME UV",
+    "model": "REME-H-T",
+    "desc": "REME Halo 24V w/day timer",
+    "price": 381.84
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "RGF REME UV",
+    "model": "REME-LED-AS",
+    "desc": "Halo LED 24V, UL2998",
+    "price": 515.18
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Media Boxes & EACs",
+    "model": "AE14-1620-51",
+    "desc": "Electronic air cleaner, 16x20",
+    "price": 500
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Media Boxes & EACs",
+    "model": "AM11-1620-AB",
+    "desc": "Cleanfit 16x20, B chassis, air handler",
+    "price": 94.94
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Fresh-Aire APCO-X",
+    "model": "TUV-APCOX-ER3",
+    "desc": "In-duct air purifier, 18-32VAC, 3yr",
+    "price": 506.29
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Fresh-Aire APCO-X",
+    "model": "TUV-APCOX-DER3",
+    "desc": "Dual air purifier, 18-32VAC, 3yr",
+    "price": 703.7
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Dust Free",
+    "model": "13071",
+    "desc": "12\" DF Active air purifier, 24V",
+    "price": 469.82
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Aprilaire Air Cleaners",
+    "model": "1210-RP",
+    "desc": "Media air cleaner, 20x25, MERV 11",
+    "price": 120.79
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Aprilaire Air Cleaners",
+    "model": "2210-RP",
+    "desc": "Media air cleaner, 20x25, MERV 13",
+    "price": 158.58
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Aprilaire Dehumidifiers",
+    "model": "E070W",
+    "desc": "Dehumidifier, 70 pints/day",
+    "price": 1683.61
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Aprilaire Dehumidifiers",
+    "model": "E100",
+    "desc": "Dehumidifier, 100PPD, 5500sf",
+    "price": 1862.14
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Aprilaire Humidifiers",
+    "model": "600-RP",
+    "desc": "Humidifier w/auto-trac",
+    "price": 321.14
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Aprilaire Humidifiers",
+    "model": "700",
+    "desc": "Power automatic humidifier",
+    "price": 471.05
+  },
+  {
+    "cat": "Parts: Indoor Air Quality",
+    "series": "Aprilaire Steam Humidifier",
+    "model": "800",
+    "desc": "Residential steam humidifier",
+    "price": 1032.99
+  },
+  {
+    "cat": "Parts: Grilles & Exhaust Fans",
+    "series": "Truaire Return Grilles",
+    "model": "17012X12",
+    "desc": "Stamped return steel, 12x12",
+    "price": 10.62
+  },
+  {
+    "cat": "Parts: Grilles & Exhaust Fans",
+    "series": "Truaire Return Grilles",
+    "model": "17016X16",
+    "desc": "Stamped return steel, 16x16",
+    "price": 18.75
+  },
+  {
+    "cat": "Parts: Grilles & Exhaust Fans",
+    "series": "Truaire Filter Back Return",
+    "model": "190RF16X16",
+    "desc": "Filter back return steel, 16x16",
+    "price": 36.78
+  },
+  {
+    "cat": "Parts: Grilles & Exhaust Fans",
+    "series": "Truaire Commercial",
+    "model": "1010MAS",
+    "desc": "24x24 perf fiberglass back, supply",
+    "price": 42.78
+  },
+  {
+    "cat": "Parts: Grilles & Exhaust Fans",
+    "series": "Truaire Commercial",
+    "model": "4010FG-2DB",
+    "desc": "24x24 stamped face fiberglass back, return",
+    "price": 74.87
+  },
+  {
+    "cat": "Parts: Grilles & Exhaust Fans",
+    "series": "Broan Exhaust Fans",
+    "model": "AE80B",
+    "desc": "Energy Star fan, 80 CFM, 0.7 sones",
+    "price": 76.09
+  },
+  {
+    "cat": "Parts: Grilles & Exhaust Fans",
+    "series": "Panasonic Exhaust Fans",
+    "model": "FV-0511VQL1",
+    "desc": "WhisperLite DC 110CFM fan/light",
+    "price": 188.38
+  },
+  {
+    "cat": "Parts: Inverter Install & Service Tools",
+    "series": "Essential Tools",
+    "model": "999133T",
+    "desc": "Magnet for EEV, 22.0mm ID",
+    "price": 212.95
+  },
+  {
+    "cat": "Parts: Inverter Install & Service Tools",
+    "series": "Essential Tools",
+    "model": "SC680",
+    "desc": "Clamp meter AC/DC w/JobLink, 600A",
+    "price": 464.91
+  },
+  {
+    "cat": "Parts: Inverter Install & Service Tools",
+    "series": "Essential Tools",
+    "model": "SDMN6",
+    "desc": "Dual pressure tester manometer",
+    "price": 379.4
+  },
+  {
+    "cat": "Parts: Inverter Install & Service Tools",
+    "series": "Essential Tools",
+    "model": "JL3KM2",
+    "desc": "JobLink dual manometer kit",
+    "price": 237.79
+  },
+  {
+    "cat": "Parts: Equipment Pads",
+    "series": "Diversitech E-Lite Pads (2\")",
+    "model": "EL2424-2",
+    "desc": "24x24x2 plastic equipment pad",
+    "price": 19.48
+  },
+  {
+    "cat": "Parts: Equipment Pads",
+    "series": "Diversitech E-Lite Pads (2\")",
+    "model": "EL3636-2",
+    "desc": "36x36x2 plastic equipment pad",
+    "price": 30.48
+  },
+  {
+    "cat": "Parts: Equipment Pads",
+    "series": "Diversitech E-Lite Pads (3\")",
+    "model": "EL3232-3",
+    "desc": "32x32x3 plastic equipment pad",
+    "price": 32.62
+  },
+  {
+    "cat": "Parts: Equipment Pads",
+    "series": "Diversitech E-Lite Pads (3\")",
+    "model": "EL4040-3",
+    "desc": "40x40x3 plastic equipment pad",
+    "price": 44.59
+  },
+  {
+    "cat": "Parts: Equipment Pads",
+    "series": "Diversitech E-Lite Pads (3\")",
+    "model": "EL5252-3",
+    "desc": "52x52x3 plastic equipment pad",
+    "price": 232.81
+  }
+]
