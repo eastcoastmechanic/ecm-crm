@@ -5,6 +5,7 @@
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
+import { randomUUID, sign } from "crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.join(__dirname, "..");
@@ -29,21 +30,52 @@ export function loadEnvLocal() {
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 export const CONNECTION_ID = process.env.MS_GRAPH_CONNECTION_ID || "ecmcrm";
 
+function base64url(input) {
+  return input.toString("base64url");
+}
+
+// Certificate-signed JWT assertion (RFC 7523) rather than a client secret --
+// this tenant blocks client-secret creation by policy. Mirrors
+// lib/graph-connector.ts's buildClientAssertion exactly.
+function buildClientAssertion(tenantId, clientId) {
+  const privateKeyPem = process.env.MS_GRAPH_CERT_PRIVATE_KEY.replace(/\\n/g, "\n");
+  const thumbprint = process.env.MS_GRAPH_CERT_THUMBPRINT;
+
+  const header = { alg: "RS256", typ: "JWT", x5t: thumbprint };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    aud: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+    iss: clientId,
+    sub: clientId,
+    jti: randomUUID(),
+    nbf: now,
+    exp: now + 300,
+  };
+
+  const signingInput = `${base64url(Buffer.from(JSON.stringify(header)))}.${base64url(Buffer.from(JSON.stringify(payload)))}`;
+  const signature = sign("RSA-SHA256", Buffer.from(signingInput), privateKeyPem);
+  return `${signingInput}.${base64url(signature)}`;
+}
+
 export async function getGraphToken() {
   const tenantId = process.env.MS_GRAPH_TENANT_ID;
   const clientId = process.env.MS_GRAPH_CLIENT_ID;
-  const clientSecret = process.env.MS_GRAPH_CLIENT_SECRET;
-  if (!tenantId || !clientId || !clientSecret) {
-    throw new Error("Missing MS_GRAPH_TENANT_ID / MS_GRAPH_CLIENT_ID / MS_GRAPH_CLIENT_SECRET in .env.local");
+  const privateKey = process.env.MS_GRAPH_CERT_PRIVATE_KEY;
+  const thumbprint = process.env.MS_GRAPH_CERT_THUMBPRINT;
+  if (!tenantId || !clientId || !privateKey || !thumbprint) {
+    throw new Error(
+      "Missing MS_GRAPH_TENANT_ID / MS_GRAPH_CLIENT_ID / MS_GRAPH_CERT_PRIVATE_KEY / MS_GRAPH_CERT_THUMBPRINT in .env.local"
+    );
   }
   const res = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: clientId,
-      client_secret: clientSecret,
       scope: "https://graph.microsoft.com/.default",
       grant_type: "client_credentials",
+      client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+      client_assertion: buildClientAssertion(tenantId, clientId),
     }),
   });
   if (!res.ok) throw new Error(`Graph token request failed: ${res.status} ${await res.text()}`);

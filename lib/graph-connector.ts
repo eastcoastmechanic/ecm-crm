@@ -9,10 +9,16 @@
  * ExternalConnection.ReadWrite.OwnedBy and ExternalItem.ReadWrite.OwnedBy
  * application permissions, admin-consented once in the Entra admin center.
  *
+ * Auth uses a certificate-signed JWT assertion rather than a client secret:
+ * East Coast Mechanical's tenant has a policy blocking client-secret
+ * creation entirely ("Client secrets are blocked by a tenant-wide policy"),
+ * which certificate credentials aren't subject to.
+ *
  * Every sync function swallows its own errors: a Copilot indexing hiccup
  * must never break the CRM action (creating a customer, closing a job) that
  * triggered it.
  */
+import { randomUUID, sign } from "crypto";
 import { supabase } from "@/lib/supabase";
 
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
@@ -23,8 +29,39 @@ function graphConfigured(): boolean {
   return Boolean(
     process.env.MS_GRAPH_TENANT_ID &&
       process.env.MS_GRAPH_CLIENT_ID &&
-      process.env.MS_GRAPH_CLIENT_SECRET
+      process.env.MS_GRAPH_CERT_PRIVATE_KEY &&
+      process.env.MS_GRAPH_CERT_THUMBPRINT
   );
+}
+
+function base64url(input: Buffer): string {
+  return input.toString("base64url");
+}
+
+/**
+ * Builds the JWT client assertion Entra expects in place of a client
+ * secret (RFC 7523). x5t in the header must be the SHA-1 thumbprint of the
+ * certificate uploaded to the app registration — Entra uses it to pick
+ * which of the app's certs to verify the signature against.
+ */
+function buildClientAssertion(tenantId: string, clientId: string): string {
+  const privateKeyPem = process.env.MS_GRAPH_CERT_PRIVATE_KEY!.replace(/\\n/g, "\n");
+  const thumbprint = process.env.MS_GRAPH_CERT_THUMBPRINT!;
+
+  const header = { alg: "RS256", typ: "JWT", x5t: thumbprint };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    aud: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+    iss: clientId,
+    sub: clientId,
+    jti: randomUUID(),
+    nbf: now,
+    exp: now + 300,
+  };
+
+  const signingInput = `${base64url(Buffer.from(JSON.stringify(header)))}.${base64url(Buffer.from(JSON.stringify(payload)))}`;
+  const signature = sign("RSA-SHA256", Buffer.from(signingInput), privateKeyPem);
+  return `${signingInput}.${base64url(signature)}`;
 }
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
@@ -35,16 +72,16 @@ async function getGraphToken(): Promise<string> {
   }
   const tenantId = process.env.MS_GRAPH_TENANT_ID!;
   const clientId = process.env.MS_GRAPH_CLIENT_ID!;
-  const clientSecret = process.env.MS_GRAPH_CLIENT_SECRET!;
 
   const res = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: clientId,
-      client_secret: clientSecret,
       scope: "https://graph.microsoft.com/.default",
       grant_type: "client_credentials",
+      client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+      client_assertion: buildClientAssertion(tenantId, clientId),
     }),
   });
   if (!res.ok) throw new Error(`Graph token request failed: ${res.status} ${await res.text()}`);
