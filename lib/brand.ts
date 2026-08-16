@@ -24,5 +24,5 @@ export const COMPANY_SLOGAN = "BUILT WITH PRIDE  ·  INSTALLED WITH PRECISION";
 export const HIC_REGISTRATION_NUMBER = "";
 
 /** Same face-of-contract requirement as the HIC number above — fill in before issuing a real contract. */
-export const COMPANY_ADDRESS = "";
-export const COMPANY_PHONE = "";
+export const COMPANY_ADDRESS = "37 Plaza Way, Unit 2304, Plymouth, MA 02360";
+export const COMPANY_PHONE = "774-343-6369";
