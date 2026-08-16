@@ -9,26 +9,34 @@ import { syncCustomerToGraph, syncJobToGraph, syncDocumentToGraph } from "@/lib/
  * (lib/supabase.ts) -- the anon key available to local scripts is
  * RLS-restricted and can't see these rows.
  *
- * Pushed in small concurrent batches, not all at once: firing 90+ items at
- * Graph's connector endpoint in parallel reliably drew 502s/504s from it
- * (confirmed against the real endpoint during the first backfill run).
- * pushCrmItem already retries transient 5xxs, so a batch size of 5 clears
- * the rest without hammering it again.
+ * Paginated via ?offset=&limit= rather than processing everything in one
+ * request: pushing ~90 items at Graph's connector endpoint even in batches
+ * of 5 with retries ran past the 60s function ceiling (confirmed --
+ * "Task timed out after 60 seconds" in Vercel's own logs). A bounded page
+ * per call, called repeatedly, stays comfortably under any duration limit;
+ * the caller loops on `done`/`nextOffset` until it's false.
  */
 const BATCH_SIZE = 5;
+const DEFAULT_LIMIT = 25;
 
-// Batched-with-retries over ~90 items ran past Vercel's default function
-// duration and got killed mid-request (FUNCTION_INVOCATION_TIMEOUT) --
-// this is a one-off admin trigger, not a hot path, so the plan's max is
-// worth spending here instead of restructuring into a background job.
 export const maxDuration = 60;
 
-async function runBatched<T>(items: T[], fn: (item: T) => Promise<boolean>): Promise<{ ok: number; failed: number }> {
+type Syncable = { type: "customer" | "job" | "document"; id: string };
+
+async function runBatched(items: Syncable[]): Promise<{ ok: number; failed: number }> {
   let ok = 0;
   let failed = 0;
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
     const batch = items.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(batch.map(fn));
+    const results = await Promise.all(
+      batch.map((item) =>
+        item.type === "customer"
+          ? syncCustomerToGraph(item.id)
+          : item.type === "job"
+            ? syncJobToGraph(item.id)
+            : syncDocumentToGraph(item.id)
+      )
+    );
     for (const success of results) {
       if (success) ok++;
       else failed++;
@@ -43,11 +51,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const url = new URL(request.url);
+  const offset = Number(url.searchParams.get("offset") ?? "0");
+  const limit = Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT);
+
   const [{ data: customers, error: custErr }, { data: jobs, error: jobErr }, { data: docs, error: docErr }] =
     await Promise.all([
-      supabase.from("customers").select("id"),
-      supabase.from("jobs").select("id"),
-      supabase.from("documents").select("id"),
+      supabase.from("customers").select("id").order("id"),
+      supabase.from("jobs").select("id").order("id"),
+      supabase.from("documents").select("id").order("id"),
     ]);
 
   if (custErr || jobErr || docErr) {
@@ -57,13 +69,23 @@ export async function GET(request: Request) {
     );
   }
 
-  const customerResult = await runBatched(customers ?? [], (c) => syncCustomerToGraph(c.id));
-  const jobResult = await runBatched(jobs ?? [], (j) => syncJobToGraph(j.id));
-  const docResult = await runBatched(docs ?? [], (d) => syncDocumentToGraph(d.id));
+  // One flat, deterministically-ordered list so offset/limit means the same
+  // thing across calls regardless of how the three tables split.
+  const all: Syncable[] = [
+    ...(customers ?? []).map((c) => ({ type: "customer" as const, id: c.id })),
+    ...(jobs ?? []).map((j) => ({ type: "job" as const, id: j.id })),
+    ...(docs ?? []).map((d) => ({ type: "document" as const, id: d.id })),
+  ];
+
+  const page = all.slice(offset, offset + limit);
+  const result = await runBatched(page);
+  const nextOffset = offset + page.length;
 
   return NextResponse.json({
-    customers: customerResult,
-    jobs: jobResult,
-    documents: docResult,
+    ...result,
+    processed: page.length,
+    total: all.length,
+    nextOffset,
+    done: nextOffset >= all.length,
   });
 }
