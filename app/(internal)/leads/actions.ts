@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { syncLeadToGraph, deleteLeadFromGraph } from "@/lib/graph-connector";
 
 export async function updateLeadDraft(formData: FormData) {
   const id = formData.get("id") as string;
@@ -11,6 +12,8 @@ export async function updateLeadDraft(formData: FormData) {
 
   const { error } = await supabase.from("leads").update({ draft_message }).eq("id", id);
   if (error) throw new Error(error.message);
+
+  await syncLeadToGraph(id);
 
   revalidatePath("/leads");
 }
@@ -24,6 +27,8 @@ export async function markContacted(formData: FormData) {
     .eq("id", id);
   if (error) throw new Error(error.message);
 
+  await syncLeadToGraph(id);
+
   revalidatePath("/leads");
 }
 
@@ -35,6 +40,8 @@ export async function dismissLead(formData: FormData) {
     .update({ status: "dismissed", dismissed_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw new Error(error.message);
+
+  await syncLeadToGraph(id);
 
   revalidatePath("/leads");
 }
@@ -50,20 +57,26 @@ export async function addManualLead(formData: FormData) {
 
   if (!contact_name) throw new Error("Name is required");
 
-  const { error } = await supabase.from("leads").insert({
-    source: "manual",
-    status: "new",
-    channel: "none",
-    contact_name,
-    phone_number,
-    contact_info: email,
-    town,
-    address,
-    summary,
-    urgency_score,
-    auto_sendable: false,
-  });
+  const { data: lead, error } = await supabase
+    .from("leads")
+    .insert({
+      source: "manual",
+      status: "new",
+      channel: "none",
+      contact_name,
+      phone_number,
+      contact_info: email,
+      town,
+      address,
+      summary,
+      urgency_score,
+      auto_sendable: false,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
+
+  if (lead) await syncLeadToGraph(lead.id);
 
   revalidatePath("/leads");
 }
@@ -79,12 +92,16 @@ export async function setLeadStage(formData: FormData) {
   const { error } = await supabase.from("leads").update(update).eq("id", id);
   if (error) throw new Error(error.message);
 
+  await syncLeadToGraph(id);
+
   revalidatePath("/leads");
 }
 
 export async function deleteLead(id: string): Promise<{ error?: string }> {
   const { error } = await supabase.from("leads").delete().eq("id", id);
   if (error) return { error: error.message };
+
+  await deleteLeadFromGraph(id);
 
   revalidatePath("/leads");
   return {};
@@ -129,6 +146,8 @@ export async function sendLeadOutreach(formData: FormData) {
     .update({ status: "sent", sent_at: new Date().toISOString(), draft_message })
     .eq("id", id);
   if (updateError) throw new Error(updateError.message);
+
+  await syncLeadToGraph(id);
 
   revalidatePath("/leads");
 }

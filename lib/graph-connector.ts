@@ -99,7 +99,7 @@ async function graphFetch(path: string, init: RequestInit = {}): Promise<Respons
   });
 }
 
-export type CrmItemType = "customer" | "job" | "document" | "price_book_item";
+export type CrmItemType = "customer" | "job" | "document" | "price_book_item" | "lead" | "inventory_item";
 
 type CrmExternalItem = {
   type: CrmItemType;
@@ -318,6 +318,92 @@ export async function syncPriceBookItemToGraph(itemId: string): Promise<boolean>
 export async function deletePriceBookItemFromGraph(itemId: string): Promise<boolean> {
   return deleteCrmItem("price_book_item", itemId).catch((err) => {
     console.error(`[graph-connector] price book item delete failed for ${itemId}:`, err);
+    return false;
+  });
+}
+
+export async function syncLeadToGraph(leadId: string): Promise<boolean> {
+  try {
+    const { data: lead } = await supabase
+      .from("leads")
+      .select("id,status,source,channel,contact_name,phone_number,contact_info,address,summary,customers(name)")
+      .eq("id", leadId)
+      .single();
+    if (!lead) return true;
+
+    const customer = lead.customers as unknown as { name: string | null } | null;
+    const contactName = lead.contact_name ?? customer?.name ?? "Lead";
+    const title = `${contactName} — ${lead.status}`;
+
+    return await pushCrmItem({
+      type: "lead",
+      id: lead.id,
+      title,
+      content: [contactName, lead.summary, lead.address, lead.contact_info].filter(Boolean).join("\n"),
+      url: `${SITE_ORIGIN}/leads`,
+      properties: {
+        status: lead.status ?? "",
+        source: lead.source ?? "",
+        channel: lead.channel ?? "",
+        contactName,
+        phone: lead.phone_number ?? "",
+        address: lead.address ?? "",
+      },
+    });
+  } catch (err) {
+    console.error(`[graph-connector] lead sync failed for ${leadId}:`, err);
+    return false;
+  }
+}
+
+export async function deleteLeadFromGraph(leadId: string): Promise<boolean> {
+  return deleteCrmItem("lead", leadId).catch((err) => {
+    console.error(`[graph-connector] lead delete failed for ${leadId}:`, err);
+    return false;
+  });
+}
+
+export async function syncInventoryItemToGraph(inventoryItemId: string): Promise<boolean> {
+  try {
+    const { data: item } = await supabase
+      .from("inventory_items")
+      .select("id,qty_on_hand,reorder_threshold,price_book_items(name,category)")
+      .eq("id", inventoryItemId)
+      .single();
+    if (!item) return true;
+
+    const priceBookItem = item.price_book_items as unknown as { name: string | null; category: string | null } | null;
+    const title = priceBookItem?.name ?? "Inventory item";
+    const lowStock = item.reorder_threshold !== null && item.qty_on_hand <= item.reorder_threshold;
+
+    return await pushCrmItem({
+      type: "inventory_item",
+      id: item.id,
+      title,
+      content: [
+        title,
+        `On hand: ${item.qty_on_hand}`,
+        lowStock ? "LOW STOCK — at or below reorder threshold" : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      url: `${SITE_ORIGIN}/inventory`,
+      properties: {
+        category: priceBookItem?.category ?? "",
+        qtyOnHand: item.qty_on_hand,
+        reorderThreshold: item.reorder_threshold,
+        lowStock: lowStock ? "true" : "false",
+      },
+    });
+  } catch (err) {
+    console.error(`[graph-connector] inventory item sync failed for ${inventoryItemId}:`, err);
+    return false;
+  }
+}
+
+export async function deleteInventoryItemFromGraph(inventoryItemId: string): Promise<boolean> {
+  return deleteCrmItem("inventory_item", inventoryItemId).catch((err) => {
+    console.error(`[graph-connector] inventory item delete failed for ${inventoryItemId}:`, err);
     return false;
   });
 }

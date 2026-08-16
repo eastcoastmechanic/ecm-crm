@@ -53,6 +53,12 @@ async function main() {
         { name: "tier", type: "string", isQueryable: true, isRetrievable: true, isSearchable: true },
         { name: "unitPrice", type: "double", isQueryable: true, isRetrievable: true },
         { name: "laborHours", type: "double", isQueryable: true, isRetrievable: true },
+        { name: "source", type: "string", isQueryable: true, isRetrievable: true, isSearchable: true },
+        { name: "channel", type: "string", isQueryable: true, isRetrievable: true, isSearchable: true },
+        { name: "contactName", type: "string", isQueryable: true, isRetrievable: true, isSearchable: true },
+        { name: "qtyOnHand", type: "double", isQueryable: true, isRetrievable: true },
+        { name: "reorderThreshold", type: "double", isQueryable: true, isRetrievable: true },
+        { name: "lowStock", type: "string", isQueryable: true, isRetrievable: true },
       ],
     }),
   });
