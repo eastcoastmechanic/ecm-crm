@@ -58,6 +58,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const offset = Number(url.searchParams.get("offset") ?? "0");
   const limit = Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT);
+  const dryRun = url.searchParams.get("dryRun") === "1";
 
   const [
     { data: customers, error: custErr },
@@ -86,6 +87,16 @@ export async function GET(request: Request) {
     ...(docs ?? []).map((d) => ({ type: "document" as const, id: d.id })),
     ...(priceBookItems ?? []).map((p) => ({ type: "price_book_item" as const, id: p.id })),
   ];
+
+  if (dryRun) {
+    return NextResponse.json({
+      customers: customers?.length ?? 0,
+      jobs: jobs?.length ?? 0,
+      documents: docs?.length ?? 0,
+      priceBookItems: priceBookItems?.length ?? 0,
+      total: all.length,
+    });
+  }
 
   const page = all.slice(offset, offset + limit);
   const result = await runBatched(page);
