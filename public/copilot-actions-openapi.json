@@ -1,0 +1,502 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "East Coast Mechanical CRM Actions",
+    "description": "Actions Copilot can take in the ECM CRM: look up customers/jobs/leads/inventory/pricing, schedule and update jobs, manage leads and tasks, log EPA 608 refrigerant handling, and create draft estimates/invoices/proposals. Every action reuses the exact same server-side logic the CRM's own UI and chat assistant use.",
+    "version": "1.0.0"
+  },
+  "servers": [{ "url": "https://eastcoastmechanical.org" }],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": { "type": "apiKey", "in": "header", "name": "x-api-key" }
+    },
+    "schemas": {
+      "ActionResult": {
+        "type": "object",
+        "properties": { "result": { "type": "string", "description": "Plain-text or JSON-string result." } }
+      },
+      "ActionError": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } }
+      }
+    }
+  },
+  "security": [{ "ApiKeyAuth": [] }],
+  "paths": {
+    "/api/copilot-actions/find_customer": {
+      "post": {
+        "operationId": "findCustomer",
+        "summary": "Look up a customer by name to get their id before creating a document or task for them.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": { "name": { "type": "string", "description": "Full or partial customer name to search for" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/list_properties": {
+      "post": {
+        "operationId": "listProperties",
+        "summary": "List a customer's properties (id, address, type). Use find_customer first to get the customerId.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["customerId"], "properties": { "customerId": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/search_price_book": {
+      "post": {
+        "operationId": "searchPriceBook",
+        "summary": "Look up real sell prices from the price book, e.g. 'how much is a Daikin mini-split'.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": { "query": { "type": "string", "description": "An item name, category, or brand" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/list_jobs": {
+      "post": {
+        "operationId": "listJobs",
+        "summary": "List jobs, optionally for one customer/status, or only upcoming ones.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "customerId": { "type": "string" },
+                  "status": { "type": "string", "enum": ["requested", "scheduled", "in_progress", "complete", "cancelled"] },
+                  "upcomingOnly": { "type": "boolean" },
+                  "limit": { "type": "number", "description": "Default 20" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/schedule_job": {
+      "post": {
+        "operationId": "scheduleJob",
+        "summary": "Book a job for a customer at a date/time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["customerId", "scheduledAt"],
+                "properties": {
+                  "customerId": { "type": "string" },
+                  "propertyId": { "type": "string" },
+                  "scheduledAt": { "type": "string", "description": "ISO 8601 datetime, e.g. 2026-08-12T09:00:00-04:00" },
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/update_job_status": {
+      "post": {
+        "operationId": "updateJobStatus",
+        "summary": "Move a job to a new status, e.g. mark it complete or cancelled.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["jobId", "status"],
+                "properties": {
+                  "jobId": { "type": "string" },
+                  "status": { "type": "string", "enum": ["requested", "scheduled", "in_progress", "complete", "cancelled"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/reschedule_job": {
+      "post": {
+        "operationId": "rescheduleJob",
+        "summary": "Move an existing job to a different date/time.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["jobId", "scheduledAt"],
+                "properties": { "jobId": { "type": "string" }, "scheduledAt": { "type": "string", "description": "New ISO 8601 datetime" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/list_leads": {
+      "post": {
+        "operationId": "listLeads",
+        "summary": "List sales leads, e.g. 'what leads do I have', 'who haven't I called'.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["new", "contacted", "quoted", "won", "lost", "dismissed"] },
+                  "town": { "type": "string" },
+                  "limit": { "type": "number", "description": "Default 25" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/add_lead": {
+      "post": {
+        "operationId": "addLead",
+        "summary": "Add a lead by hand -- someone who called, a referral, a door-knock.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["contactName"],
+                "properties": {
+                  "contactName": { "type": "string" },
+                  "phoneNumber": { "type": "string" },
+                  "email": { "type": "string" },
+                  "town": { "type": "string" },
+                  "address": { "type": "string" },
+                  "summary": { "type": "string", "description": "What they need" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/set_lead_stage": {
+      "post": {
+        "operationId": "setLeadStage",
+        "summary": "Move a lead through the pipeline -- contacted, quoted, won, lost.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["leadId", "status"],
+                "properties": {
+                  "leadId": { "type": "string" },
+                  "status": { "type": "string", "enum": ["new", "contacted", "quoted", "won", "lost", "dismissed"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/list_inventory": {
+      "post": {
+        "operationId": "listInventory",
+        "summary": "Check truck/shop stock, e.g. 'do we have X', or lowOnly for what needs reordering.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": { "type": "string", "description": "Filter by item name" },
+                  "lowOnly": { "type": "boolean", "description": "Only items at or below their reorder threshold" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/adjust_inventory": {
+      "post": {
+        "operationId": "adjustInventory",
+        "summary": "Set an inventory item's quantity on hand (absolute count, not a delta).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["itemId", "qtyOnHand"],
+                "properties": { "itemId": { "type": "string" }, "qtyOnHand": { "type": "number", "description": "The new absolute count" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/add_task": {
+      "post": {
+        "operationId": "addTask",
+        "summary": "Add a task/to-do for the owner, optionally with a due date and linked to a customer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title"],
+                "properties": {
+                  "title": { "type": "string", "description": "Short task title" },
+                  "notes": { "type": "string" },
+                  "dueDate": { "type": "string", "description": "YYYY-MM-DD" },
+                  "customerId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/list_open_tasks": {
+      "post": {
+        "operationId": "listOpenTasks",
+        "summary": "List open (not completed) tasks, soonest due first.",
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": {} } } } },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/complete_task": {
+      "post": {
+        "operationId": "completeTask",
+        "summary": "Mark a task complete, given its id (from list_open_tasks).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "type": "object", "required": ["taskId"], "properties": { "taskId": { "type": "string" } } } }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/log_refrigerant": {
+      "post": {
+        "operationId": "logRefrigerant",
+        "summary": "Record refrigerant added to or recovered from a system, and any leak inspection/repair (EPA 608).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["action", "refrigerantType"],
+                "properties": {
+                  "action": { "type": "string", "enum": ["added", "recovered"] },
+                  "refrigerantType": { "type": "string", "enum": ["R-410A", "R-32", "R-454B", "R-22", "R-134a", "R-407C"] },
+                  "amountLb": { "type": "number", "description": "Amount in pounds, if given in pounds" },
+                  "amountOz": { "type": "number", "description": "Amount in ounces, if given in ounces" },
+                  "jobId": { "type": "string" },
+                  "equipmentId": { "type": "string" },
+                  "customerId": { "type": "string" },
+                  "cylinderId": { "type": "string" },
+                  "leakInspection": { "type": "boolean" },
+                  "leakFound": { "type": "boolean" },
+                  "leakLocation": { "type": "string" },
+                  "leakRepaired": { "type": "boolean" },
+                  "techName": { "type": "string" },
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/list_refrigerant_log": {
+      "post": {
+        "operationId": "listRefrigerantLog",
+        "summary": "Read the EPA 608 refrigerant handling log, by job/equipment/date range.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "jobId": { "type": "string" },
+                  "equipmentId": { "type": "string" },
+                  "since": { "type": "string", "description": "ISO date" },
+                  "until": { "type": "string", "description": "ISO date" },
+                  "unrepairedLeaksOnly": { "type": "boolean" },
+                  "limit": { "type": "number", "description": "Default 50" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/create_estimate": {
+      "post": {
+        "operationId": "createEstimate",
+        "summary": "Generate a draft estimate priced from the real price book. Does not send it to the customer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["jobDescription"],
+                "properties": {
+                  "customerId": { "type": "string", "description": "Existing customer id, from find_customer" },
+                  "customerName": { "type": "string", "description": "Required only for a brand-new customer" },
+                  "phone": { "type": "string" },
+                  "email": { "type": "string" },
+                  "address": { "type": "string" },
+                  "jobDescription": { "type": "string", "description": "What the job involves, in enough detail to select price book items" },
+                  "jobId": { "type": "string" },
+                  "pricingMode": { "type": "string", "enum": ["tiered", "flat"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/create_invoice": {
+      "post": {
+        "operationId": "createInvoice",
+        "summary": "Generate a draft invoice priced from the real price book. Does not send it to the customer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["jobDescription"],
+                "properties": {
+                  "customerId": { "type": "string" },
+                  "customerName": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "email": { "type": "string" },
+                  "address": { "type": "string" },
+                  "jobDescription": { "type": "string" },
+                  "jobId": { "type": "string" },
+                  "pricingMode": { "type": "string", "enum": ["tiered", "flat"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/create_proposal": {
+      "post": {
+        "operationId": "createProposal",
+        "summary": "Generate a draft proposal priced from the real price book. Does not send it to the customer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["jobDescription"],
+                "properties": {
+                  "customerId": { "type": "string" },
+                  "customerName": { "type": "string" },
+                  "phone": { "type": "string" },
+                  "email": { "type": "string" },
+                  "address": { "type": "string" },
+                  "jobDescription": { "type": "string" },
+                  "jobId": { "type": "string" },
+                  "pricingMode": { "type": "string", "enum": ["tiered", "flat"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    }
+  }
+}
