@@ -17,6 +17,12 @@ import { syncCustomerToGraph, syncJobToGraph, syncDocumentToGraph } from "@/lib/
  */
 const BATCH_SIZE = 5;
 
+// Batched-with-retries over ~90 items ran past Vercel's default function
+// duration and got killed mid-request (FUNCTION_INVOCATION_TIMEOUT) --
+// this is a one-off admin trigger, not a hot path, so the plan's max is
+// worth spending here instead of restructuring into a background job.
+export const maxDuration = 60;
+
 async function runBatched<T>(items: T[], fn: (item: T) => Promise<boolean>): Promise<{ ok: number; failed: number }> {
   let ok = 0;
   let failed = 0;
