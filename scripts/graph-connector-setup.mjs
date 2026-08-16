@@ -49,6 +49,10 @@ async function main() {
         { name: "scheduledAt", type: "dateTime", isQueryable: true, isRetrievable: true },
         { name: "docType", type: "string", isQueryable: true, isRetrievable: true, isSearchable: true },
         { name: "total", type: "double", isQueryable: true, isRetrievable: true },
+        { name: "category", type: "string", isQueryable: true, isRetrievable: true, isSearchable: true },
+        { name: "tier", type: "string", isQueryable: true, isRetrievable: true, isSearchable: true },
+        { name: "unitPrice", type: "double", isQueryable: true, isRetrievable: true },
+        { name: "laborHours", type: "double", isQueryable: true, isRetrievable: true },
       ],
     }),
   });

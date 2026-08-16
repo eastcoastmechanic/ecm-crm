@@ -99,7 +99,7 @@ async function graphFetch(path: string, init: RequestInit = {}): Promise<Respons
   });
 }
 
-export type CrmItemType = "customer" | "job" | "document";
+export type CrmItemType = "customer" | "job" | "document" | "price_book_item";
 
 type CrmExternalItem = {
   type: CrmItemType;
@@ -277,6 +277,47 @@ export async function syncDocumentToGraph(documentId: string): Promise<boolean> 
 export async function deleteDocumentFromGraph(documentId: string): Promise<boolean> {
   return deleteCrmItem("document", documentId).catch((err) => {
     console.error(`[graph-connector] document delete failed for ${documentId}:`, err);
+    return false;
+  });
+}
+
+// unit_cost is deliberately excluded from both content and properties --
+// it's margin data that's gated to the owner role even inside the app
+// (see app/(internal)/price-book/actions.ts), and indexing it here would
+// hand every Copilot user in the tenant a shortcut past that gate.
+export async function syncPriceBookItemToGraph(itemId: string): Promise<boolean> {
+  try {
+    const { data: item } = await supabase
+      .from("price_book_items")
+      .select("id,category,tier,name,description,unit_price,labor_hours")
+      .eq("id", itemId)
+      .single();
+    if (!item) return true;
+
+    return await pushCrmItem({
+      type: "price_book_item",
+      id: item.id,
+      title: item.name ?? "Price book item",
+      content: [item.name, item.category, item.tier, item.description]
+        .filter(Boolean)
+        .join("\n"),
+      url: `${SITE_ORIGIN}/price-book`,
+      properties: {
+        category: item.category ?? "",
+        tier: item.tier ?? "",
+        unitPrice: item.unit_price ?? null,
+        laborHours: item.labor_hours ?? null,
+      },
+    });
+  } catch (err) {
+    console.error(`[graph-connector] price book item sync failed for ${itemId}:`, err);
+    return false;
+  }
+}
+
+export async function deletePriceBookItemFromGraph(itemId: string): Promise<boolean> {
+  return deleteCrmItem("price_book_item", itemId).catch((err) => {
+    console.error(`[graph-connector] price book item delete failed for ${itemId}:`, err);
     return false;
   });
 }
