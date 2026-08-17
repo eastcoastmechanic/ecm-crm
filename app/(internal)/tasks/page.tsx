@@ -1,21 +1,18 @@
-import { supabase } from "@/lib/supabase";
+import { listOpenPlannerTasks, plannerConfigured } from "@/lib/planner-connector";
 import { addTask } from "./actions";
 import TaskList from "./TaskList";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, cardClass, errorClass, headingClass, inputClass, subTextClass } from "../ui";
 
 export default async function TasksPage() {
-  const { data: tasks, error } = await supabase
-    .from("tasks")
-    .select("id, title, notes, due_at, customers(name)")
-    .is("completed_at", null)
-    .order("due_at", { ascending: true, nullsFirst: false });
+  const configured = plannerConfigured();
+  const tasks = configured ? await listOpenPlannerTasks() : [];
 
   return (
     <div className="flex flex-col gap-8">
       <div>
         <h1 className={headingClass}>Tasks</h1>
-        <p className={subTextClass}>To-dos and reminders — yours or created by the CRM assistant.</p>
+        <p className={subTextClass}>To-dos and reminders — yours or created by the CRM assistant. Lives in Planner now.</p>
       </div>
 
       <form action={addTask} className={cardClass}>
@@ -34,9 +31,11 @@ export default async function TasksPage() {
         <SubmitButton className={`${buttonClass} sm:col-span-2 sm:w-fit`}>Add Task</SubmitButton>
       </form>
 
-      {error && <p className={errorClass}>Error loading tasks: {error.message}</p>}
+      {!configured && (
+        <p className={errorClass}>Planner isn&apos;t configured yet — tasks can&apos;t be loaded or added until setup finishes.</p>
+      )}
 
-      <TaskList tasks={tasks ?? []} />
+      <TaskList tasks={tasks} />
     </div>
   );
 }

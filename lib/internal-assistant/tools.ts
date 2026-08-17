@@ -9,6 +9,7 @@ import { addProperty, updateProperty, deleteProperty } from "@/app/(internal)/pr
 import { addEquipment, updateEquipment, deleteEquipment } from "@/app/(internal)/equipment/actions";
 import { updateWarranty } from "@/app/(internal)/documents/[id]/actions";
 import { deleteDocument } from "@/app/(internal)/documents/actions";
+import { createPlannerTask, listOpenPlannerTasks, completePlannerTask } from "@/lib/planner-connector";
 import { opsTools, buildJobPhotoTools } from "./tools-ops";
 import { fieldTools } from "./tools-field";
 import { referenceTools } from "./tools-reference";
@@ -638,19 +639,18 @@ const addTaskTool = betaZodTool({
     customerId: z.string().optional().describe("Related customer id, if any"),
   }),
   run: async ({ title, notes, dueDate, customerId }) => {
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert({
-        title,
-        notes: notes || null,
-        due_at: dueDate ? new Date(`${dueDate}T12:00:00`).toISOString() : null,
-        customer_id: customerId || null,
-        created_via: "ai_chat",
-      })
-      .select("id")
-      .single();
-    if (error) return `Failed to add task: ${error.message}`;
-    return `Added task "${title}"${dueDate ? ` due ${dueDate}` : ""} (id ${data.id}).`;
+    let taskNotes = notes || undefined;
+    if (customerId) {
+      const { data: customer } = await supabase.from("customers").select("name").eq("id", customerId).single();
+      if (customer?.name) taskNotes = [`Customer: ${customer.name}`, notes].filter(Boolean).join("\n");
+    }
+    try {
+      const taskId = await createPlannerTask({ title, notes: taskNotes, dueDate, bucket: "tasks" });
+      if (!taskId) return "Planner isn't configured yet — task not created. Ask an admin to finish Planner setup.";
+      return `Added task "${title}"${dueDate ? ` due ${dueDate}` : ""} to Planner (id ${taskId}).`;
+    } catch (err) {
+      return `Failed to add task: ${err instanceof Error ? err.message : "unknown error"}`;
+    }
   },
 });
 
@@ -659,13 +659,9 @@ const listOpenTasksTool = betaZodTool({
   description: "List open (not completed) tasks, soonest due first.",
   inputSchema: z.object({}),
   run: async () => {
-    const { data } = await supabase
-      .from("tasks")
-      .select("id, title, notes, due_at")
-      .is("completed_at", null)
-      .order("due_at", { ascending: true, nullsFirst: false });
-    if (!data || data.length === 0) return "No open tasks.";
-    return JSON.stringify(data);
+    const tasks = await listOpenPlannerTasks();
+    if (tasks.length === 0) return "No open tasks.";
+    return JSON.stringify(tasks.map((t) => ({ id: t.id, title: t.title, notes: t.notes, due_at: t.dueDateTime })));
   },
 });
 
@@ -676,12 +672,13 @@ const completeTaskTool = betaZodTool({
     taskId: z.string(),
   }),
   run: async ({ taskId }) => {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ completed_at: new Date().toISOString() })
-      .eq("id", taskId);
-    if (error) return `Failed to complete task: ${error.message}`;
-    return `Marked task ${taskId} complete.`;
+    try {
+      const ok = await completePlannerTask(taskId);
+      if (!ok) return `Failed to complete task ${taskId}.`;
+      return `Marked task ${taskId} complete.`;
+    } catch (err) {
+      return `Failed to complete task: ${err instanceof Error ? err.message : "unknown error"}`;
+    }
   },
 });
 

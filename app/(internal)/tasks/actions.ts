@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/supabase";
+import { createPlannerTask, completePlannerTask } from "@/lib/planner-connector";
 
 export async function addTask(formData: FormData) {
   const title = (formData.get("title") as string)?.trim();
@@ -10,24 +10,19 @@ export async function addTask(formData: FormData) {
 
   if (!title) throw new Error("Title is required");
 
-  const { error } = await supabase.from("tasks").insert({
+  await createPlannerTask({
     title,
-    notes: notes || null,
-    due_at: due_date ? new Date(`${due_date}T12:00:00`).toISOString() : null,
+    notes: notes || undefined,
+    dueDate: due_date || undefined,
+    bucket: "tasks",
   });
-
-  if (error) throw new Error(error.message);
 
   revalidatePath("/tasks");
 }
 
 export async function completeTask(id: string): Promise<{ error?: string }> {
-  const { error } = await supabase
-    .from("tasks")
-    .update({ completed_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) return { error: error.message };
+  const ok = await completePlannerTask(id);
+  if (!ok) return { error: "Failed to complete task." };
 
   revalidatePath("/tasks");
   return {};

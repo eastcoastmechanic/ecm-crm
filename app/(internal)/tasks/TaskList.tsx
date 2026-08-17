@@ -2,15 +2,8 @@
 
 import { useState } from "react";
 import { completeTask } from "./actions";
+import type { OpenPlannerTask } from "@/lib/planner-connector";
 import { errorClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
-
-type Task = {
-  id: string;
-  title: string;
-  notes: string | null;
-  due_at: string | null;
-  customers: { name: string }[] | null;
-};
 
 function formatDue(dueAt: string | null) {
   if (!dueAt) return null;
@@ -20,11 +13,11 @@ function formatDue(dueAt: string | null) {
   return { label, isOverdue };
 }
 
-export default function TaskList({ tasks }: { tasks: Task[] }) {
+export default function TaskList({ tasks }: { tasks: OpenPlannerTask[] }) {
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  async function handleComplete(task: Task) {
+  async function handleComplete(task: OpenPlannerTask) {
     setErrors((prev) => ({ ...prev, [task.id]: "" }));
     setCompletingId(task.id);
     try {
@@ -44,8 +37,7 @@ export default function TaskList({ tasks }: { tasks: Task[] }) {
   return (
     <div className="flex flex-col divide-y divide-white/8">
       {tasks.map((task) => {
-        const due = formatDue(task.due_at);
-        const customerName = task.customers?.[0]?.name;
+        const due = formatDue(task.dueDateTime);
         return (
           <div key={task.id} className="flex items-start gap-3 py-3">
             <button
@@ -57,16 +49,14 @@ export default function TaskList({ tasks }: { tasks: Task[] }) {
             />
             <div className="min-w-0 flex-1">
               <div className={itemTitleClass}>{task.title}</div>
-              <div className={itemSubClass}>
-                {due && (
+              {due && (
+                <div className={itemSubClass}>
                   <span className={due.isOverdue ? "text-accent" : ""}>
                     {due.isOverdue ? "Overdue " : "Due "}
                     {due.label}
                   </span>
-                )}
-                {due && customerName ? " · " : ""}
-                {customerName}
-              </div>
+                </div>
+              )}
               {task.notes && <p className={`mt-1 ${itemSubClass}`}>{task.notes}</p>}
               {errors[task.id] && <p className={`mt-1 ${errorClass}`}>{errors[task.id]}</p>}
             </div>
