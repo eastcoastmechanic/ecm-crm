@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { syncLeadToGraph, deleteLeadFromGraph } from "@/lib/graph-connector";
+import { createPlannerTask } from "@/lib/planner-connector";
 
 export async function updateLeadDraft(formData: FormData) {
   const id = formData.get("id") as string;
@@ -76,7 +77,18 @@ export async function addManualLead(formData: FormData) {
     .single();
   if (error) throw new Error(error.message);
 
-  if (lead) await syncLeadToGraph(lead.id);
+  if (lead) {
+    await syncLeadToGraph(lead.id);
+    // Manual entry means a human is walking this through the sales pipeline
+    // by hand (see 0024_lead_radar_pipeline.sql) -- unlike an automated
+    // sweep's draft-and-auto-send leads, this one needs a person to actually
+    // do something next, so it gets a Planner card.
+    await createPlannerTask({
+      title: [contact_name, town].filter(Boolean).join(" — ") || "New lead",
+      notes: summary ?? undefined,
+      bucket: "tasks",
+    });
+  }
 
   revalidatePath("/leads");
 }

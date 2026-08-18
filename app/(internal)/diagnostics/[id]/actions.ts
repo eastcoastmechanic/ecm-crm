@@ -196,7 +196,7 @@ export async function finishServiceReport(formData: FormData) {
       );
     }
 
-    const result = await createInvoiceDirect({ customerId, propertyId, items });
+    const result = await createInvoiceDirect({ customerId, propertyId, items, jobId: diagnostic.job_id ?? undefined });
     invoiceDocumentId = result.documentId;
 
     if (diagnostic.job_id && !diagnostic.jobs?.document_id) {

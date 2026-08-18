@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { stripe } from "@/lib/stripe";
+import { movePlannerTaskForJob } from "@/lib/planner-connector";
 
 function todayISODate() {
   return new Date().toISOString().slice(0, 10);
@@ -20,7 +21,7 @@ type CustomerContact = { name: string | null; email: string | null } | null;
 async function sendOverdueInvoiceReminders() {
   const { data: invoices, error } = await supabase
     .from("documents")
-    .select("id, doc_number, total, due_date, last_reminder_sent_at, customers(name, email)")
+    .select("id, doc_number, total, due_date, last_reminder_sent_at, job_id, customers(name, email)")
     .eq("type", "invoice")
     .eq("status", "sent")
     .lt("due_date", todayISODate())
@@ -32,6 +33,13 @@ async function sendOverdueInvoiceReminders() {
   let sent = 0;
 
   for (const invoice of invoices ?? []) {
+    // Every row here is overdue by the query above -- flag the job's Planner
+    // card regardless of whether an email goes out, since a missing customer
+    // email shouldn't also hide it from the internal board.
+    if (invoice.job_id) {
+      await movePlannerTaskForJob(invoice.job_id, "needs_attention");
+    }
+
     const customer = invoice.customers as unknown as CustomerContact;
     const email = customer?.email;
     if (!email) continue;

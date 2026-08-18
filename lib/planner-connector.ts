@@ -23,6 +23,7 @@
  * people) that's never going to matter in practice.
  */
 import { graphConfigured, graphFetch, graphFetchWithRetry } from "@/lib/graph-auth";
+import { supabase } from "@/lib/supabase";
 
 export type PlannerBucketName =
   | "tasks"
@@ -179,4 +180,89 @@ export async function movePlannerTaskToBucket(taskId: string, bucket: PlannerBuc
     return false;
   }
   return true;
+}
+
+/**
+ * Keeps a job's card in the "Jobs" plan in step with its status. Creates the
+ * card on first use (bucket "jobs") and stores its id on the job row so
+ * later calls move the same card instead of creating a new one each time.
+ *
+ * "complete" splits into needs_attention vs finished depending on whether a
+ * diagnostics row exists yet -- a completed job with no QC reading is exactly
+ * the "blocked/flagged" case the needs_attention bucket exists for.
+ *
+ * Mirrors syncJobToGraph's contract: never throws, so a Planner/Graph hiccup
+ * never breaks a status update for whoever's standing in front of a customer.
+ */
+export async function syncJobToPlanner(jobId: string, status: string): Promise<boolean> {
+  if (!plannerConfigured()) return true;
+
+  try {
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("planner_task_id, scheduled_at, customers(name), properties(address)")
+      .eq("id", jobId)
+      .single();
+    if (!job) return true;
+
+    let taskId = job.planner_task_id as string | null;
+
+    if (!taskId) {
+      const customer = job.customers as unknown as { name: string | null } | null;
+      const property = job.properties as unknown as { address: string | null } | null;
+      const title = [customer?.name, property?.address].filter(Boolean).join(" — ") || "Job";
+
+      taskId = await createPlannerTask({
+        title,
+        dueDate: job.scheduled_at ? job.scheduled_at.slice(0, 10) : undefined,
+        bucket: "jobs",
+      });
+      if (!taskId) return true; // Planner not configured — nothing more to do
+      await supabase.from("jobs").update({ planner_task_id: taskId }).eq("id", jobId);
+    }
+
+    if (status === "cancelled") {
+      await completePlannerTask(taskId);
+      return true;
+    }
+    if (status === "in_progress") {
+      await movePlannerTaskToBucket(taskId, "in_progress");
+      return true;
+    }
+    if (status === "complete") {
+      const { count } = await supabase
+        .from("diagnostics")
+        .select("id", { count: "exact", head: true })
+        .eq("job_id", jobId);
+      await movePlannerTaskToBucket(taskId, count && count > 0 ? "finished" : "needs_attention");
+    }
+    // requested / scheduled: the card was just created (or already exists) in
+    // the "jobs" bucket -- nothing more to do.
+    return true;
+  } catch (err) {
+    console.error(`[planner] job sync failed for ${jobId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Moves a job's existing Planner card by job id rather than task id -- for
+ * callers (invoice paid, invoice overdue) that know which job a document
+ * belongs to but don't otherwise touch Planner. No-ops quietly if the job
+ * has no card yet (nothing created via syncJobToPlanner) instead of making
+ * one, since creating a card here would put it straight into whichever
+ * bucket the caller asked for, skipping the "jobs" bucket every card is
+ * meant to start in.
+ */
+export async function movePlannerTaskForJob(jobId: string, bucket: PlannerBucketName): Promise<boolean> {
+  if (!plannerConfigured()) return true;
+
+  try {
+    const { data: job } = await supabase.from("jobs").select("planner_task_id").eq("id", jobId).single();
+    if (!job?.planner_task_id) return true;
+    return await movePlannerTaskToBucket(job.planner_task_id, bucket);
+  } catch (err) {
+    console.error(`[planner] move-by-job failed for ${jobId}:`, err);
+    return false;
+  }
 }

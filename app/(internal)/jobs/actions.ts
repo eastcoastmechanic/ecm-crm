@@ -13,6 +13,7 @@ import {
   type JobPhotoPhase,
 } from "@/lib/job-photos";
 import { syncJobToGraph } from "@/lib/graph-connector";
+import { syncJobToPlanner } from "@/lib/planner-connector";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
@@ -156,6 +157,7 @@ export async function updateJobStatus(formData: FormData) {
   }
 
   await syncJobToGraph(id);
+  await syncJobToPlanner(id, status);
 
   revalidatePath("/jobs");
 }

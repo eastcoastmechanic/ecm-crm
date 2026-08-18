@@ -363,6 +363,7 @@ export async function createInvoiceDirect(input: {
   customerId: string;
   propertyId: string | null;
   items: DirectLineItem[];
+  jobId?: string;
 }): Promise<CreateInvoiceDirectResult> {
   if (input.items.length === 0) throw new Error("Add at least one line item before creating an invoice");
 
@@ -390,6 +391,7 @@ export async function createInvoiceDirect(input: {
       type: "invoice",
       customer_id: input.customerId,
       property_id: input.propertyId,
+      job_id: input.jobId ?? null,
       status: "draft",
       line_items: {
         items: itemsForStorage,

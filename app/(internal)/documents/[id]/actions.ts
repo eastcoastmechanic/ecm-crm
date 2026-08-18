@@ -12,6 +12,7 @@ import { getContractForPdf } from "@/lib/contract-reports";
 import { renderContractPdf } from "@/lib/contract-pdf";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { flagReferralRewardIfEligible } from "@/lib/referral";
+import { movePlannerTaskForJob } from "@/lib/planner-connector";
 
 type LineItem = {
   category: string;
@@ -159,7 +160,7 @@ export async function updateDocument(formData: FormData) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("documents")
-    .select("line_items, type, due_date, customer_id")
+    .select("line_items, type, due_date, customer_id, job_id")
     .eq("id", id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
@@ -223,6 +224,10 @@ export async function updateDocument(formData: FormData) {
 
   if (status === "paid" && existing.customer_id) {
     await flagReferralRewardIfEligible(existing.customer_id, existing.type);
+  }
+
+  if (status === "paid" && existing.type === "invoice" && existing.job_id) {
+    await movePlannerTaskForJob(existing.job_id, "billed");
   }
 
   revalidatePath(`/documents/${id}`);
