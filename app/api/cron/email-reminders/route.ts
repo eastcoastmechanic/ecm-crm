@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { stripe } from "@/lib/stripe";
-import { movePlannerTaskForJob } from "@/lib/planner-connector";
+import { movePlannerTaskForJob, createPlannerTask } from "@/lib/planner-connector";
 
 function todayISODate() {
   return new Date().toISOString().slice(0, 10);
@@ -163,7 +163,7 @@ async function sendJobFollowUps() {
 async function sendStaleEstimateFollowUps() {
   const { data: estimates, error } = await supabase
     .from("documents")
-    .select("id, doc_number, total, customers(name, email)")
+    .select("id, doc_number, total, last_reminder_sent_at, customers(name, email)")
     .eq("type", "estimate")
     .eq("status", "sent")
     .lte("created_at", daysAgoISO(5))
@@ -176,6 +176,18 @@ async function sendStaleEstimateFollowUps() {
 
   for (const estimate of estimates ?? []) {
     const customer = estimate.customers as unknown as CustomerContact;
+
+    // First time this estimate shows up stale, flag it for staff too --
+    // the customer email below repeats every 7 days, but one Planner card
+    // per estimate is enough; it isn't going anywhere until someone acts on it.
+    if (!estimate.last_reminder_sent_at) {
+      await createPlannerTask({
+        title: `Follow up: ${customer?.name ?? "Customer"} — estimate ${estimate.doc_number ?? ""}`,
+        notes: `Sitting at "sent" with no response for 5+ days.`,
+        bucket: "tasks",
+      });
+    }
+
     const email = customer?.email;
     if (!email) continue;
 
@@ -201,6 +213,45 @@ async function sendStaleEstimateFollowUps() {
   }
 
   return { sent, errors };
+}
+
+async function sendMassSaveStallAlerts() {
+  const { data: rebates, error } = await supabase
+    .from("documents")
+    .select("id, doc_number, last_reminder_sent_at, customers(name, email)")
+    .eq("type", "mass_save_rebate")
+    .eq("status", "sent")
+    .lte("created_at", daysAgoISO(14))
+    .is("last_reminder_sent_at", null);
+
+  if (error) return { flagged: 0, errors: [error.message] };
+
+  const errors: string[] = [];
+  let flagged = 0;
+
+  // Internal-only -- Mass Save paperwork is ECM's process, not the
+  // customer's, so this is a Planner card, not an email.
+  for (const rebate of rebates ?? []) {
+    const customer = rebate.customers as unknown as CustomerContact;
+
+    await createPlannerTask({
+      title: `Mass Save stalled: ${customer?.name ?? "Customer"} — ${rebate.doc_number ?? ""}`,
+      notes: `Submitted 14+ days ago with no status update. Check on approval.`,
+      bucket: "tasks",
+    });
+
+    const { error: updateError } = await supabase
+      .from("documents")
+      .update({ last_reminder_sent_at: new Date().toISOString() })
+      .eq("id", rebate.id);
+    if (updateError) {
+      errors.push(`rebate ${rebate.id}: ${updateError.message}`);
+      continue;
+    }
+    flagged++;
+  }
+
+  return { flagged, errors };
 }
 
 async function sendWarrantyAlerts() {
@@ -334,6 +385,7 @@ export async function GET(request: Request) {
     contractRenewals,
     jobFollowUps,
     estimateFollowUps,
+    massSaveStallAlerts,
     warrantyAlerts,
     maintenancePlanCharges,
   ] = await Promise.all([
@@ -341,6 +393,7 @@ export async function GET(request: Request) {
     sendContractRenewalNotices(),
     sendJobFollowUps(),
     sendStaleEstimateFollowUps(),
+    sendMassSaveStallAlerts(),
     sendWarrantyAlerts(),
     sendMaintenancePlanCharges(),
   ]);
@@ -350,6 +403,7 @@ export async function GET(request: Request) {
     contractRenewals,
     jobFollowUps,
     estimateFollowUps,
+    massSaveStallAlerts,
     warrantyAlerts,
     maintenancePlanCharges,
   });
