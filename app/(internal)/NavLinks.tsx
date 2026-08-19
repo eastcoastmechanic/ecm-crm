@@ -40,6 +40,7 @@ const navEntries: NavEntry[] = [
       { href: "/diagnostics", label: "Diagnostics" },
       { href: "/tasks", label: "Tasks" },
       { href: "/inventory", label: "Inventory" },
+      { href: "/procurement", label: "Procurement" },
     ],
   },
   {
