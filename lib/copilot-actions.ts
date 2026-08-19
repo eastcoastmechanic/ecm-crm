@@ -38,6 +38,7 @@ export const COPILOT_ACTION_NAMES = [
   "create_estimate",
   "create_invoice",
   "create_proposal",
+  "get_daily_brief",
 ] as const;
 
 export type CopilotActionName = (typeof COPILOT_ACTION_NAMES)[number];

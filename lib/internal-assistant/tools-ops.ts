@@ -12,6 +12,7 @@ import {
   JOB_PHOTO_PHASES,
   type JobPhotoPhase,
 } from "@/lib/job-photos";
+import { listOpenPlannerTasks } from "@/lib/planner-connector";
 
 /**
  * Jobs, leads, inventory and document sending.
@@ -425,6 +426,66 @@ const jobPhotoStatusTool = betaZodTool({
   },
 });
 
+// ---------------------------------------------------------------- daily brief
+
+function todayISODate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function daysAgoISO(n: number) {
+  return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+}
+
+const getDailyBriefTool = betaZodTool({
+  name: "get_daily_brief",
+  description:
+    "Everything that needs a person's attention right now, in one call: today's jobs, overdue Planner tasks, new/urgent leads, overdue invoices, and Mass Save paperwork stuck 14+ days. Use this for a morning status briefing or whenever someone asks 'what's going on today' / 'what needs attention'.",
+  inputSchema: z.object({}),
+  run: async () => {
+    const today = todayISODate();
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const [jobsToday, newLeads, overdueInvoices, staleMassSave, openTasks] = await Promise.all([
+      supabase
+        .from("jobs")
+        .select("id, scheduled_at, status, customers(name), properties(address)")
+        .gte("scheduled_at", today)
+        .lt("scheduled_at", tomorrow)
+        .neq("status", "cancelled")
+        .order("scheduled_at", { ascending: true }),
+      supabase
+        .from("leads")
+        .select("id, contact_name, town, urgency_score, status, created_at")
+        .eq("status", "new")
+        .or(`urgency_score.gte.7,created_at.gte.${daysAgoISO(1)}`)
+        .order("urgency_score", { ascending: false }),
+      supabase
+        .from("documents")
+        .select("id, doc_number, total, due_date, customers(name)")
+        .eq("type", "invoice")
+        .eq("status", "sent")
+        .lt("due_date", today),
+      supabase
+        .from("documents")
+        .select("id, doc_number, created_at, customers(name)")
+        .eq("type", "mass_save_rebate")
+        .eq("status", "sent")
+        .lte("created_at", daysAgoISO(14)),
+      listOpenPlannerTasks(),
+    ]);
+
+    const overdueTasks = openTasks.filter((t) => t.dueDateTime && t.dueDateTime < new Date().toISOString());
+
+    return JSON.stringify({
+      jobsToday: jobsToday.data ?? [],
+      newOrUrgentLeads: newLeads.data ?? [],
+      overdueInvoices: overdueInvoices.data ?? [],
+      staleMassSaveRebates: staleMassSave.data ?? [],
+      overduePlannerTasks: overdueTasks,
+    });
+  },
+});
+
 export const opsTools = [
   listJobsTool,
   scheduleJobTool,
@@ -438,6 +499,7 @@ export const opsTools = [
   listInventoryTool,
   adjustInventoryTool,
   sendDocumentTool,
+  getDailyBriefTool,
 ];
 
 /** Needs the current message's attachments, so it can't live in opsTools. */

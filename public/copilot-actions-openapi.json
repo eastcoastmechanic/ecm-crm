@@ -497,6 +497,16 @@
           "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
         }
       }
+    },
+    "/api/copilot-actions/get_daily_brief": {
+      "post": {
+        "operationId": "getDailyBrief",
+        "summary": "Everything that needs attention right now: today's jobs, overdue Planner tasks, new/urgent leads, overdue invoices, and Mass Save paperwork stuck 14+ days. Use for a morning status briefing.",
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": {} } } } },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
     }
   }
 }
