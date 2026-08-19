@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { computeSuperheat, computeSubcooling, saturationTempF, REFRIGERANT_TYPES, type RefrigerantType } from "@/lib/refrigerant";
+import { syncJobToPlanner } from "@/lib/planner-connector";
 
 /**
  * Machine ingest for diagnostic readings.
@@ -120,6 +121,14 @@ export async function POST(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (body.jobId) {
+    // Same reasoning as the internal diagnostics form: a job marked complete
+    // before this reading came in would otherwise be stuck in Needs
+    // Attention with nothing left to move it to Finished.
+    const { data: job } = await supabase.from("jobs").select("status").eq("id", body.jobId).single();
+    if (job) await syncJobToPlanner(body.jobId, job.status);
+  }
 
   return NextResponse.json({
     diagnosticId: data.id,

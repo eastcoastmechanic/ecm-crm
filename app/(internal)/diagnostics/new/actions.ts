@@ -16,6 +16,7 @@ import {
   REFRIGERANT_TYPES,
   type RefrigerantType,
 } from "@/lib/refrigerant";
+import { syncJobToPlanner } from "@/lib/planner-connector";
 
 const ScannedReadingsSchema = z.object({
   outdoor_temp: z.number().nullable(),
@@ -279,18 +280,26 @@ Diagnose the fault and suggest a fix.`;
 
   if (error) throw new Error(error.message);
 
-  if (job_id && (resolvedCustomerId || resolvedPropertyId)) {
+  if (job_id) {
     const { data: job } = await supabase
       .from("jobs")
-      .select("customer_id, property_id")
+      .select("status, customer_id, property_id")
       .eq("id", job_id)
       .single();
 
-    const updates: Record<string, string> = {};
-    if (job && !job.customer_id && resolvedCustomerId) updates.customer_id = resolvedCustomerId;
-    if (job && !job.property_id && resolvedPropertyId) updates.property_id = resolvedPropertyId;
-    if (Object.keys(updates).length) {
-      await supabase.from("jobs").update(updates).eq("id", job_id);
+    if (job) {
+      const updates: Record<string, string> = {};
+      if (!job.customer_id && resolvedCustomerId) updates.customer_id = resolvedCustomerId;
+      if (!job.property_id && resolvedPropertyId) updates.property_id = resolvedPropertyId;
+      if (Object.keys(updates).length) {
+        await supabase.from("jobs").update(updates).eq("id", job_id);
+      }
+
+      // Resyncs the job's Planner card against its current status. Matters
+      // most when the job was already marked complete before this diagnostic
+      // existed -- its card would be stuck in Needs Attention otherwise, with
+      // nothing else to ever move it to Finished.
+      await syncJobToPlanner(job_id, job.status);
     }
   }
 

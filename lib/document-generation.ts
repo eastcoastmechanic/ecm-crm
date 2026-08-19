@@ -290,6 +290,7 @@ ${input.rawRequest}`;
         type: input.type,
         customer_id: customerId,
         property_id: propertyId,
+        job_id: input.jobId ?? null,
         status: "draft",
         line_items: {
           items: itemsWithCost,

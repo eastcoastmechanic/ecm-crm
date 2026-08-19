@@ -24,6 +24,7 @@ export async function createServiceCall() {
       customer_id: null,
       property_id: null,
       status: "in_progress",
+      job_type: "service",
       scheduled_at: new Date().toISOString(),
       created_via: "manual",
     })
@@ -31,6 +32,8 @@ export async function createServiceCall() {
     .single();
 
   if (error || !job) throw new Error(error?.message ?? "Failed to start service call");
+
+  await syncJobToPlanner(job.id, "in_progress");
 
   revalidatePath("/jobs");
   redirect(`/diagnostics/new?job_id=${job.id}`);
