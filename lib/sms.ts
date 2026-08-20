@@ -1,17 +1,8 @@
+import { toE164 } from "@/lib/phone";
+
 const INFINIREACH_BASE_URL = process.env.SMS_GATEWAY_BASE_URL || "https://api.infinireach.io";
 const INFINIREACH_API_KEY = process.env.SMS_GATEWAY_API_KEY;
 const INFINIREACH_FROM_NUMBER = process.env.SMS_GATEWAY_FROM_NUMBER;
-
-// Customer phone numbers are stored as free-text (e.g. "(774) 555-1234"), but
-// InfiniReach requires E.164. Assumes US/+1 since the business only serves
-// the Plymouth, MA area.
-function toE164(raw: string) {
-  if (raw.startsWith("+")) return raw;
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  return raw;
-}
 
 export async function sendSMS(to: string | null | undefined, body: string) {
   if (!to) return;

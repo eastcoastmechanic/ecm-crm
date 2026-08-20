@@ -23,6 +23,7 @@ const INTERNAL_PATH_PREFIXES = [
   "/analytics",
   "/mass-save",
   "/conversations",
+  "/api/twilio/recordings",
 ];
 
 const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize", "/api/ingest/readings"];
@@ -193,6 +194,7 @@ export const config = {
     "/mass-save",
     "/conversations/:path*",
     "/conversations",
+    "/api/twilio/recordings/:path*",
     "/api/internal-chat",
     "/api/ingest/readings",
     "/api/dispatch/optimize",
