@@ -2,6 +2,8 @@ import { z } from "zod";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { buildMcpTools } from "@/lib/internal-assistant/tools-mcp";
+import { supabase } from "@/lib/supabase";
+import { hashToken } from "@/lib/oauth";
 
 /**
  * The MCP endpoint Josh's own Claude client connects to directly -- a third
@@ -55,8 +57,31 @@ const handler = createMcpHandler(
 );
 
 const verifyToken = async (_req: Request, bearerToken?: string): Promise<AuthInfo | undefined> => {
-  if (!bearerToken || bearerToken !== process.env.MCP_API_KEY) return undefined;
-  return { token: bearerToken, clientId: "josh", scopes: [] };
+  if (!bearerToken) return undefined;
+
+  // Static key kept as a fallback for direct/CLI callers (curl, `claude mcp
+  // add --header`) that don't need the OAuth dance -- already verified
+  // end-to-end in production; adding OAuth alongside it doesn't weaken it,
+  // it's an independent secret.
+  if (process.env.MCP_API_KEY && bearerToken === process.env.MCP_API_KEY) {
+    return { token: bearerToken, clientId: "josh-static", scopes: [] };
+  }
+
+  const { data: row } = await supabase
+    .from("oauth_tokens")
+    .select("client_id, expires_at, revoked_at")
+    .eq("token_hash", hashToken(bearerToken))
+    .eq("token_type", "access")
+    .maybeSingle();
+
+  if (!row || row.revoked_at) return undefined;
+  const expiresAtMs = new Date(row.expires_at).getTime();
+  if (expiresAtMs < Date.now()) return undefined;
+
+  // withMcpAuth compares expiresAt in epoch *seconds* (Date.now()/1e3,
+  // confirmed by reading node_modules/mcp-handler/dist/index.js) — must not
+  // pass milliseconds here.
+  return { token: bearerToken, clientId: row.client_id, scopes: [], expiresAt: Math.floor(expiresAtMs / 1000) };
 };
 
 const authHandler = withMcpAuth(handler, verifyToken, { required: true });

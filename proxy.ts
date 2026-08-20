@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { verifyInternalCredentials } from "@/lib/internal-auth";
 
 const PUBLIC_PORTAL_PATHS = ["/portal/login", "/portal/auth"];
 
@@ -32,11 +33,6 @@ function isInternalPath(pathname: string) {
 }
 
 function hasValidBasicAuth(request: NextRequest) {
-  const expectedUser = process.env.INTERNAL_AUTH_USER;
-  const expectedPass = process.env.INTERNAL_AUTH_PASSWORD;
-  // Fail closed if the gate isn't configured — never fall back to "open".
-  if (!expectedUser || !expectedPass) return false;
-
   const header = request.headers.get("authorization");
   if (!header?.startsWith("Basic ")) return false;
 
@@ -49,7 +45,7 @@ function hasValidBasicAuth(request: NextRequest) {
   const sep = decoded.indexOf(":");
   if (sep === -1) return false;
 
-  return decoded.slice(0, sep) === expectedUser && decoded.slice(sep + 1) === expectedPass;
+  return verifyInternalCredentials(decoded.slice(0, sep), decoded.slice(sep + 1));
 }
 
 // Alternative to the shared Basic-Auth password: a real Supabase Auth session
