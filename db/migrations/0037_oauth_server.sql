@@ -5,6 +5,16 @@
 -- support Dynamic Client Registration, which the static-MCP_API_KEY-only
 -- setup (still kept working unchanged for direct/CLI callers) can't satisfy
 -- from that surface.
+--
+-- Deliberately NOT using this schema's usual "internal full access to anon"
+-- RLS policy on these three tables. Every app/api/oauth/* route reads these
+-- through lib/supabase.ts's service-role client, which bypasses RLS
+-- entirely -- so an anon policy here buys the app nothing, while
+-- NEXT_PUBLIC_SUPABASE_ANON_KEY *is* shipped to the browser (see
+-- lib/supabase-portal/client.ts). An anon-writable oauth_tokens would let
+-- anyone holding that public key INSERT a token_hash of their own choosing
+-- and authenticate to /api/mcp directly, skipping login and PKCE entirely.
+-- RLS stays enabled with no policy, i.e. default-deny for anon.
 
 create table if not exists oauth_clients (
   client_id uuid primary key default gen_random_uuid(),  -- doubles as the DCR-returned client_id (RFC 7591)
@@ -15,10 +25,6 @@ create table if not exists oauth_clients (
 
 alter table oauth_clients enable row level security;
 drop policy if exists "internal full access oauth clients" on oauth_clients;
-create policy "internal full access oauth clients" on oauth_clients
-  for all to anon
-  using (true)
-  with check (true);
 
 -- Single-use, short-lived authorization codes, bound to the exact
 -- client_id + redirect_uri + code_challenge presented at /authorize so
@@ -41,10 +47,6 @@ create index if not exists oauth_authorization_codes_expiry_idx
 
 alter table oauth_authorization_codes enable row level security;
 drop policy if exists "internal full access oauth authorization codes" on oauth_authorization_codes;
-create policy "internal full access oauth authorization codes" on oauth_authorization_codes
-  for all to anon
-  using (true)
-  with check (true);
 
 -- Issued access + refresh tokens, stored hashed -- never plaintext -- so a
 -- DB read doesn't hand out usable credentials directly. `family_id` stays
@@ -68,7 +70,3 @@ create index if not exists oauth_tokens_expiry_idx
 
 alter table oauth_tokens enable row level security;
 drop policy if exists "internal full access oauth tokens" on oauth_tokens;
-create policy "internal full access oauth tokens" on oauth_tokens
-  for all to anon
-  using (true)
-  with check (true);
