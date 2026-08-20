@@ -2,7 +2,7 @@ import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { supabase } from "@/lib/supabase";
 import { updateJobStatus, rescheduleJob } from "@/app/(internal)/jobs/actions";
-import { setLeadStage, addManualLead, dismissLead } from "@/app/(internal)/leads/actions";
+import { setLeadStage, addManualLead, dismissLead, deleteLead } from "@/app/(internal)/leads/actions";
 import { adjustInventoryQty } from "@/app/(internal)/inventory/actions";
 import { sendDocumentEmail } from "@/app/(internal)/documents/[id]/actions";
 import {
@@ -238,6 +238,19 @@ const addLeadTool = betaZodTool({
     } catch (err) {
       return `Failed to add lead: ${err instanceof Error ? err.message : "unknown error"}`;
     }
+  },
+});
+
+const deleteLeadTool = betaZodTool({
+  name: "delete_lead",
+  description: "Permanently delete a lead. Use list_leads to get the leadId first. This cannot be undone; confirm with the user before calling.",
+  inputSchema: z.object({
+    leadId: z.string(),
+  }),
+  run: async ({ leadId }) => {
+    const result = await deleteLead(leadId);
+    if (result.error) return result.error;
+    return `Deleted lead ${leadId}.`;
   },
 });
 
@@ -496,6 +509,7 @@ export const opsTools = [
   listLeadsTool,
   setLeadStageTool,
   addLeadTool,
+  deleteLeadTool,
   listInventoryTool,
   adjustInventoryTool,
   sendDocumentTool,

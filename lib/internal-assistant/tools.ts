@@ -9,6 +9,8 @@ import { addProperty, updateProperty, deleteProperty } from "@/app/(internal)/pr
 import { addEquipment, updateEquipment, deleteEquipment } from "@/app/(internal)/equipment/actions";
 import { updateWarranty } from "@/app/(internal)/documents/[id]/actions";
 import { deleteDocument } from "@/app/(internal)/documents/actions";
+import { deletePriceBookItem } from "@/app/(internal)/price-book/actions";
+import { deletePurchaseOrder } from "@/app/(internal)/procurement/actions";
 import { createPlannerTask, listOpenPlannerTasks, completePlannerTask } from "@/lib/planner-connector";
 import { opsTools, buildJobPhotoTools } from "./tools-ops";
 import { fieldTools } from "./tools-field";
@@ -54,6 +56,32 @@ const searchPriceBookTool = betaZodTool({
       return `${name}: ${priced.join(", ")}`;
     });
     return lines.join("\n");
+  },
+});
+
+const deletePriceBookItemTool = betaZodTool({
+  name: "delete_price_book_item",
+  description: "Permanently delete a price book item. Use search_price_book to find the item's id first. This cannot be undone; confirm with the user before calling.",
+  inputSchema: z.object({
+    itemId: z.string(),
+  }),
+  run: async ({ itemId }) => {
+    const result = await deletePriceBookItem(itemId);
+    if (result.error) return result.error;
+    return `Deleted price book item ${itemId}.`;
+  },
+});
+
+const deletePurchaseOrderTool = betaZodTool({
+  name: "delete_purchase_order",
+  description: "Permanently delete a purchase order. This cannot be undone; confirm with the user before calling.",
+  inputSchema: z.object({
+    purchaseOrderId: z.string(),
+  }),
+  run: async ({ purchaseOrderId }) => {
+    const result = await deletePurchaseOrder(purchaseOrderId);
+    if (result.error) return result.error;
+    return `Deleted purchase order ${purchaseOrderId}.`;
   },
 });
 
@@ -701,6 +729,8 @@ export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?:
     listDocumentsTool,
     deleteDocumentTool,
     searchPriceBookTool,
+    deletePriceBookItemTool,
+    deletePurchaseOrderTool,
     updateWarrantyTool,
     createWarrantyTool,
     createMassSaveRebateTool,
