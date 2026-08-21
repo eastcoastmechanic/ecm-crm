@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { getSquareRevenue, getSquareMoneyOwed } from "@/lib/square";
 import {
   buttonClass,
   buttonSecondaryClass,
@@ -34,6 +35,8 @@ export default async function DashboardPage() {
     { count: contractsRenewing },
     { data: upcomingJobs },
     { data: recentDocuments },
+    squareRevenue,
+    squareMoneyOwed,
   ] = await Promise.all([
     supabase.from("customers").select("*", { count: "exact", head: true }),
     supabase
@@ -60,6 +63,14 @@ export default async function DashboardPage() {
       .select("*, customers(name)")
       .order("created_at", { ascending: false })
       .limit(5),
+    // Real revenue mostly flows through Square (POS, Square Invoices), not
+    // the CRM's own documents -- see lib/square.ts. Shown as its own card
+    // rather than merged into "Revenue Collected" to avoid double-counting
+    // a job that's tracked in both places.
+    getSquareRevenue("2000-01-01T00:00:00Z"),
+    process.env.SQUARE_LOCATION_ID
+      ? getSquareMoneyOwed(process.env.SQUARE_LOCATION_ID)
+      : Promise.resolve({ totalCents: 0, count: 0 }),
   ]);
 
   const outstandingTotal = (outstandingInvoices ?? []).reduce((sum, doc) => sum + (doc.total ?? 0), 0);
@@ -74,6 +85,16 @@ export default async function DashboardPage() {
       sub: `${outstandingInvoices?.length ?? 0} unpaid`,
     },
     { label: "Revenue Collected", value: formatPrice(revenueTotal) },
+    {
+      label: "Revenue Collected (Square)",
+      value: formatPrice(squareRevenue.totalCents / 100),
+      sub: `${squareRevenue.count} payments`,
+    },
+    {
+      label: "Money Owed (Square)",
+      value: formatPrice(squareMoneyOwed.totalCents / 100),
+      sub: `${squareMoneyOwed.count} unpaid invoices`,
+    },
     { label: "Contracts Renewing", value: contractsRenewing ?? 0, sub: "next 30 days" },
   ];
 
@@ -94,7 +115,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.label} className="rounded-xl border border-white/8 bg-white/3 p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-g500">
