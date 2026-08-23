@@ -76,6 +76,7 @@ export async function GET(request: Request) {
 
   const page = toInsert.slice(offset, offset + limit);
   let inserted = 0;
+  let skippedAsRaceDuplicate = 0;
   let failed = 0;
 
   for (const { item, name } of page) {
@@ -93,6 +94,14 @@ export async function GET(request: Request) {
       .single();
 
     if (error || !row) {
+      // 23505 = unique_violation on price_book_items_flat_name_uniq -- another
+      // concurrent call (or a retry) already inserted this name. That's the
+      // outcome we want, not a failure: the existingNames snapshot above is
+      // only a pre-filter, the unique index is what actually prevents dupes.
+      if (error?.code === "23505") {
+        skippedAsRaceDuplicate++;
+        continue;
+      }
       console.error(`[price-book-import] insert failed for "${name}": ${error?.message}`);
       failed++;
       continue;
@@ -105,6 +114,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     inserted,
+    skippedAsRaceDuplicate,
     failed,
     processed: page.length,
     totalToInsert: toInsert.length,
