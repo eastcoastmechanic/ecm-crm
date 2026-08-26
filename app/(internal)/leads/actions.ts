@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
-import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { syncLeadToGraph, deleteLeadFromGraph } from "@/lib/graph-connector";
 import { createPlannerTask } from "@/lib/planner-connector";
 
@@ -144,6 +144,7 @@ export async function sendLeadOutreach(formData: FormData) {
     if (!customer?.email) throw new Error("No email on file for this lead");
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: customer.email,
       subject: "A note from East Coast Mechanical",
       text: draft_message,

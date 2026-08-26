@@ -10,7 +10,7 @@ import { getWarrantyReportForPdf } from "@/lib/warranty-reports";
 import { renderWarrantyReportPdf } from "@/lib/warranty-report-pdf";
 import { getContractForPdf } from "@/lib/contract-reports";
 import { renderContractPdf } from "@/lib/contract-pdf";
-import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { flagReferralRewardIfEligible } from "@/lib/referral";
 import { movePlannerTaskForJob } from "@/lib/planner-connector";
 
@@ -258,6 +258,7 @@ export async function sendDocumentEmail(formData: FormData) {
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: customerEmail,
       subject: `Condition Assessment ${data.doc_number ?? ""} from East Coast Mechanical`,
       text: `Hi ${data.customer_name},\n\nAttached is the equipment condition assessment from your recent visit.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
@@ -285,6 +286,7 @@ export async function sendDocumentEmail(formData: FormData) {
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: customerEmail,
       subject: `Warranty Registration ${data.doc_number ?? ""} from East Coast Mechanical`,
       text: `Hi ${data.customer_name},\n\nAttached is your warranty registration, including our standard 1-year craftsmanship warranty on the install.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
@@ -312,6 +314,7 @@ export async function sendDocumentEmail(formData: FormData) {
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: customerEmail,
       subject: `Contract ${data.doc_number ?? ""} from East Coast Mechanical — signature needed`,
       text: `Hi ${data.customer_name},\n\nAttached is your service contract ${data.doc_number ?? ""} (${formatPrice(data.total ?? 0)}). Please log in to your customer portal to review and sign it before work begins.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
@@ -339,6 +342,7 @@ export async function sendDocumentEmail(formData: FormData) {
 
   const { error: sendError } = await resend.emails.send({
     from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+    replyTo: RESEND_REPLY_TO,
     to: customerEmail,
     subject: `${label} ${data.doc_number ?? ""} from East Coast Mechanical`,
     text: `Hi ${data.customer_name},\n\nAttached is your ${label.toLowerCase()} ${data.doc_number ?? ""} (Better tier total: ${formatPrice(

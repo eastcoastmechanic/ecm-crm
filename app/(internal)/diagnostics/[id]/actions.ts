@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { getServiceReportForPdf } from "@/lib/service-reports";
 import { renderServiceReportPdf } from "@/lib/service-report-pdf";
-import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createInvoiceDirect, type DirectLineItem } from "@/lib/document-generation";
 
@@ -233,6 +233,7 @@ export async function sendServiceReportEmail(formData: FormData) {
 
   const { error: sendError } = await resend.emails.send({
     from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+    replyTo: RESEND_REPLY_TO,
     to: customerEmail,
     subject: `Service Report ${data.doc_number ?? ""} from East Coast Mechanical`,
     text: `Hi ${data.customer_name},\n\nAttached is the service report from your recent visit${

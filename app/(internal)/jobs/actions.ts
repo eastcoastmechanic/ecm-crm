@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
-import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { sendSMS } from "@/lib/sms";
 import { generateJobICS } from "@/lib/ics";
 import {
@@ -73,6 +73,7 @@ async function sendScheduleNotifications(jobId: string) {
   if (customer?.email) {
     await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: customer.email,
       subject: `You're scheduled for ${when}`,
       text: `Hi ${customer.name ?? ""},\n\nYou're scheduled with East Coast Mechanical on ${when}${whereText}.\n\nWe'll see you then!\n\nEast Coast Mechanical`,
@@ -231,6 +232,7 @@ export async function markOnWay(jobId: string) {
   if (customer?.email) {
     await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: customer.email,
       subject: "Your technician is on the way",
       text: message,

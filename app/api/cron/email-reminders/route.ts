@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { stripe } from "@/lib/stripe";
 import { movePlannerTaskForJob, createPlannerTask } from "@/lib/planner-connector";
 
@@ -46,6 +46,7 @@ async function sendOverdueInvoiceReminders() {
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: email,
       subject: `Reminder: Invoice ${invoice.doc_number ?? ""} is past due`,
       text: `Hi ${customer?.name ?? ""},\n\nThis is a friendly reminder that invoice ${invoice.doc_number ?? ""} for ${formatPrice(
@@ -92,6 +93,7 @@ async function sendContractRenewalNotices() {
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: email,
       subject: `Your service plan renews soon`,
       text: `Hi ${customer?.name ?? ""},\n\nYour service plan${
@@ -138,6 +140,7 @@ async function sendJobFollowUps() {
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: email,
       subject: `How did we do?`,
       text: `Hi ${customer?.name ?? ""},\n\nThanks for choosing East Coast Mechanical for your recent service${
@@ -193,6 +196,7 @@ async function sendStaleEstimateFollowUps() {
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: email,
       subject: `Following up on estimate ${estimate.doc_number ?? ""}`,
       text: `Hi ${customer?.name ?? ""},\n\nJust checking in on estimate ${estimate.doc_number ?? ""} for ${formatPrice(
@@ -284,6 +288,7 @@ async function sendWarrantyAlerts() {
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
       to: email,
       subject: `Your warranty is expiring soon`,
       text: `Hi ${customer?.name ?? ""},\n\nThe manufacturer warranty on ${label}${
