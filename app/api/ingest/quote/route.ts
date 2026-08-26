@@ -253,11 +253,14 @@ export async function POST(request: Request) {
         .select("id")
         .single();
 
-      if (jobError) {
-        return NextResponse.json({ error: `Failed to create job: ${jobError.message}` }, { status: 500 });
+      if (jobError || !job?.id) {
+        return NextResponse.json(
+          { error: `Failed to create job: ${jobError?.message ?? "missing id"}` },
+          { status: 500 }
+        );
       }
       jobId = job.id;
-      await syncJobToGraph(jobId);
+      await syncJobToGraph(job.id);
     }
 
     const docNumber = await nextDocNumber(type);
