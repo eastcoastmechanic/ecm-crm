@@ -29,6 +29,7 @@ const navEntries: NavEntry[] = [
     items: [
       { href: "/leads", label: "Leads" },
       { href: "/documents", label: "Documents" },
+      { href: "/catalog", label: "Catalog" },
       { href: "/price-book", label: "Price Book" },
       { href: "/mass-save", label: "MassSave" },
     ],
@@ -52,9 +53,7 @@ const navEntries: NavEntry[] = [
   },
 ];
 
-// A logged-in "tech" role gets a reduced nav (their own jobs only); the
-// shared Basic-Auth password and "owner"/"office" staff roles get everything.
-const TECH_VISIBLE_PATHS = ["/dashboard", "/tech-hub", "/jobs"];
+const TECH_VISIBLE_PATHS = ["/dashboard", "/tech-hub", "/jobs", "/catalog"];
 
 function pillClass(active: boolean) {
   return `shrink-0 rounded-md px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
@@ -70,14 +69,8 @@ function NavDropdown({ group, active }: { group: NavGroup; active: boolean }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // The nav strip scrolls horizontally (overflow-x-auto), which forces the
-  // browser to also clip the other axis (overflow-y computes to auto/hidden
-  // whenever overflow-x isn't visible) — an absolutely-positioned panel
-  // inside it gets silently clipped. Rendering into a portal at fixed
-  // screen coordinates sidesteps the clipping ancestor entirely.
   useEffect(() => {
     if (!open) return;
-
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
       if (
