@@ -26,7 +26,7 @@ const INTERNAL_PATH_PREFIXES = [
   "/api/twilio/recordings",
 ];
 
-const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize", "/api/ingest/readings"];
+const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize", "/api/ingest/readings", "/api/ingest/quote"];
 
 function isInternalPath(pathname: string) {
   if (INTERNAL_API_PATHS.includes(pathname)) return true;
@@ -197,6 +197,7 @@ export const config = {
     "/api/twilio/recordings/:path*",
     "/api/internal-chat",
     "/api/ingest/readings",
+    "/api/ingest/quote",
     "/api/dispatch/optimize",
   ],
 };
