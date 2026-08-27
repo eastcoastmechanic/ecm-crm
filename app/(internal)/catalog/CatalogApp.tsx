@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buttonClass, buttonSecondaryClass, inputClass } from "../ui";
+import { finalizeCatalogQuote } from "./actions";
 
 export type CatalogItem = {
   id: string;
@@ -221,45 +222,39 @@ export default function CatalogApp({ items }: { items: CatalogItem[] }) {
     setStatus(null);
     setResultUrl(null);
     try {
-      const res = await fetch("/api/ingest/quote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          source: "catalog-app",
-          customer: {
-            name: customerName.trim(),
-            email: customerEmail.trim() || undefined,
-            phone: customerPhone.trim() || undefined,
-          },
-          property: jobAddress.trim() ? { address: jobAddress.trim() } : undefined,
-          job: {
-            createJob: true,
-            notes: jobNotes.trim() || pkgText.trim() || undefined,
-          },
-          document: {
-            type: "estimate",
-            status: "draft",
-            lineItems: cart.map((l) => ({
-              description: l.description,
-              model: l.model,
-              qty: l.qty,
-              unitPrice: l.unitPrice,
-              category: l.category,
-            })),
-            laborHours: laborHours > 0 ? laborHours : undefined,
-            laborRate: LABOR_RATE,
-            subtotal,
-            tax,
-            total,
-            depositPercent: 50,
-            rawRequest: pkgText.trim() || jobNotes.trim() || undefined,
-            notes: jobNotes.trim() || undefined,
-          },
-        }),
+      const data = await finalizeCatalogQuote({
+        source: "catalog-app",
+        customer: {
+          name: customerName.trim(),
+          email: customerEmail.trim() || undefined,
+          phone: customerPhone.trim() || undefined,
+        },
+        property: jobAddress.trim() ? { address: jobAddress.trim() } : undefined,
+        job: {
+          createJob: true,
+          notes: jobNotes.trim() || pkgText.trim() || undefined,
+        },
+        document: {
+          type: "estimate",
+          status: "draft",
+          lineItems: cart.map((l) => ({
+            description: l.description,
+            model: l.model,
+            qty: l.qty,
+            unitPrice: l.unitPrice,
+            category: l.category,
+          })),
+          laborHours: laborHours > 0 ? laborHours : undefined,
+          laborRate: LABOR_RATE,
+          subtotal,
+          tax,
+          total,
+          depositPercent: 50,
+          rawRequest: pkgText.trim() || jobNotes.trim() || undefined,
+          notes: jobNotes.trim() || undefined,
+        },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!data.ok) throw new Error(data.error);
       setStatus(`Saved ${data.docNumber} · total ${formatMoney(data.total)}`);
       setResultUrl(data.documentUrl || null);
       setCart([]);
