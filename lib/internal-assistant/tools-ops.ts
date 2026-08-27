@@ -177,7 +177,7 @@ const listLeadsTool = betaZodTool({
   run: async ({ status, town, limit }) => {
     let q = supabase
       .from("leads")
-      .select("id, contact_name, phone_number, email, town, address, status, source, summary, urgency_score, created_at")
+      .select("id, contact_name, phone_number, contact_info, town, address, status, source, summary, urgency_score, created_at")
       .order("created_at", { ascending: false })
       .limit(limit ?? 25);
     if (status) q = q.eq("status", status);
