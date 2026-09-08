@@ -7,7 +7,6 @@ import {
   listSquarePayments,
   type SquareCustomer,
   type SquareInvoice,
-  type SquarePayment,
 } from "@/lib/square";
 
 export type SquareSyncResult = {
