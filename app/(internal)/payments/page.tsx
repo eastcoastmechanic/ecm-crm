@@ -1,10 +1,17 @@
 import { supabase } from "@/lib/supabase";
 import { isSquareConfigured, getSquareLocationId } from "@/lib/square";
-import PaymentsList from "./PaymentsList";
+import PaymentsList, { type SquareInvoiceRow, type SquarePaymentRow } from "./PaymentsList";
 import SyncSquareButton from "./SyncSquareButton";
 import { errorClass, headingClass, subTextClass } from "../ui";
 
 export const dynamic = "force-dynamic";
+
+type RelatedCustomer = { name: string | null } | { name: string | null }[] | null;
+
+function relatedName(value: RelatedCustomer) {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0]?.name ?? null) : value.name;
+}
 
 export default async function PaymentsPage() {
   const configured = isSquareConfigured();
@@ -26,8 +33,8 @@ export default async function PaymentsPage() {
           .order("square_created_at", { ascending: false }),
       ])
     : [
-        { data: [], error: null },
-        { data: [], error: null },
+        { data: [] as never[], error: null },
+        { data: [] as never[], error: null },
       ];
 
   const missingTable =
@@ -35,6 +42,22 @@ export default async function PaymentsPage() {
     paymentsResult.error?.message?.includes("square_payments") ||
     invoicesResult.error?.message?.includes("square_customer_id") ||
     invoicesResult.error?.message?.includes("square_invoice_id");
+
+  const invoices: SquareInvoiceRow[] = (invoicesResult.data ?? []).map((row) => {
+    const record = row as SquareInvoiceRow & { customers: RelatedCustomer };
+    return {
+      ...record,
+      customers: { name: relatedName(record.customers) },
+    };
+  });
+
+  const payments: SquarePaymentRow[] = (paymentsResult.data ?? []).map((row) => {
+    const record = row as SquarePaymentRow & { customers: RelatedCustomer };
+    return {
+      ...record,
+      customers: { name: relatedName(record.customers) },
+    };
+  });
 
   return (
     <div className="flex flex-col gap-8">
@@ -70,9 +93,7 @@ export default async function PaymentsPage() {
         <p className={errorClass}>Error loading Square payments: {paymentsResult.error.message}</p>
       )}
 
-      {!missingTable && (
-        <PaymentsList invoices={invoicesResult.data ?? []} payments={paymentsResult.data ?? []} />
-      )}
+      {!missingTable && <PaymentsList invoices={invoices} payments={payments} />}
     </div>
   );
 }
