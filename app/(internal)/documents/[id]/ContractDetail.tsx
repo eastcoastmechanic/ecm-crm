@@ -2,6 +2,7 @@ import Link from "next/link";
 import { sendDocumentEmail } from "./actions";
 import SubmitButton from "../../SubmitButton";
 import { headingClass, subTextClass, buttonClass, buttonSecondaryClass, itemSubClass } from "../../ui";
+import DocumentDeleteButton from "../DocumentDeleteButton";
 import type { ContractLineItems } from "@/lib/contract-terms";
 
 function formatPrice(value: number | null) {
@@ -59,7 +60,7 @@ export default function ContractDetail({
             {new Date(doc.created_at).toLocaleDateString()}
           </p>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
           <a
             href={`/documents/${doc.id}/pdf`}
             target="_blank"
@@ -68,6 +69,7 @@ export default function ContractDetail({
           >
             Download PDF
           </a>
+          <DocumentDeleteButton id={doc.id} label="Contract" />
           {doc.status !== "signed" &&
             (hasEmail ? (
               <form action={sendDocumentEmail} className="flex items-center gap-2">
