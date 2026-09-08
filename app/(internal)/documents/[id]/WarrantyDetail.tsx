@@ -3,6 +3,7 @@ import { sendDocumentEmail } from "./actions";
 import SubmitButton from "../../SubmitButton";
 import WarrantyItemsEditor from "./WarrantyItemsEditor";
 import { headingClass, subTextClass, buttonClass, buttonSecondaryClass, itemSubClass } from "../../ui";
+import DocumentDeleteButton from "../DocumentDeleteButton";
 
 export type WarrantyItem = {
   equipment_label: string;
@@ -64,7 +65,7 @@ export default function WarrantyDetail({
             {technician_name ? ` · Installed by ${technician_name}` : ""}
           </p>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
           <a
             href={`/documents/${doc.id}/pdf`}
             target="_blank"
@@ -73,6 +74,7 @@ export default function WarrantyDetail({
           >
             Download PDF
           </a>
+          <DocumentDeleteButton id={doc.id} label="Warranty" />
           {hasEmail ? (
             <form action={sendDocumentEmail} className="flex items-center gap-2">
               {doc.sent_at && (

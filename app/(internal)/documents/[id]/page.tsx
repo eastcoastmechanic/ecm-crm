@@ -11,6 +11,7 @@ import ContractDetail from "./ContractDetail";
 import LineItemsEditor from "./LineItemsEditor";
 import EditCustomerForm from "../../customers/[id]/EditCustomerForm";
 import SubmitButton from "../../SubmitButton";
+import DocumentDeleteButton from "../DocumentDeleteButton";
 import { headingClass, subTextClass, buttonClass, buttonSecondaryClass } from "../../ui";
 
 type LineItem = {
@@ -202,7 +203,7 @@ export default async function DocumentPage({
           </p>
           {doc.customers?.id && <EditCustomerForm customer={doc.customers} />}
         </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
           {doc.type === "estimate" && doc.status === "approved" && (
             <a href={`/documents/contract/new?from=${doc.id}`} className={buttonSecondaryClass}>
               Create Contract
@@ -216,6 +217,7 @@ export default async function DocumentPage({
           >
             Download PDF
           </a>
+          <DocumentDeleteButton id={doc.id} label={typeLabel[doc.type] ?? "Document"} />
           {doc.customers?.email ? (
             <form action={sendDocumentEmail}>
               <input type="hidden" name="id" value={doc.id} />

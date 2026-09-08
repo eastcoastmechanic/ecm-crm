@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { headingClass, subTextClass, buttonSecondaryClass, itemSubClass } from "../../ui";
+import DocumentDeleteButton from "../DocumentDeleteButton";
 
 type StoredLineItems = {
   sponsor: { electric: string | null; gas: string | null };
@@ -56,6 +57,7 @@ export default function MassSaveRebateDetail({
             {new Date(doc.created_at).toLocaleDateString()}
           </p>
         </div>
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
         <a
           href={`/documents/${doc.id}/pdf`}
           target="_blank"
@@ -64,6 +66,8 @@ export default function MassSaveRebateDetail({
         >
           Download Filled Rebate Form
         </a>
+          <DocumentDeleteButton id={doc.id} label="Rebate form" />
+        </div>
       </div>
 
       <section className="rounded-xl border border-white/8 p-4">

@@ -4,6 +4,8 @@ import { supabase } from "@/lib/supabase";
 import { headingClass, subTextClass, itemSubClass, itemTitleClass, errorClass } from "../../ui";
 import EditCustomerForm from "./EditCustomerForm";
 import PropertiesEquipmentSection from "./PropertiesEquipmentSection";
+import DeleteRecordButton from "../../DeleteRecordButton";
+import { deleteCustomer } from "../actions";
 
 export default async function CustomerProfilePage({
   params,
@@ -92,24 +94,32 @@ export default async function CustomerProfilePage({
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <Link href="/customers" className={subTextClass}>
-          &larr; Back to customers
-        </Link>
-        <h1 className={`${headingClass} mt-2`}>{customer.name}</h1>
-        <p className={subTextClass}>
-          {[customer.email, customer.phone].filter(Boolean).join(" · ")}
-        </p>
-        {customer.notes && <p className={`${subTextClass} mt-1`}>{customer.notes}</p>}
-        {referredBy && (
-          <p className={`${subTextClass} mt-1`}>
-            Referred by{" "}
-            <Link href={`/customers/${referredBy.id}`} className="underline">
-              {referredBy.name}
-            </Link>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Link href="/customers" className={subTextClass}>
+            &larr; Back to customers
+          </Link>
+          <h1 className={`${headingClass} mt-2`}>{customer.name}</h1>
+          <p className={subTextClass}>
+            {[customer.email, customer.phone].filter(Boolean).join(" · ")}
           </p>
-        )}
-        <EditCustomerForm customer={customer} />
+          {customer.notes && <p className={`${subTextClass} mt-1`}>{customer.notes}</p>}
+          {referredBy && (
+            <p className={`${subTextClass} mt-1`}>
+              Referred by{" "}
+              <Link href={`/customers/${referredBy.id}`} className="underline">
+                {referredBy.name}
+              </Link>
+            </p>
+          )}
+          <EditCustomerForm customer={customer} />
+        </div>
+        <DeleteRecordButton
+          label="Delete customer"
+          confirmMessage={`Delete ${customer.name}? This also permanently deletes their properties, equipment, jobs, documents, and service history. This cannot be undone.`}
+          onDelete={deleteCustomer.bind(null, id)}
+          redirectTo="/customers"
+        />
       </div>
 
       {error && <p className={errorClass}>Error loading customer: {error}</p>}

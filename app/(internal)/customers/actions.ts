@@ -81,56 +81,101 @@ export async function updateCustomer(formData: FormData) {
 
 // Deletes a customer and everything hanging off it — properties, equipment,
 // jobs, documents, diagnostics, satisfaction surveys, SMS history, service
-// contracts, and AI conversation history. Traced from the live DB's actual
-// foreign keys (not the schema.sql snapshot, which is stale for newer
-// tables). Runs as a sequence of awaited deletes rather than a single SQL
-// transaction, same style as the rest of this codebase (e.g. submitWarranty)
-// — Supabase's REST client doesn't expose multi-statement transactions.
+// contracts, install reports, and AI conversation history. Traced from the
+// live DB's actual foreign keys (not the schema.sql snapshot, which is stale
+// for newer tables). Runs as a sequence of awaited deletes rather than a
+// single SQL transaction, same style as the rest of this codebase (e.g.
+// submitWarranty) — Supabase's REST client doesn't expose multi-statement
+// transactions.
 export async function deleteCustomer(id: string): Promise<{ error?: string }> {
-  const propertyIds = await idsWhere("properties", "customer_id", id);
+  if (!id) return { error: "Missing customer id" };
 
-  const jobIds = unique([
-    ...(await idsWhere("jobs", "customer_id", id)),
-    ...(await idsWhereIn("jobs", "property_id", propertyIds)),
-  ]);
+  try {
+    const propertyIds = await idsWhere("properties", "customer_id", id);
 
-  const equipmentIds = await idsWhereIn("equipment", "property_id", propertyIds);
+    const jobIds = unique([
+      ...(await idsWhere("jobs", "customer_id", id)),
+      ...(await idsWhereIn("jobs", "property_id", propertyIds)),
+    ]);
 
-  await cascadeUnlinkEquipment(equipmentIds);
-  await cascadeUnlinkJobs(jobIds);
+    const equipmentIds = await idsWhereIn("equipment", "property_id", propertyIds);
 
-  await supabase.from("sms_messages").delete().eq("customer_id", id);
+    await cascadeUnlinkEquipment(equipmentIds);
+    await cascadeUnlinkJobs(jobIds);
 
-  if (equipmentIds.length) await supabase.from("equipment").delete().in("id", equipmentIds);
-  if (jobIds.length) await supabase.from("jobs").delete().in("id", jobIds);
+    const { error: smsError } = await supabase.from("sms_messages").delete().eq("customer_id", id);
+    if (smsError) return { error: smsError.message };
 
-  const documentIds = unique([
-    ...(await idsWhere("documents", "customer_id", id)),
-    ...(await idsWhereIn("documents", "property_id", propertyIds)),
-  ]);
-  await cascadeUnlinkDocuments(documentIds);
-  if (documentIds.length) await supabase.from("documents").delete().in("id", documentIds);
+    const { error: installByCustomerError } = await supabase.from("install_reports").delete().eq("customer_id", id);
+    if (installByCustomerError) return { error: installByCustomerError.message };
 
-  await Promise.all([
-    deleteCustomerFromGraph(id),
-    ...jobIds.map(deleteJobFromGraph),
-    ...documentIds.map(deleteDocumentFromGraph),
-  ]);
+    if (propertyIds.length) {
+      const { error: installByPropertyError } = await supabase
+        .from("install_reports")
+        .delete()
+        .in("property_id", propertyIds);
+      if (installByPropertyError) return { error: installByPropertyError.message };
+    }
 
-  await supabase.from("service_contracts").delete().eq("customer_id", id);
-  if (propertyIds.length) await supabase.from("service_contracts").delete().in("property_id", propertyIds);
+    if (equipmentIds.length) {
+      const { error: equipmentError } = await supabase.from("equipment").delete().in("id", equipmentIds);
+      if (equipmentError) return { error: equipmentError.message };
+    }
+    if (jobIds.length) {
+      const { error: jobError } = await supabase.from("jobs").delete().in("id", jobIds);
+      if (jobError) return { error: jobError.message };
+    }
 
-  if (propertyIds.length) await supabase.from("properties").delete().in("id", propertyIds);
+    const documentIds = unique([
+      ...(await idsWhere("documents", "customer_id", id)),
+      ...(await idsWhereIn("documents", "property_id", propertyIds)),
+    ]);
+    await cascadeUnlinkDocuments(documentIds);
+    if (documentIds.length) {
+      const { error: documentError } = await supabase.from("documents").delete().in("id", documentIds);
+      if (documentError) return { error: documentError.message };
+    }
 
-  await supabase.from("ai_conversations").delete().eq("customer_id", id);
+    await Promise.all([
+      deleteCustomerFromGraph(id),
+      ...jobIds.map(deleteJobFromGraph),
+      ...documentIds.map(deleteDocumentFromGraph),
+    ]);
 
-  // Unlink rather than delete — these reference this customer without belonging to them.
-  await supabase.from("leads").update({ customer_id: null }).eq("customer_id", id);
-  await supabase.from("customers").update({ referred_by_customer_id: null }).eq("referred_by_customer_id", id);
-  await supabase.from("tasks").update({ customer_id: null }).eq("customer_id", id);
+    const { error: contractError } = await supabase.from("service_contracts").delete().eq("customer_id", id);
+    if (contractError) return { error: contractError.message };
+    if (propertyIds.length) {
+      const { error: contractByPropertyError } = await supabase
+        .from("service_contracts")
+        .delete()
+        .in("property_id", propertyIds);
+      if (contractByPropertyError) return { error: contractByPropertyError.message };
+    }
 
-  const { error } = await supabase.from("customers").delete().eq("id", id);
-  if (error) return { error: error.message };
+    if (propertyIds.length) {
+      const { error: propertyError } = await supabase.from("properties").delete().in("id", propertyIds);
+      if (propertyError) return { error: propertyError.message };
+    }
+
+    const { error: conversationError } = await supabase.from("ai_conversations").delete().eq("customer_id", id);
+    if (conversationError) return { error: conversationError.message };
+
+    // Unlink rather than delete — these reference this customer without belonging to them.
+    const { error: leadError } = await supabase.from("leads").update({ customer_id: null }).eq("customer_id", id);
+    if (leadError) return { error: leadError.message };
+    const { error: referralError } = await supabase
+      .from("customers")
+      .update({ referred_by_customer_id: null })
+      .eq("referred_by_customer_id", id);
+    if (referralError) return { error: referralError.message };
+    const { error: taskError } = await supabase.from("tasks").update({ customer_id: null }).eq("customer_id", id);
+    if (taskError) return { error: taskError.message };
+
+    const { error } = await supabase.from("customers").delete().eq("id", id);
+    if (error) return { error: error.message };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not delete customer" };
+  }
 
   revalidatePath("/customers");
   revalidatePath("/properties");
