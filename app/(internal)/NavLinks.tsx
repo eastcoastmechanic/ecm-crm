@@ -29,6 +29,7 @@ const navEntries: NavEntry[] = [
     items: [
       { href: "/leads", label: "Leads" },
       { href: "/documents", label: "Documents" },
+      { href: "/payments", label: "Payments" },
       { href: "/catalog", label: "Catalog" },
       { href: "/price-book", label: "Price Book" },
       { href: "/mass-save", label: "MassSave" },
