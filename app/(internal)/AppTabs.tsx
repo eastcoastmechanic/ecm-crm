@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { COMPANY_NAME } from "@/lib/brand";
 import {
   STAFF_TABS,
   TECH_TABS,
@@ -141,7 +142,7 @@ export default function AppTabs({ role }: { role?: string | null }) {
 
       <nav className="fixed inset-y-0 left-0 z-50 hidden w-52 flex-col border-r border-white/10 bg-navy/95 px-3 py-4 backdrop-blur-md md:flex">
         <div className="px-2 pb-4 font-display text-xs font-bold uppercase tracking-wide text-g300">
-          ECM App
+          {COMPANY_NAME}
         </div>
         <div className="grid gap-1">
           {tabs.map((tab) => {
