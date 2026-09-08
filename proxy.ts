@@ -21,6 +21,7 @@ const INTERNAL_PATH_PREFIXES = [
   "/analytics",
   "/mass-save",
   "/conversations",
+  "/payments",
   "/api/twilio/recordings",
 ];
 
@@ -182,6 +183,8 @@ export const config = {
     "/mass-save",
     "/conversations/:path*",
     "/conversations",
+    "/payments/:path*",
+    "/payments",
     "/api/twilio/recordings/:path*",
     "/api/internal-chat",
     "/api/ingest/readings",
