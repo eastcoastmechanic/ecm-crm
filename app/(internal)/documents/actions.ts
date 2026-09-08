@@ -10,12 +10,21 @@ export async function deleteDocument(id: string): Promise<{ error?: string }> {
 
   try {
     await cascadeUnlinkDocuments([id]);
+    const { error } = await supabase.from("documents").delete().eq("id", id);
+    if (error) {
+      // Last pass: if a job snuck in between the unlink and the delete, clear
+      // again and retry once so the staff action actually goes through.
+      if (error.message.includes("jobs_document_id_fkey")) {
+        await cascadeUnlinkDocuments([id]);
+        const retry = await supabase.from("documents").delete().eq("id", id);
+        if (retry.error) return { error: retry.error.message };
+      } else {
+        return { error: error.message };
+      }
+    }
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not unlink related jobs" };
+    return { error: err instanceof Error ? err.message : "Could not delete document" };
   }
-
-  const { error } = await supabase.from("documents").delete().eq("id", id);
-  if (error) return { error: error.message };
 
   await deleteDocumentFromGraph(id);
 

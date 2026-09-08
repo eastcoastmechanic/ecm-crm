@@ -58,27 +58,42 @@ export async function cascadeUnlinkJobs(jobIds: string[]): Promise<void> {
   await must(await supabase.from("tasks").update({ job_id: null }).in("job_id", jobIds), "unlink tasks from jobs");
 }
 
-// Unlinks anything that still points at these documents so a delete is never
-// blocked by a leftover FK (a job converted from an estimate, a diagnostic
-// that produced an invoice). Throws if the unlink does not actually clear
-// jobs.document_id — that is the constraint that surfaces as
-// jobs_document_id_fkey when the document row is deleted.
+// jobs.document_id is the constraint named jobs_document_id_fkey. A bulk
+// `.in(document_id)` update can report success without touching rows, so we
+// load the jobs first and clear (or delete) each one by primary key.
 export async function cascadeUnlinkDocuments(documentIds: string[]): Promise<void> {
   if (documentIds.length === 0) return;
 
-  await must(
-    await supabase.from("jobs").update({ document_id: null }).in("document_id", documentIds),
-    "unlink jobs.document_id",
-  );
+  const jobIds: string[] = [];
+  for (const documentId of documentIds) {
+    const { data, error } = await supabase.from("jobs").select("id").eq("document_id", documentId);
+    if (error) throw new Error(`find jobs for document: ${error.message}`);
+    for (const row of data ?? []) jobIds.push(row.id as string);
+  }
+
+  const uniqueJobIds = unique(jobIds);
+  if (uniqueJobIds.length) {
+    const { error: unlinkError } = await supabase
+      .from("jobs")
+      .update({ document_id: null })
+      .in("id", uniqueJobIds);
+
+    let leftover = await idsWhereIn("jobs", "document_id", documentIds);
+    if (unlinkError || leftover.length) {
+      await cascadeUnlinkJobs(uniqueJobIds);
+      await must(
+        await supabase.from("jobs").delete().in("id", uniqueJobIds),
+        "delete jobs still pointing at document",
+      );
+      leftover = await idsWhereIn("jobs", "document_id", documentIds);
+      if (leftover.length) {
+        throw new Error(`Could not clear ${leftover.length} job(s) pointing at this document`);
+      }
+    }
+  }
+
   await must(
     await supabase.from("diagnostics").update({ invoice_document_id: null }).in("invoice_document_id", documentIds),
     "unlink diagnostics.invoice_document_id",
   );
-
-  const leftoverJobIds = await idsWhereIn("jobs", "document_id", documentIds);
-  if (leftoverJobIds.length) {
-    throw new Error(
-      `Could not unlink ${leftoverJobIds.length} job(s) from this document before delete`,
-    );
-  }
 }

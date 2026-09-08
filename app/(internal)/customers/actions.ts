@@ -72,36 +72,31 @@ export async function updateCustomer(formData: FormData) {
 
   revalidatePath(`/customers/${id}`);
   revalidatePath("/customers");
-  // Documents render the customer's name/email and gate "Send to Customer" on
-  // that email, and this form is reachable from a document's own header — so
-  // without this the page you just edited from would keep showing the stale
-  // value (and keep hiding the send button) until a hard reload.
   revalidatePath("/documents", "layout");
 }
 
-// Deletes a customer and everything hanging off it — properties, equipment,
-// jobs, documents, diagnostics, satisfaction surveys, SMS history, service
-// contracts, install reports, and AI conversation history. Traced from the
-// live DB's actual foreign keys (not the schema.sql snapshot, which is stale
-// for newer tables). Runs as a sequence of awaited deletes rather than a
-// single SQL transaction, same style as the rest of this codebase (e.g.
-// submitWarranty) — Supabase's REST client doesn't expose multi-statement
-// transactions.
 export async function deleteCustomer(id: string): Promise<{ error?: string }> {
   if (!id) return { error: "Missing customer id" };
 
   try {
     const propertyIds = await idsWhere("properties", "customer_id", id);
 
+    const documentIds = unique([
+      ...(await idsWhere("documents", "customer_id", id)),
+      ...(await idsWhereIn("documents", "property_id", propertyIds)),
+    ]);
+
     const jobIds = unique([
       ...(await idsWhere("jobs", "customer_id", id)),
       ...(await idsWhereIn("jobs", "property_id", propertyIds)),
+      ...(await idsWhereIn("jobs", "document_id", documentIds)),
     ]);
 
     const equipmentIds = await idsWhereIn("equipment", "property_id", propertyIds);
 
     await cascadeUnlinkEquipment(equipmentIds);
     await cascadeUnlinkJobs(jobIds);
+    await cascadeUnlinkDocuments(documentIds);
 
     const { error: smsError } = await supabase.from("sms_messages").delete().eq("customer_id", id);
     if (smsError) return { error: smsError.message };
@@ -125,12 +120,6 @@ export async function deleteCustomer(id: string): Promise<{ error?: string }> {
       const { error: jobError } = await supabase.from("jobs").delete().in("id", jobIds);
       if (jobError) return { error: jobError.message };
     }
-
-    const documentIds = unique([
-      ...(await idsWhere("documents", "customer_id", id)),
-      ...(await idsWhereIn("documents", "property_id", propertyIds)),
-    ]);
-    await cascadeUnlinkDocuments(documentIds);
     if (documentIds.length) {
       const { error: documentError } = await supabase.from("documents").delete().in("id", documentIds);
       if (documentError) return { error: documentError.message };
@@ -160,7 +149,6 @@ export async function deleteCustomer(id: string): Promise<{ error?: string }> {
     const { error: conversationError } = await supabase.from("ai_conversations").delete().eq("customer_id", id);
     if (conversationError) return { error: conversationError.message };
 
-    // Unlink rather than delete — these reference this customer without belonging to them.
     const { error: leadError } = await supabase.from("leads").update({ customer_id: null }).eq("customer_id", id);
     if (leadError) return { error: leadError.message };
     const { error: referralError } = await supabase
