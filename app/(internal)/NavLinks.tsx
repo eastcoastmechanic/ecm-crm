@@ -4,56 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-type NavItem = { href: string; label: string };
-type NavGroup = { label: string; items: NavItem[] };
-type NavEntry = NavItem | NavGroup;
-
-function isGroup(entry: NavEntry): entry is NavGroup {
-  return "items" in entry;
-}
-
-const navEntries: NavEntry[] = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/tech-hub", label: "Tech Hub" },
-  {
-    label: "Customers",
-    items: [
-      { href: "/customers", label: "Customers" },
-      { href: "/properties", label: "Properties" },
-      { href: "/equipment", label: "Equipment" },
-    ],
-  },
-  {
-    label: "Sales",
-    items: [
-      { href: "/leads", label: "Leads" },
-      { href: "/documents", label: "Documents" },
-      { href: "/catalog", label: "Catalog" },
-      { href: "/price-book", label: "Price Book" },
-      { href: "/mass-save", label: "MassSave" },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { href: "/jobs", label: "Jobs" },
-      { href: "/diagnostics", label: "Diagnostics" },
-      { href: "/tasks", label: "Tasks" },
-      { href: "/inventory", label: "Inventory" },
-      { href: "/procurement", label: "Procurement" },
-    ],
-  },
-  {
-    label: "Insights",
-    items: [
-      { href: "/analytics", label: "Analytics" },
-      { href: "/conversations", label: "Conversations" },
-    ],
-  },
-];
-
-const TECH_VISIBLE_PATHS = ["/dashboard", "/tech-hub", "/jobs", "/catalog"];
+import {
+  navEntries,
+  isGroup,
+  isNavActive,
+  flattenNavItems,
+  TECH_VISIBLE_PATHS,
+  type NavGroup,
+  type NavItem,
+} from "./nav-config";
 
 function pillClass(active: boolean) {
   return `shrink-0 rounded-md px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
@@ -136,28 +95,29 @@ export default function NavLinks({ role }: { role?: string | null }) {
   const pathname = usePathname();
 
   if (role === "tech") {
+    const techItems: NavItem[] = flattenNavItems().filter((item) =>
+      TECH_VISIBLE_PATHS.includes(item.href)
+    );
     return (
-      <nav className="no-scrollbar flex gap-1 overflow-x-auto rounded-lg border border-white/6 bg-white/4 p-1">
-        {navEntries
-          .filter((entry): entry is NavItem => !isGroup(entry) && TECH_VISIBLE_PATHS.includes(entry.href))
-          .map((item) => (
-            <Link key={item.href} href={item.href} className={pillClass(pathname.startsWith(item.href))}>
-              {item.label}
-            </Link>
-          ))}
+      <nav className="no-scrollbar hidden gap-1 overflow-x-auto rounded-lg border border-white/6 bg-white/4 p-1 md:flex">
+        {techItems.map((item) => (
+          <Link key={item.href} href={item.href} className={pillClass(isNavActive(item.href, pathname))}>
+            {item.label}
+          </Link>
+        ))}
       </nav>
     );
   }
 
   return (
-    <nav className="no-scrollbar flex gap-1 overflow-x-auto rounded-lg border border-white/6 bg-white/4 p-1">
+    <nav className="no-scrollbar hidden gap-1 overflow-x-auto rounded-lg border border-white/6 bg-white/4 p-1 md:flex">
       {navEntries.map((entry) => {
         if (isGroup(entry)) {
-          const groupActive = entry.items.some((item) => pathname.startsWith(item.href));
+          const groupActive = entry.items.some((item) => isNavActive(item.href, pathname));
           return <NavDropdown key={entry.label} group={entry} active={groupActive} />;
         }
         return (
-          <Link key={entry.href} href={entry.href} className={pillClass(pathname.startsWith(entry.href))}>
+          <Link key={entry.href} href={entry.href} className={pillClass(isNavActive(entry.href, pathname))}>
             {entry.label}
           </Link>
         );

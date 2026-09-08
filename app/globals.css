@@ -53,6 +53,11 @@ body {
   color: #ffffff;
 }
 
+.app-shell {
+  min-height: 100dvh;
+  overscroll-behavior-y: contain;
+}
+
 select option {
   background: var(--navy-2);
   color: #ffffff;

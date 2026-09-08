@@ -4,8 +4,10 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "East Coast Mechanical CRM",
     short_name: "ECM CRM",
+    description: "Jobs, customers, and diagnostics for East Coast Mechanical.",
     start_url: "/dashboard",
     scope: "/",
+    id: "/dashboard",
     display: "standalone",
     background_color: "#0a1628",
     theme_color: "#0a1628",
