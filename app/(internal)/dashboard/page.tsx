@@ -109,6 +109,9 @@ export default async function DashboardPage() {
           <Link href="/customers" className={buttonSecondaryClass}>
             New Customer
           </Link>
+          <Link href="/payments" className={buttonSecondaryClass}>
+            Square Payments
+          </Link>
           <Link href="/documents/new" className={buttonClass}>
             New Document
           </Link>
