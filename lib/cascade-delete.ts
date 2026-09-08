@@ -22,9 +22,6 @@ export function unique(values: string[]): string[] {
   return Array.from(new Set(values));
 }
 
-// Clears everything that references this equipment before the caller deletes
-// the equipment rows themselves. Leads are unlinked rather than deleted —
-// they don't belong to the equipment, they just point at it.
 export async function cascadeUnlinkEquipment(equipmentIds: string[]): Promise<void> {
   if (equipmentIds.length === 0) return;
   await must(
@@ -41,8 +38,6 @@ export async function cascadeUnlinkEquipment(equipmentIds: string[]): Promise<vo
   );
 }
 
-// Clears everything that references these jobs before the caller deletes the
-// job rows themselves. Tasks are unlinked rather than deleted — same reason.
 export async function cascadeUnlinkJobs(jobIds: string[]): Promise<void> {
   if (jobIds.length === 0) return;
   await must(await supabase.from("diagnostics").delete().in("job_id", jobIds), "delete diagnostics by job");
@@ -58,9 +53,10 @@ export async function cascadeUnlinkJobs(jobIds: string[]): Promise<void> {
   await must(await supabase.from("tasks").update({ job_id: null }).in("job_id", jobIds), "unlink tasks from jobs");
 }
 
-// jobs.document_id is the constraint named jobs_document_id_fkey. A bulk
-// `.in(document_id)` update can report success without touching rows, so we
-// load the jobs first and clear (or delete) each one by primary key.
+// Always resolve jobs by document_id, then write document_id=null on the job
+// primary key. If that still leaves a pointer (NOT NULL in some live DBs),
+// delete the job after unlinking its children. 0039 also makes the FK
+// ON DELETE SET NULL so the database itself will not block a document delete.
 export async function cascadeUnlinkDocuments(documentIds: string[]): Promise<void> {
   if (documentIds.length === 0) return;
 
@@ -73,22 +69,21 @@ export async function cascadeUnlinkDocuments(documentIds: string[]): Promise<voi
 
   const uniqueJobIds = unique(jobIds);
   if (uniqueJobIds.length) {
-    const { error: unlinkError } = await supabase
-      .from("jobs")
-      .update({ document_id: null })
-      .in("id", uniqueJobIds);
-
-    let leftover = await idsWhereIn("jobs", "document_id", documentIds);
-    if (unlinkError || leftover.length) {
-      await cascadeUnlinkJobs(uniqueJobIds);
-      await must(
-        await supabase.from("jobs").delete().in("id", uniqueJobIds),
-        "delete jobs still pointing at document",
-      );
-      leftover = await idsWhereIn("jobs", "document_id", documentIds);
-      if (leftover.length) {
-        throw new Error(`Could not clear ${leftover.length} job(s) pointing at this document`);
+    for (const jobId of uniqueJobIds) {
+      const { error: unlinkError } = await supabase.from("jobs").update({ document_id: null }).eq("id", jobId);
+      if (unlinkError) {
+        await cascadeUnlinkJobs([jobId]);
+        await must(await supabase.from("jobs").delete().eq("id", jobId), `delete job ${jobId} still pointing at document`);
       }
+    }
+
+    const leftover = await idsWhereIn("jobs", "document_id", documentIds);
+    if (leftover.length) {
+      await cascadeUnlinkJobs(leftover);
+      await must(
+        await supabase.from("jobs").delete().in("id", leftover),
+        "delete leftover jobs still pointing at document",
+      );
     }
   }
 
