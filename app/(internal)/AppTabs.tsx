@@ -13,14 +13,79 @@ import {
   navEntries,
 } from "./nav-config";
 
-export default function AppTabs({ role }: { role?: string | null }) {
-  const pathname = usePathname();
-  const [moreOpen, setMoreOpen] = useState(false);
-  const tabs = role === "tech" ? TECH_TABS : STAFF_TABS;
+function MoreLinks({
+  role,
+  pathname,
+}: {
+  role?: string | null;
+  pathname: string;
+}) {
   const moreItems =
     role === "tech"
       ? flattenNavItems().filter((item) => TECH_VISIBLE_PATHS.includes(item.href))
       : flattenNavItems();
+
+  if (role === "tech") {
+    return (
+      <div className="grid gap-1">
+        {moreItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`rounded-lg px-3 py-3 text-sm font-semibold ${
+              isNavActive(item.href, pathname) ? "bg-accent text-white" : "bg-white/4 text-white"
+            }`}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {navEntries.map((entry) => {
+        if (!isGroup(entry)) {
+          return (
+            <Link
+              key={entry.href}
+              href={entry.href}
+              className={`rounded-lg px-3 py-3 text-sm font-semibold ${
+                isNavActive(entry.href, pathname) ? "bg-accent text-white" : "bg-white/4 text-white"
+              }`}
+            >
+              {entry.label}
+            </Link>
+          );
+        }
+        return (
+          <div key={entry.label} className="grid gap-1">
+            <div className="px-1 text-[11px] font-bold uppercase tracking-wide text-g300">
+              {entry.label}
+            </div>
+            {entry.items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`rounded-lg px-3 py-3 text-sm font-semibold ${
+                  isNavActive(item.href, pathname) ? "bg-accent text-white" : "bg-white/4 text-white"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+export default function AppTabs({ role }: { role?: string | null }) {
+  const pathname = usePathname();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const tabs = role === "tech" ? TECH_TABS : STAFF_TABS;
   const moreActive =
     moreOpen ||
     (!tabs.some((tab) => isNavActive(tab.href, pathname)) && pathname !== "/account");
@@ -41,14 +106,14 @@ export default function AppTabs({ role }: { role?: string | null }) {
   return (
     <>
       {moreOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-40">
           <button
             type="button"
             aria-label="Close menu"
             className="absolute inset-0 bg-black/55"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-2xl border border-white/10 bg-navy-2 pb-[calc(5.5rem+env(safe-area-inset-bottom))] shadow-2xl">
+          <div className="absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-2xl border border-white/10 bg-navy-2 pb-[calc(5.5rem+env(safe-area-inset-bottom))] shadow-2xl md:inset-y-0 md:left-52 md:right-auto md:bottom-auto md:h-full md:w-80 md:max-h-none md:rounded-none md:border-y-0 md:border-l md:border-r md:pb-6">
             <div className="sticky top-0 flex items-center justify-between border-b border-white/8 bg-navy-2 px-5 py-3">
               <div className="font-display text-sm font-bold">More</div>
               <button
@@ -60,59 +125,7 @@ export default function AppTabs({ role }: { role?: string | null }) {
               </button>
             </div>
             <div className="grid gap-4 px-5 py-4">
-              {role === "tech" ? (
-                <div className="grid gap-1">
-                  {moreItems.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`rounded-lg px-3 py-3 text-sm font-semibold ${
-                        isNavActive(item.href, pathname) ? "bg-accent text-white" : "bg-white/4 text-white"
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                navEntries.map((entry) => {
-                  if (!isGroup(entry)) {
-                    return (
-                      <Link
-                        key={entry.href}
-                        href={entry.href}
-                        className={`rounded-lg px-3 py-3 text-sm font-semibold ${
-                          isNavActive(entry.href, pathname)
-                            ? "bg-accent text-white"
-                            : "bg-white/4 text-white"
-                        }`}
-                      >
-                        {entry.label}
-                      </Link>
-                    );
-                  }
-                  return (
-                    <div key={entry.label} className="grid gap-1">
-                      <div className="px-1 text-[11px] font-bold uppercase tracking-wide text-g300">
-                        {entry.label}
-                      </div>
-                      {entry.items.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={`rounded-lg px-3 py-3 text-sm font-semibold ${
-                            isNavActive(item.href, pathname)
-                              ? "bg-accent text-white"
-                              : "bg-white/4 text-white"
-                          }`}
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
-                    </div>
-                  );
-                })
-              )}
+              <MoreLinks role={role} pathname={pathname} />
               <Link
                 href="/account"
                 className={`rounded-lg px-3 py-3 text-sm font-semibold ${
@@ -125,6 +138,37 @@ export default function AppTabs({ role }: { role?: string | null }) {
           </div>
         </div>
       )}
+
+      <nav className="fixed inset-y-0 left-0 z-50 hidden w-52 flex-col border-r border-white/10 bg-navy/95 px-3 py-4 backdrop-blur-md md:flex">
+        <div className="px-2 pb-4 font-display text-xs font-bold uppercase tracking-wide text-g300">
+          ECM App
+        </div>
+        <div className="grid gap-1">
+          {tabs.map((tab) => {
+            const active = !moreOpen && isNavActive(tab.href, pathname);
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${
+                  active ? "bg-accent text-white" : "text-g300 hover:bg-white/6 hover:text-white"
+                }`}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            className={`rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+              moreActive ? "bg-accent text-white" : "text-g300 hover:bg-white/6 hover:text-white"
+            }`}
+          >
+            More
+          </button>
+        </div>
+      </nav>
 
       <nav
         className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-navy/95 backdrop-blur-md md:hidden"
