@@ -70,13 +70,14 @@ export async function updateProperty(formData: FormData) {
 }
 
 // Deletes a property and everything hanging off it — equipment, jobs,
-// documents, and service contracts — mirroring deleteCustomer's cascade.
+// documents, install reports, and service contracts — mirroring deleteCustomer's cascade.
 export async function deleteProperty(id: string): Promise<{ error?: string }> {
   const jobIds = await idsWhere("jobs", "property_id", id);
   const equipmentIds = await idsWhere("equipment", "property_id", id);
 
   await cascadeUnlinkEquipment(equipmentIds);
   await cascadeUnlinkJobs(jobIds);
+  await supabase.from("install_reports").delete().eq("property_id", id);
 
   if (equipmentIds.length) await supabase.from("equipment").delete().in("id", equipmentIds);
   if (jobIds.length) await supabase.from("jobs").delete().in("id", jobIds);

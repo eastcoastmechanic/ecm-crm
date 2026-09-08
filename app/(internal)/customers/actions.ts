@@ -81,12 +81,15 @@ export async function updateCustomer(formData: FormData) {
 
 // Deletes a customer and everything hanging off it — properties, equipment,
 // jobs, documents, diagnostics, satisfaction surveys, SMS history, service
-// contracts, and AI conversation history. Traced from the live DB's actual
-// foreign keys (not the schema.sql snapshot, which is stale for newer
-// tables). Runs as a sequence of awaited deletes rather than a single SQL
-// transaction, same style as the rest of this codebase (e.g. submitWarranty)
-// — Supabase's REST client doesn't expose multi-statement transactions.
+// contracts, install reports, and AI conversation history. Traced from the
+// live DB's actual foreign keys (not the schema.sql snapshot, which is stale
+// for newer tables). Runs as a sequence of awaited deletes rather than a
+// single SQL transaction, same style as the rest of this codebase (e.g.
+// submitWarranty) — Supabase's REST client doesn't expose multi-statement
+// transactions.
 export async function deleteCustomer(id: string): Promise<{ error?: string }> {
+  if (!id) return { error: "Missing customer id" };
+
   const propertyIds = await idsWhere("properties", "customer_id", id);
 
   const jobIds = unique([
@@ -100,6 +103,8 @@ export async function deleteCustomer(id: string): Promise<{ error?: string }> {
   await cascadeUnlinkJobs(jobIds);
 
   await supabase.from("sms_messages").delete().eq("customer_id", id);
+  await supabase.from("install_reports").delete().eq("customer_id", id);
+  if (propertyIds.length) await supabase.from("install_reports").delete().in("property_id", propertyIds);
 
   if (equipmentIds.length) await supabase.from("equipment").delete().in("id", equipmentIds);
   if (jobIds.length) await supabase.from("jobs").delete().in("id", jobIds);

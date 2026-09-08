@@ -21,6 +21,7 @@ export function unique(values: string[]): string[] {
 export async function cascadeUnlinkEquipment(equipmentIds: string[]): Promise<void> {
   if (equipmentIds.length === 0) return;
   await supabase.from("diagnostics").delete().in("equipment_id", equipmentIds);
+  await supabase.from("install_reports").delete().in("equipment_id", equipmentIds);
   await supabase.from("leads").update({ equipment_id: null }).in("equipment_id", equipmentIds);
 }
 
@@ -31,12 +32,15 @@ export async function cascadeUnlinkJobs(jobIds: string[]): Promise<void> {
   await supabase.from("diagnostics").delete().in("job_id", jobIds);
   await supabase.from("satisfaction_surveys").delete().in("job_id", jobIds);
   await supabase.from("sms_messages").delete().in("job_id", jobIds);
+  await supabase.from("install_reports").delete().in("job_id", jobIds);
   await supabase.from("tasks").update({ job_id: null }).in("job_id", jobIds);
 }
 
-// Clears jobs.document_id before the caller deletes these document rows
-// themselves (a job converted from an estimate keeps a pointer back to it).
+// Unlinks anything that still points at these documents so a delete is never
+// blocked by a leftover FK (a job converted from an estimate, a diagnostic
+// that produced an invoice). The document rows themselves are deleted by the caller.
 export async function cascadeUnlinkDocuments(documentIds: string[]): Promise<void> {
   if (documentIds.length === 0) return;
   await supabase.from("jobs").update({ document_id: null }).in("document_id", documentIds);
+  await supabase.from("diagnostics").update({ invoice_document_id: null }).in("invoice_document_id", documentIds);
 }
