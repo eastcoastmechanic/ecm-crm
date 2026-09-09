@@ -23,10 +23,18 @@ const orbitron = Orbitron({
 export const metadata: Metadata = {
   title: "ECM Platform",
   description: "CRM, billing, and diagnostics for East Coast Mechanical",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ECM CRM",
+  },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0a1628",
+  viewportFit: "cover",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
