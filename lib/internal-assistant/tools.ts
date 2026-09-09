@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { generateDocumentForCustomer, startDocumentGenerationInBackground } from "@/lib/document-generation";
 import { createWarrantyForCustomer, type WarrantyEquipmentInput } from "@/lib/warranty-creation";
 import { createMassSaveRebateForCustomer } from "@/lib/mass-save-rebate-creation";
+import { createContract } from "@/lib/contract-creation";
 import { updateCustomer, deleteCustomer } from "@/app/(internal)/customers/actions";
 import { addProperty, updateProperty, deleteProperty } from "@/app/(internal)/properties/actions";
 import { addEquipment, updateEquipment, deleteEquipment } from "@/app/(internal)/equipment/actions";
@@ -377,11 +378,11 @@ const deleteEquipmentTool = betaZodTool({
 
 const listDocumentsTool = betaZodTool({
   name: "list_documents",
-  description: "List a customer's documents (id, doc number, type, status) — estimates, invoices, proposals, assessments, warranties, Mass Save rebates. Use to find a documentId before updating or deleting one.",
+  description: "List a customer's documents (id, doc number, type, status) — estimates, invoices, proposals, assessments, warranties, Mass Save rebates, contracts. Use to find a documentId before updating or deleting one.",
   inputSchema: z.object({
     customerId: z.string(),
     type: z
-      .enum(["estimate", "invoice", "proposal", "assessment", "warranty", "mass_save_rebate"])
+      .enum(["estimate", "invoice", "proposal", "assessment", "warranty", "mass_save_rebate", "contract"])
       .optional(),
   }),
   run: async ({ customerId, type }) => {
@@ -400,7 +401,7 @@ const listDocumentsTool = betaZodTool({
 
 const deleteDocumentTool = betaZodTool({
   name: "delete_document",
-  description: "Permanently delete any document (estimate, invoice, proposal, assessment, warranty, or Mass Save rebate). Use list_documents to get the documentId first.",
+  description: "Permanently delete any document (estimate, invoice, proposal, assessment, warranty, Mass Save rebate, or contract). Use list_documents to get the documentId first.",
   inputSchema: z.object({
     documentId: z.string(),
   }),
@@ -565,6 +566,54 @@ const createMassSaveRebateTool = betaZodTool({
       return `Created draft Mass Save rebate application. /documents/${result.documentId} — finish filling in exact rebate details in the app before submitting.`;
     } catch (err) {
       return `Failed to create Mass Save rebate: ${err instanceof Error ? err.message : "unknown error"}`;
+    }
+  },
+});
+
+const createContractTool = betaZodTool({
+  name: "create_contract",
+  description:
+    "Create a branded ECM service contract (draft) for an existing customer/property. Pulls customer + property from the CRM. Default payment is 50% deposit / 50% on completion, automatically reduced to the Massachusetts 1/3 cap unless specialOrderMaterials covers the 50% deposit. Confirm price and scope with the tech before creating. Does not email or send — use send_document after they approve.",
+  inputSchema: z.object({
+    customerId: z.string(),
+    propertyId: z.string(),
+    price: z.number().describe("Contract price in dollars"),
+    scopeOfWork: z.string().describe("What work is being performed, equipment involved, what's included"),
+    startDate: z.string().optional().describe("YYYY-MM-DD"),
+    estimatedCompletion: z.string().optional().describe("YYYY-MM-DD"),
+    specialOrderMaterials: z
+      .number()
+      .optional()
+      .describe("Dollar cost of special-order equipment/materials. If >= 50% of price, deposit stays at 50%; otherwise MA 1/3 cap applies."),
+    notes: z.string().optional(),
+    fromDocumentId: z.string().optional().describe("Estimate id to link this contract to, if converting an accepted estimate"),
+  }),
+  run: async ({
+    customerId,
+    propertyId,
+    price,
+    scopeOfWork,
+    startDate,
+    estimatedCompletion,
+    specialOrderMaterials,
+    notes,
+    fromDocumentId,
+  }) => {
+    try {
+      const result = await createContract({
+        customerId,
+        propertyId,
+        price,
+        scopeOfWork,
+        startDate: startDate ?? null,
+        estimatedCompletion: estimatedCompletion ?? null,
+        specialOrderMaterials: specialOrderMaterials ?? null,
+        notes: notes ?? null,
+        fromDocumentId: fromDocumentId ?? null,
+      });
+      return `Created contract ${result.docNumber} (draft). /documents/${result.documentId} — branded PDF matches estimates/invoices. Not sent. Confirm, then send_document.`;
+    } catch (err) {
+      return `Failed to create contract: ${err instanceof Error ? err.message : "unknown error"}`;
     }
   },
 });
@@ -734,6 +783,7 @@ export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?:
     updateWarrantyTool,
     createWarrantyTool,
     createMassSaveRebateTool,
+    createContractTool,
     buildDocumentTool("estimate", fast, attachmentFiles),
     buildDocumentTool("invoice", fast, attachmentFiles),
     buildDocumentTool("proposal", fast, attachmentFiles),

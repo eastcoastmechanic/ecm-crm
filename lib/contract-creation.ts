@@ -1,6 +1,11 @@
 import { supabase } from "@/lib/supabase";
 import { syncDocumentToGraph } from "@/lib/graph-connector";
-import { DEFAULT_PAYMENT_TERMS, DEFAULT_WARRANTY_TERMS, type ContractLineItems } from "@/lib/contract-terms";
+import {
+  DEFAULT_PAYMENT_TERMS,
+  DEFAULT_WARRANTY_TERMS,
+  paymentTermsForPrice,
+  type ContractLineItems,
+} from "@/lib/contract-terms";
 
 async function nextContractNumber(): Promise<string> {
   const { count } = await supabase
@@ -21,6 +26,7 @@ export type CreateContractInput = {
   estimatedCompletion?: string | null;
   notes?: string | null;
   fromDocumentId?: string | null;
+  specialOrderMaterials?: number | null;
 };
 
 export type CreateContractResult = { documentId: string; docNumber: string };
@@ -33,7 +39,9 @@ export async function createContract(input: CreateContractInput): Promise<Create
 
   const lineItems: ContractLineItems = {
     scopeOfWork: input.scopeOfWork.trim(),
-    paymentTerms: input.paymentTerms?.trim() || DEFAULT_PAYMENT_TERMS,
+    paymentTerms:
+      input.paymentTerms?.trim() ||
+      (input.price > 0 ? paymentTermsForPrice(input.price, input.specialOrderMaterials ?? 0) : DEFAULT_PAYMENT_TERMS),
     warrantyTerms: input.warrantyTerms?.trim() || DEFAULT_WARRANTY_TERMS,
     startDate: input.startDate || null,
     estimatedCompletion: input.estimatedCompletion || null,

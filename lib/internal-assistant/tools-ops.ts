@@ -313,7 +313,7 @@ const adjustInventoryTool = betaZodTool({
 const sendDocumentTool = betaZodTool({
   name: "send_document",
   description:
-    "Email a finished estimate, invoice, proposal, assessment or warranty to the customer as a PDF. Use list_documents to get the documentId. The customer must have an email on file — if they don't, add one with update_customer first. Confirm with the tech before sending; this reaches the customer directly.",
+    "Email a finished estimate, invoice, proposal, assessment, warranty, or contract to the customer as a PDF. Use list_documents to get the documentId. The customer must have an email on file — if they don't, add one with update_customer first. Confirm with the tech before sending; this reaches the customer directly.",
   inputSchema: z.object({
     documentId: z.string(),
   }),

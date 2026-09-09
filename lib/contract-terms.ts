@@ -21,11 +21,31 @@ export type ContractLineItems = {
   fromDocumentId?: string | null;
 };
 
+function money(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+}
+
+/** 50% when special-order materials cover it; otherwise MA HIC 1/3 cap. */
+export function paymentTermsForPrice(price: number, specialOrderMaterials = 0): string {
+  const third = Math.round((price / 3) * 100) / 100;
+  const half = Math.round((price / 2) * 100) / 100;
+  const cap = Math.max(third, specialOrderMaterials);
+  const deposit = Math.min(half, cap);
+  const balance = Math.round((price - deposit) * 100) / 100;
+  const usedHalf = deposit === half;
+
+  if (usedHalf) {
+    return `A 50% deposit of ${money(deposit)} is due upon signing, equal to or less than the special-order equipment/materials cost. The remaining ${money(balance)} is due upon completion. Massachusetts law caps deposits on home-improvement contracts at one-third of the contract price, or the cost of special-order materials, whichever is greater.`;
+  }
+
+  return `A deposit of ${money(deposit)} (one-third) is due upon signing. The remaining ${money(balance)} is due upon completion. Massachusetts law caps deposits on home-improvement contracts at one-third of the contract price, or the cost of special-order materials, whichever is greater.`;
+}
+
 export const DEFAULT_WARRANTY_TERMS =
   `${COMPANY_NAME} warrants that this installation will be completed correctly and in accordance with manufacturer specifications and applicable code. If a defect in our workmanship causes a failure within 1 year of completion, we will repair or correct it at no charge for labor. Manufacturer warranties on equipment and parts are separate and are the manufacturer's responsibility per their published terms. This warranty does not cover normal wear and tear, damage from misuse or lack of maintenance, acts of nature, or work not performed by ${COMPANY_NAME}.`;
 
 export const DEFAULT_PAYMENT_TERMS =
-  "A deposit is due upon signing, with the balance due upon completion of work. Payment methods and any financing terms will be confirmed separately. Massachusetts law caps deposits on home improvement contracts at one-third of the total contract price, or the cost of special-order materials, whichever is greater.";
+  "A 50% deposit is due upon signing, with the remaining 50% due upon completion. On Massachusetts home-improvement contracts over $1,000, the deposit will not exceed one-third of the contract price or the cost of special-order materials, whichever is greater. Payment methods and any financing terms will be confirmed separately.";
 
 /**
  * MGL c.142A §2(a)(9) / FTC 16 CFR Part 429: the buyer may cancel within 3
