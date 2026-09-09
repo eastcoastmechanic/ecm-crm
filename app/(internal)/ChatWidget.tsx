@@ -140,9 +140,9 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
+    <div className="fixed right-4 z-50 flex flex-col items-end gap-3 max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:right-5 md:bottom-5">
       {open && (
-        <div className="flex h-[28rem] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-navy-2 shadow-2xl">
+        <div className="flex h-[min(28rem,calc(100dvh-10rem))] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-navy-2 shadow-2xl">
           <div className="flex items-center justify-between border-b border-white/8 bg-gradient-to-r from-accent/20 to-transparent px-4 py-3">
             <div>
               <div className="font-display text-sm font-bold">CRM Assistant</div>
@@ -160,8 +160,8 @@ export default function ChatWidget() {
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
             {messages.length === 0 && (
               <p className="text-sm text-g300">
-                Try: &quot;Add a customer named Jane Doe, phone 555-1234&quot; or &quot;Make an estimate
-                for Jane Doe — replacing a leaking water heater&quot;.
+                Try: "Add a customer named Jane Doe, phone 555-1234" or "Make an estimate
+                for Jane Doe — replacing a leaking water heater".
               </p>
             )}
             {messages.map((m, i) => (
