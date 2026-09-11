@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { COMPANY_NAME } from "@/lib/brand";
+import TabIcon from "./TabIcon";
 import {
   STAFF_TABS,
   TECH_TABS,
@@ -33,7 +34,7 @@ function MoreLinks({
           <Link
             key={item.href}
             href={item.href}
-            className={`rounded-lg px-3 py-3 text-sm font-semibold ${
+            className={`rounded-xl px-3 py-3.5 text-sm font-semibold ${
               isNavActive(item.href, pathname) ? "bg-accent text-white" : "bg-white/4 text-white"
             }`}
           >
@@ -52,7 +53,7 @@ function MoreLinks({
             <Link
               key={entry.href}
               href={entry.href}
-              className={`rounded-lg px-3 py-3 text-sm font-semibold ${
+              className={`rounded-xl px-3 py-3.5 text-sm font-semibold ${
                 isNavActive(entry.href, pathname) ? "bg-accent text-white" : "bg-white/4 text-white"
               }`}
             >
@@ -69,7 +70,7 @@ function MoreLinks({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-lg px-3 py-3 text-sm font-semibold ${
+                className={`rounded-xl px-3 py-3.5 text-sm font-semibold ${
                   isNavActive(item.href, pathname) ? "bg-accent text-white" : "bg-white/4 text-white"
                 }`}
               >
@@ -114,7 +115,7 @@ export default function AppTabs({ role }: { role?: string | null }) {
             className="absolute inset-0 bg-black/55"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-2xl border border-white/10 bg-navy-2 pb-[calc(5.5rem+env(safe-area-inset-bottom))] shadow-2xl md:inset-y-0 md:left-52 md:right-auto md:bottom-auto md:h-full md:w-80 md:max-h-none md:rounded-none md:border-y-0 md:border-l md:border-r md:pb-6">
+          <div className="absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-3xl border border-white/10 bg-navy-2 pb-[calc(5.75rem+env(safe-area-inset-bottom))] shadow-2xl md:inset-y-0 md:left-52 md:right-auto md:bottom-auto md:h-full md:w-80 md:max-h-none md:rounded-none md:border-y-0 md:border-l md:border-r md:pb-6">
             <div className="sticky top-0 flex items-center justify-between border-b border-white/8 bg-navy-2 px-5 py-3">
               <div className="font-display text-sm font-bold">More</div>
               <button
@@ -129,7 +130,7 @@ export default function AppTabs({ role }: { role?: string | null }) {
               <MoreLinks role={role} pathname={pathname} />
               <Link
                 href="/account"
-                className={`rounded-lg px-3 py-3 text-sm font-semibold ${
+                className={`rounded-xl px-3 py-3.5 text-sm font-semibold ${
                   pathname.startsWith("/account") ? "bg-accent text-white" : "bg-white/4 text-white"
                 }`}
               >
@@ -151,10 +152,11 @@ export default function AppTabs({ role }: { role?: string | null }) {
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`rounded-lg px-3 py-2.5 text-sm font-semibold ${
+                className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold ${
                   active ? "bg-accent text-white" : "text-g300 hover:bg-white/6 hover:text-white"
                 }`}
               >
+                {tab.icon && <TabIcon name={tab.icon} className="h-4 w-4" />}
                 {tab.label}
               </Link>
             );
@@ -162,10 +164,11 @@ export default function AppTabs({ role }: { role?: string | null }) {
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
-            className={`rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
+            className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${
               moreActive ? "bg-accent text-white" : "text-g300 hover:bg-white/6 hover:text-white"
             }`}
           >
+            <TabIcon name="more" className="h-4 w-4" />
             More
           </button>
         </div>
@@ -182,10 +185,11 @@ export default function AppTabs({ role }: { role?: string | null }) {
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`flex min-h-12 touch-manipulation flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                className={`flex min-h-14 touch-manipulation flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wide ${
                   active ? "text-accent" : "text-g300"
                 }`}
               >
+                {tab.icon && <TabIcon name={tab.icon} />}
                 {tab.label}
               </Link>
             );
@@ -193,10 +197,11 @@ export default function AppTabs({ role }: { role?: string | null }) {
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
-            className={`flex min-h-12 touch-manipulation flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wide ${
+            className={`flex min-h-14 touch-manipulation flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-wide ${
               moreActive ? "text-accent" : "text-g300"
             }`}
           >
+            <TabIcon name="more" />
             More
           </button>
         </div>
