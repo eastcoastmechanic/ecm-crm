@@ -140,9 +140,9 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className="fixed right-4 z-50 flex flex-col items-end gap-3 max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:right-5 md:bottom-5">
+    <div className="fixed right-4 z-50 flex flex-col items-end gap-3 max-md:bottom-[calc(5.25rem+env(safe-area-inset-bottom))] md:right-5 md:bottom-5">
       {open && (
-        <div className="flex h-[min(28rem,calc(100dvh-10rem))] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-navy-2 shadow-2xl">
+        <div className="flex h-[min(28rem,calc(100dvh-11rem))] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-navy-2 shadow-2xl">
           <div className="flex items-center justify-between border-b border-white/8 bg-gradient-to-r from-accent/20 to-transparent px-4 py-3">
             <div>
               <div className="font-display text-sm font-bold">CRM Assistant</div>
@@ -253,9 +253,11 @@ export default function ChatWidget() {
 
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-full bg-gradient-to-br from-accent to-accent-2 px-5 py-3 text-sm font-bold text-white shadow-[0_4px_16px_rgba(232,80,42,.4)] transition-transform hover:scale-105"
+        aria-label={open ? "Close assistant" : "Open assistant"}
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-2 text-lg font-bold text-white shadow-[0_4px_16px_rgba(232,80,42,.4)] transition-transform hover:scale-105 md:h-auto md:w-auto md:gap-2 md:px-5 md:py-3 md:text-sm"
       >
-        {open ? "Close" : "💬 Assistant"}
+        <span className="md:hidden">{open ? "✕" : "✦"}</span>
+        <span className="hidden md:inline">{open ? "Close" : "Assistant"}</span>
       </button>
     </div>
   );

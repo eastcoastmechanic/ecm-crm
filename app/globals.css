@@ -48,14 +48,22 @@
   --font-display: var(--font-syne);
 }
 
+html,
 body {
   background: var(--navy);
   color: #ffffff;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .app-shell {
   min-height: 100dvh;
   overscroll-behavior-y: contain;
+}
+
+@media (display-mode: standalone) {
+  .app-shell {
+    min-height: 100dvh;
+  }
 }
 
 select option {
