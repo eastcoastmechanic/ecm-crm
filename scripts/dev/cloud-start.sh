@@ -7,6 +7,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
+# /workspace is re-checked out from git on boot and node_modules is gitignored,
+# so it won't be present even when the base image baked it during install.
+# Restore it here (cheap no-op once it exists) so `npm run dev` can start.
+if [ ! -d "$ROOT/node_modules" ]; then
+  echo "==> node_modules missing; running npm ci"
+  npm ci
+fi
+
 echo "==> Ensuring Docker daemon is running"
 if ! docker info >/dev/null 2>&1; then
   sudo dockerd >/tmp/dockerd.log 2>&1 &
