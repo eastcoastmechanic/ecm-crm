@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { FIELD_BOARD_URL, FIELD_BOT_INSTRUCTIONS } from "@/lib/field-board";
+import { FIELD_BOARD_URL, FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus } from "@/lib/field-board";
 import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function FieldBoardPage() {
+  const secrets = fieldBoardSecretStatus();
   const { data: events, error } = await supabase
     .from("field_board_events")
     .select("id, source, title, body, board_status, job_id, created_at")
@@ -31,6 +32,12 @@ export default async function FieldBoardPage() {
         </div>
       </div>
 
+      {!secrets.field_board_secret && (
+        <p className="text-sm text-accent">
+          FIELD_BOARD_SECRET is not on this production deploy. Add it in Vercel for Production, then Redeploy.
+        </p>
+      )}
+
       <div className="rounded-xl border border-white/8 bg-white/3 p-4">
         <div className={itemTitleClass}>How the field talks to the office</div>
         <ol className={`${itemSubClass} mt-2 list-decimal space-y-1 pl-5`}>
@@ -50,8 +57,7 @@ export default async function FieldBoardPage() {
         <h2 className="mb-3 font-display text-lg font-bold">From the field</h2>
         {error && (
           <p className="text-sm text-accent">
-            Field events table is not live yet. Run db/migrations/0041_field_board_events.sql in Supabase,
-            then add FIELD_BOARD_SECRET on Vercel.
+            Field events table is not live yet. Run db/migrations/0041_field_board_events.sql in Supabase.
           </p>
         )}
         {!error && (events ?? []).length === 0 && (
