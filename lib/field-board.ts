@@ -16,6 +16,14 @@ Auth: Authorization: Bearer <FIELD_BOARD_SECRET>
 
 const JOB_STATUSES = new Set(["requested", "scheduled", "in_progress", "complete", "cancelled"]);
 
+export function fieldBoardSecretStatus() {
+  return {
+    field_board_secret: Boolean(process.env.FIELD_BOARD_SECRET),
+    cron_secret: Boolean(process.env.CRON_SECRET),
+    mcp_key: Boolean(process.env.MCP_API_KEY),
+  };
+}
+
 export function fieldBoardAuthorized(request: Request) {
   const header = request.headers.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
