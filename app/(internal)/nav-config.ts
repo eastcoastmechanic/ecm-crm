@@ -17,6 +17,7 @@ export function isGroup(entry: NavEntry): entry is NavGroup {
 export const navEntries: NavEntry[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/tech-hub", label: "Tech Hub" },
+  { href: "/field-board", label: "Field Board" },
   {
     label: "Customers",
     items: [
@@ -55,18 +56,18 @@ export const navEntries: NavEntry[] = [
   },
 ];
 
-export const TECH_VISIBLE_PATHS = ["/dashboard", "/tech-hub", "/jobs", "/catalog"];
+export const TECH_VISIBLE_PATHS = ["/dashboard", "/tech-hub", "/field-board", "/jobs", "/catalog"];
 
 export const STAFF_TABS: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: "home" },
   { href: "/customers", label: "Customers", icon: "customers" },
   { href: "/jobs", label: "Jobs", icon: "jobs" },
-  { href: "/documents", label: "Docs", icon: "docs" },
+  { href: "/field-board", label: "Field", icon: "hub" },
 ];
 
 export const TECH_TABS: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: "home" },
-  { href: "/tech-hub", label: "Hub", icon: "hub" },
+  { href: "/field-board", label: "Field", icon: "hub" },
   { href: "/jobs", label: "Jobs", icon: "jobs" },
   { href: "/catalog", label: "Catalog", icon: "catalog" },
 ];
@@ -83,6 +84,7 @@ export function isNavActive(href: string, pathname: string) {
 export function pageTitle(pathname: string) {
   if (pathname === "/dashboard") return "Home";
   if (pathname.startsWith("/account")) return "Account";
+  if (pathname.startsWith("/field-board")) return "Field Board";
   const match = flattenNavItems()
     .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0];

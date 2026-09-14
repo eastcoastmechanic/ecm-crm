@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FIELD_BOARD_URL } from "@/lib/field-board";
 import { pageTitle } from "./nav-config";
 
 export default function AppHeader() {
@@ -19,6 +20,14 @@ export default function AppHeader() {
         <div className="min-w-0 flex-1">
           <div className="truncate font-display text-base font-bold tracking-wide">{title}</div>
         </div>
+        <a
+          href={FIELD_BOARD_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="hidden h-9 shrink-0 items-center rounded-full border border-white/10 bg-white/6 px-3 text-[11px] font-bold uppercase tracking-wide text-g300 hover:bg-white/10 hover:text-white sm:flex"
+        >
+          Board
+        </a>
         <Link
           href="/account"
           aria-label="Account"
