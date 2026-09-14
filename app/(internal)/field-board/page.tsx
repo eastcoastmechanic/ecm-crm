@@ -77,8 +77,8 @@ export default async function FieldBoardPage() {
                 {event.job_id ? (
                   <>
                     {" · "}
-                    <Link href={`/jobs/${event.job_id}`} className="text-accent">
-                      Open job
+                    <Link href="/jobs" className="text-accent">
+                      Jobs hub
                     </Link>
                   </>
                 ) : (

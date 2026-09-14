@@ -67,7 +67,7 @@ export async function getFieldBoardSheet() {
       job_type: job.job_type ?? null,
       customer: relatedName(job.customers as RelatedName),
       address: relatedAddress(job.properties as RelatedAddress),
-      crm_href: `${CRM_HUB_URL}/jobs/${job.id}`,
+      crm_href: `${CRM_HUB_URL}/jobs`,
     })),
     tasks: tasks ?? [],
     events: events ?? [],
@@ -128,6 +128,6 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
     event_id: event.id,
     job_id: event.job_id,
     field_board_url: FIELD_BOARD_URL,
-    crm_job_href: event.job_id ? `${CRM_HUB_URL}/jobs/${event.job_id}` : null,
+    crm_job_href: event.job_id ? `${CRM_HUB_URL}/jobs` : null,
   };
 }
