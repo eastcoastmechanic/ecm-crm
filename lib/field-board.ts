@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import { CRM_HUB_URL, FIELD_BOARD_URL } from "@/lib/field-board-links";
 
-export const FIELD_BOARD_URL = "https://branch-valley-tango-sand.grok.me";
-export const CRM_HUB_URL = "https://ecm-crm.vercel.app";
+export { CRM_HUB_URL, FIELD_BOARD_URL };
 
 export const FIELD_BOT_INSTRUCTIONS = `You are an East Coast Mechanical field bot.
 Field Board is first in the truck. CRM is the office hub.

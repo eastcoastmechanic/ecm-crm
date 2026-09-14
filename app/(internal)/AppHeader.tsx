@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FIELD_BOARD_URL } from "@/lib/field-board";
+import { FIELD_BOARD_URL } from "@/lib/field-board-links";
 import { pageTitle } from "./nav-config";
 
 export default function AppHeader() {

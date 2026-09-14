@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FIELD_BOARD_URL } from "@/lib/field-board";
+import { FIELD_BOARD_URL } from "@/lib/field-board-links";
 import { headingClass, subTextClass, itemTitleClass, itemSubClass } from "../ui";
 
 const tiles = [
