@@ -6,6 +6,15 @@ import JobStatusButtons from "./JobStatusButtons";
 
 export const dynamic = "force-dynamic";
 
+type BoardJob = {
+  id: string;
+  status: string;
+  scheduled_at: string | null;
+  notes: string | null;
+  customer: string | null;
+  address: string | null;
+};
+
 function stamp(value: string | null) {
   if (!value) return "unscheduled";
   return new Date(value).toLocaleString("en-US", {
@@ -16,7 +25,7 @@ function stamp(value: string | null) {
   });
 }
 
-function section(jobs: { status: string }[], statuses: string[]) {
+function section(jobs: BoardJob[], statuses: string[]) {
   return jobs.filter((job) => statuses.includes(job.status));
 }
 
@@ -25,11 +34,15 @@ export default async function FieldBoardPage() {
   let sheetError: string | null = null;
   const sheet = await getFieldBoardSheet().catch((err: unknown) => {
     sheetError = err instanceof Error ? err.message : "Field sheet failed";
-    return { jobs: [], events: [], tasks: [] as { id: string; title: string; due_at: string | null }[] };
+    return {
+      jobs: [] as BoardJob[],
+      events: [] as { id: string; title: string; body: string | null; board_status: string | null; source: string; created_at: string }[],
+      tasks: [] as { id: string; title: string; due_at: string | null }[],
+    };
   });
 
   const tableMissing = Boolean(sheetError && /field_board_events/i.test(sheetError));
-  const jobs = sheet.jobs ?? [];
+  const jobs = (sheet.jobs ?? []) as BoardJob[];
   const events = sheet.events ?? [];
   const active = section(jobs, ["in_progress"]);
   const queued = section(jobs, ["requested", "scheduled"]);
@@ -75,9 +88,7 @@ export default async function FieldBoardPage() {
 
       <div>
         <h2 className="mb-3 font-display text-lg font-bold">From the field</h2>
-        {!tableMissing && events.length === 0 && (
-          <p className={itemSubClass}>No notes yet. Log one above.</p>
-        )}
+        {!tableMissing && events.length === 0 && <p className={itemSubClass}>No notes yet. Log one above.</p>}
         <div className="grid gap-3">
           {events.map((event) => (
             <div key={event.id} className="rounded-xl border border-white/8 bg-white/3 p-4">
@@ -116,22 +127,7 @@ export default async function FieldBoardPage() {
   );
 }
 
-function BoardColumn({
-  title,
-  empty,
-  jobs,
-}: {
-  title: string;
-  empty: string;
-  jobs: {
-    id: string;
-    status: string;
-    scheduled_at: string | null;
-    notes: string | null;
-    customer: string | null;
-    address: string | null;
-  }[];
-}) {
+function BoardColumn({ title, empty, jobs }: { title: string; empty: string; jobs: BoardJob[] }) {
   return (
     <div>
       <h2 className="mb-3 font-display text-lg font-bold">{title}</h2>

@@ -25,10 +25,10 @@ export async function logFieldNote(formData: FormData) {
   return { success: true };
 }
 
-export async function setFieldJobStatus(formData: FormData) {
+export async function setFieldJobStatus(formData: FormData): Promise<void> {
   const jobId = String(formData.get("job_id") ?? "").trim();
   const crmStatus = String(formData.get("crm_status") ?? "").trim();
-  if (!jobId || !crmStatus) return { error: "Job and status required" };
+  if (!jobId || !crmStatus) return;
 
   const result = await ingestFieldBoardEvent({
     source: "crm-field",
@@ -38,8 +38,7 @@ export async function setFieldJobStatus(formData: FormData) {
     board_status: crmStatus === "complete" ? "finished" : crmStatus === "in_progress" ? "active" : crmStatus,
   });
 
-  if (!result.ok) return { error: result.error };
+  if (!result.ok) return;
   revalidatePath("/field-board");
   revalidatePath("/jobs");
-  return { success: true };
 }
