@@ -1,18 +1,11 @@
 import Link from "next/link";
-import { FIELD_BOARD_URL } from "@/lib/field-board-links";
 import { headingClass, subTextClass, itemTitleClass, itemSubClass } from "../ui";
 
 const tiles = [
   {
-    href: FIELD_BOARD_URL,
-    external: true,
-    title: "Field Board",
-    description: "Truck board first. Same sheet the bots print. Updates land in CRM.",
-  },
-  {
     href: "/field-board",
-    title: "Field → CRM",
-    description: "Hub view of board events. Open a job only when the field note already exists.",
+    title: "Field Board",
+    description: "Truck board. Today's jobs, notes, and status. Writes the CRM hub.",
   },
   {
     href: "/diagnostics/new",
@@ -60,24 +53,16 @@ export default function TechHubPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {tiles.map((tile) => {
-          const className =
-            "flex flex-col gap-1.5 rounded-xl border border-white/8 bg-white/3 p-4 transition-colors hover:bg-white/6";
-          if ("external" in tile && tile.external) {
-            return (
-              <a key={tile.href} href={tile.href} target="_blank" rel="noreferrer" className={className}>
-                <div className={itemTitleClass}>{tile.title}</div>
-                <div className={itemSubClass}>{tile.description}</div>
-              </a>
-            );
-          }
-          return (
-            <Link key={tile.href} href={tile.href} className={className}>
-              <div className={itemTitleClass}>{tile.title}</div>
-              <div className={itemSubClass}>{tile.description}</div>
-            </Link>
-          );
-        })}
+        {tiles.map((tile) => (
+          <Link
+            key={tile.href}
+            href={tile.href}
+            className="flex flex-col gap-1.5 rounded-xl border border-white/8 bg-white/3 p-4 transition-colors hover:bg-white/6"
+          >
+            <div className={itemTitleClass}>{tile.title}</div>
+            <div className={itemSubClass}>{tile.description}</div>
+          </Link>
+        ))}
       </div>
     </div>
   );
