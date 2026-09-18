@@ -3,16 +3,7 @@ import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { supabase } from "@/lib/supabase";
 import { createInvoicePaymentLink } from "@/lib/payment-links";
 import { finishServiceReport, sendServiceReportEmail, assignCustomer } from "@/app/(internal)/diagnostics/[id]/actions";
-
-/**
- * Field work: service reports (diagnostics), install reports, and getting paid.
- *
- * Same rule as tools-ops.ts — wrap the server action the UI already calls
- * rather than reimplementing it, so validation and revalidation stay in one
- * place.
- */
-
-// -------------------------------------------------- service reports
+import { fieldBoardTools } from "./tools-field-board";
 
 const listServiceReportsTool = betaZodTool({
   name: "list_service_reports",
@@ -112,8 +103,6 @@ const sendServiceReportTool = betaZodTool({
   },
 });
 
-// -------------------------------------------------- install reports
-
 const listInstallReportsTool = betaZodTool({
   name: "list_install_reports",
   description:
@@ -139,8 +128,6 @@ const listInstallReportsTool = betaZodTool({
   },
 });
 
-// -------------------------------------------------- getting paid
-
 const createPaymentLinkTool = betaZodTool({
   name: "create_payment_link",
   description:
@@ -159,26 +146,23 @@ const createPaymentLinkTool = betaZodTool({
   },
 });
 
-// ------------------------------------------------ refrigerant / EPA 608
-
 const REFRIGERANTS = ["R-410A", "R-32", "R-454B", "R-22", "R-134a", "R-407C"] as const;
-
 const OZ_PER_LB = 16;
 
 const logRefrigerantTool = betaZodTool({
   name: "log_refrigerant",
   description:
-    "Record refrigerant added to or recovered from a system, and any leak inspection or repair. EPA 608 requires this record for every charge and recovery. Use it whenever a tech says they added or took out refrigerant — 'put two pounds of 410 in the Hutchinson unit', 'recovered 3 lb off the roof unit'. Get jobId from list_jobs and equipmentId from list_equipment where possible; both are optional but a log entry with neither is hard to defend in an audit.",
+    "Record refrigerant added to or recovered from a system, and any leak inspection or repair. EPA 608 requires this record for every charge and recovery.",
   inputSchema: z.object({
     action: z.enum(["added", "recovered"]),
     refrigerantType: z.enum(REFRIGERANTS),
-    amountLb: z.number().optional().describe("Amount in pounds, if the tech said pounds"),
-    amountOz: z.number().optional().describe("Amount in ounces, if the tech said ounces"),
+    amountLb: z.number().optional(),
+    amountOz: z.number().optional(),
     jobId: z.string().optional(),
     equipmentId: z.string().optional(),
     customerId: z.string().optional(),
-    cylinderId: z.string().optional().describe("Cylinder/bottle serial or tag it came from or went into"),
-    leakInspection: z.boolean().optional().describe("True if a leak inspection was performed"),
+    cylinderId: z.string().optional(),
+    leakInspection: z.boolean().optional(),
     leakFound: z.boolean().optional(),
     leakLocation: z.string().optional(),
     leakRepaired: z.boolean().optional(),
@@ -187,11 +171,7 @@ const logRefrigerantTool = betaZodTool({
   }),
   run: async (input) => {
     const oz =
-      input.amountOz != null
-        ? input.amountOz
-        : input.amountLb != null
-          ? input.amountLb * OZ_PER_LB
-          : null;
+      input.amountOz != null ? input.amountOz : input.amountLb != null ? input.amountLb * OZ_PER_LB : null;
     if (oz === null) return "How much? Give the amount in pounds or ounces.";
     if (oz < 0) return "Amount can't be negative — use action 'recovered' for refrigerant coming out.";
 
@@ -226,15 +206,14 @@ const logRefrigerantTool = betaZodTool({
 
 const listRefrigerantLogTool = betaZodTool({
   name: "list_refrigerant_log",
-  description:
-    "Read the refrigerant handling log — by job, by equipment, or over a date range. Use for EPA 608 recordkeeping questions, 'how much 410 did we put in that unit', or to see whether a leak was ever repaired. Also totals the amounts so a recurring top-up shows up as the leak it probably is.",
+  description: "Read the refrigerant handling log — by job, by equipment, or over a date range.",
   inputSchema: z.object({
     jobId: z.string().optional(),
     equipmentId: z.string().optional(),
-    since: z.string().optional().describe("ISO date — only entries on/after this"),
-    until: z.string().optional().describe("ISO date — only entries on/before this"),
-    unrepairedLeaksOnly: z.boolean().optional().describe("Only entries with a leak found and not repaired"),
-    limit: z.number().optional().describe("Default 50"),
+    since: z.string().optional(),
+    until: z.string().optional(),
+    unrepairedLeaksOnly: z.boolean().optional(),
+    limit: z.number().optional(),
   }),
   run: async ({ jobId, equipmentId, since, until, unrepairedLeaksOnly, limit }) => {
     let q = supabase
@@ -255,24 +234,13 @@ const listRefrigerantLogTool = betaZodTool({
     if (error) return `Failed to read the refrigerant log: ${error.message}`;
     if (!data || data.length === 0) return "No refrigerant log entries match that.";
 
-    const added = data
-      .filter((r) => r.action === "added")
-      .reduce((sum, r) => sum + Number(r.amount_oz ?? 0), 0);
-    const recovered = data
-      .filter((r) => r.action === "recovered")
-      .reduce((sum, r) => sum + Number(r.amount_oz ?? 0), 0);
-
+    const added = data.filter((r) => r.action === "added").reduce((sum, r) => sum + Number(r.amount_oz ?? 0), 0);
+    const recovered = data.filter((r) => r.action === "recovered").reduce((sum, r) => sum + Number(r.amount_oz ?? 0), 0);
     const lb = (oz: number) => Math.round((oz / OZ_PER_LB) * 100) / 100;
 
     return JSON.stringify({
       entries: data,
       totals: { added_lb: lb(added), recovered_lb: lb(recovered) },
-      // Repeated top-ups on one system is the pattern worth naming out loud —
-      // it's a leak the customer is paying for in refrigerant instead of repair.
-      note:
-        data.filter((r) => r.action === "added").length > 1 && equipmentId
-          ? "This unit has been charged more than once — worth flagging as a probable leak rather than another top-up."
-          : undefined,
     });
   },
 });
@@ -286,4 +254,5 @@ export const fieldTools = [
   createPaymentLinkTool,
   logRefrigerantTool,
   listRefrigerantLogTool,
+  ...fieldBoardTools,
 ];
