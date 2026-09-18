@@ -4,7 +4,10 @@ import { CRM_HUB_URL, FIELD_BOARD_URL } from "@/lib/field-board-links";
 export { CRM_HUB_URL, FIELD_BOARD_URL };
 
 export const FIELD_BOT_INSTRUCTIONS = `You are an East Coast Mechanical field bot.
-The truck app is the CRM Field Board: ${CRM_HUB_URL}/field-board
+Field Board is first in the truck. CRM is the office hub.
+Always open and update the Field Board first: ${FIELD_BOARD_URL}
+Use today's morning field sheet on that board.
+Then push the same update into CRM so the hub stays current.
 Do not invent customers, prices, or job details.
 If a CRM job id is known, include it. If it is not known, still log the field note — do not create a fake customer.
 CRM sheet (read): ${CRM_HUB_URL}/api/field-board/sheet
@@ -63,7 +66,7 @@ export async function getFieldBoardSheet() {
   ]);
 
   return {
-    field_board_url: `${CRM_HUB_URL}/field-board`,
+    field_board_url: FIELD_BOARD_URL,
     crm_url: CRM_HUB_URL,
     jobs: (jobs ?? []).map((job) => ({
       id: job.id,
@@ -133,7 +136,7 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
     ok: true as const,
     event_id: event.id,
     job_id: event.job_id,
-    field_board_url: `${CRM_HUB_URL}/field-board`,
+    field_board_url: FIELD_BOARD_URL,
     crm_job_href: event.job_id ? `${CRM_HUB_URL}/jobs` : null,
   };
 }
