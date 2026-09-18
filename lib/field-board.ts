@@ -16,6 +16,7 @@ Auth: Authorization: Bearer <FIELD_BOARD_SECRET>
 `;
 
 const JOB_STATUSES = new Set(["requested", "scheduled", "in_progress", "complete", "cancelled"]);
+const TZ = "America/New_York";
 
 export function fieldBoardSecretStatus() {
   return {
@@ -48,7 +49,40 @@ function relatedAddress(value: RelatedAddress) {
   return Array.isArray(value) ? value[0]?.address ?? null : value.address;
 }
 
+function nyDateKey(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-CA", { timeZone: TZ });
+}
+
+function todayKey() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+}
+
+export type BoardJob = {
+  id: string;
+  status: string;
+  scheduled_at: string | null;
+  notes: string | null;
+  job_type: string | null;
+  customer: string | null;
+  address: string | null;
+  crm_href: string;
+  board_column: "today" | "needs_attention" | "active" | "ongoing" | "finished";
+};
+
+function classifyJob(job: Omit<BoardJob, "board_column">, today: string): BoardJob["board_column"] {
+  if (job.status === "complete") return "finished";
+  if (job.status === "in_progress") return "active";
+  const day = nyDateKey(job.scheduled_at);
+  if (day === today) return "today";
+  if (job.status === "requested" || (day && day < today)) return "needs_attention";
+  return "ongoing";
+}
+
 export async function getFieldBoardSheet() {
+  const today = todayKey();
   const [{ data: jobs }, { data: tasks }, { data: events }] = await Promise.all([
     supabase
       .from("jobs")
@@ -65,10 +99,8 @@ export async function getFieldBoardSheet() {
     supabase.from("field_board_events").select("*").order("created_at", { ascending: false }).limit(30),
   ]);
 
-  return {
-    field_board_url: FIELD_BOARD_URL,
-    crm_url: CRM_HUB_URL,
-    jobs: (jobs ?? []).map((job) => ({
+  const mappedJobs: BoardJob[] = (jobs ?? []).map((job) => {
+    const base = {
       id: job.id,
       status: job.status,
       scheduled_at: job.scheduled_at,
@@ -77,8 +109,30 @@ export async function getFieldBoardSheet() {
       customer: relatedName(job.customers as RelatedName),
       address: relatedAddress(job.properties as RelatedAddress),
       crm_href: `${CRM_HUB_URL}/jobs`,
-    })),
-    tasks: tasks ?? [],
+    };
+    return { ...base, board_column: classifyJob(base, today) };
+  });
+
+  const openTasks = (tasks ?? []).map((task) => {
+    const day = nyDateKey(task.due_at);
+    let board_column: "today" | "needs_attention" | "ongoing" = "ongoing";
+    if (day === today) board_column = "today";
+    else if (day && day < today) board_column = "needs_attention";
+    return { ...task, board_column };
+  });
+
+  return {
+    generated_at: new Date().toISOString(),
+    timezone: TZ,
+    today_key: today,
+    field_board_url: FIELD_BOARD_URL,
+    crm_url: CRM_HUB_URL,
+    today: mappedJobs.filter((job) => job.board_column === "today"),
+    needs_attention: mappedJobs.filter((job) => job.board_column === "needs_attention"),
+    active: mappedJobs.filter((job) => job.board_column === "active"),
+    ongoing: mappedJobs.filter((job) => job.board_column === "ongoing"),
+    jobs: mappedJobs,
+    tasks: openTasks,
     events: events ?? [],
   };
 }
