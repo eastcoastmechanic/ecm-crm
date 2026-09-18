@@ -18,15 +18,12 @@ type BoardJob = {
 function stamp(value: string | null) {
   if (!value) return "unscheduled";
   return new Date(value).toLocaleString("en-US", {
+    timeZone: "America/New_York",
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-function section(jobs: BoardJob[], statuses: string[]) {
-  return jobs.filter((job) => statuses.includes(job.status));
 }
 
 export default async function FieldBoardPage() {
@@ -35,26 +32,36 @@ export default async function FieldBoardPage() {
   const sheet = await getFieldBoardSheet().catch((err: unknown) => {
     sheetError = err instanceof Error ? err.message : "Field sheet failed";
     return {
+      generated_at: null as string | null,
+      today_key: null as string | null,
+      today: [] as BoardJob[],
+      needs_attention: [] as BoardJob[],
+      active: [] as BoardJob[],
+      ongoing: [] as BoardJob[],
       jobs: [] as BoardJob[],
       events: [] as { id: string; title: string; body: string | null; board_status: string | null; source: string; created_at: string }[],
-      tasks: [] as { id: string; title: string; due_at: string | null }[],
+      tasks: [] as { id: string; title: string; due_at: string | null; board_column?: string }[],
     };
   });
 
   const tableMissing = Boolean(sheetError && /field_board_events/i.test(sheetError));
-  const jobs = (sheet.jobs ?? []) as BoardJob[];
+  const todayJobs = sheet.today ?? [];
+  const needsAttention = sheet.needs_attention ?? [];
+  const active = sheet.active ?? [];
+  const ongoing = sheet.ongoing ?? [];
   const events = sheet.events ?? [];
-  const active = section(jobs, ["in_progress"]);
-  const queued = section(jobs, ["requested", "scheduled"]);
-  const done = section(jobs, ["complete"]).slice(0, 8);
-  const openJobs = [...active, ...queued];
+  const tasks = sheet.tasks ?? [];
+  const openJobs = [...active, ...todayJobs, ...needsAttention, ...ongoing];
 
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className={headingClass}>Field Board</h1>
-          <p className={subTextClass}>One truck app. Jobs and notes write the CRM hub.</p>
+          <h1 className={headingClass}>Today's board</h1>
+          <p className={subTextClass}>
+            Truck first. CRM hub. Morning sheet only — no invented jobs.
+            {sheet.today_key ? ` ${sheet.today_key}` : ""}
+          </p>
         </div>
         <Link href="/jobs" className={buttonSecondaryClass}>
           Jobs list
@@ -71,13 +78,30 @@ export default async function FieldBoardPage() {
           Field events table is not live yet. Run db/migrations/0041_field_board_events.sql in Supabase.
         </p>
       )}
+      {sheetError && !tableMissing && <p className="text-sm text-accent">{sheetError}</p>}
 
-      <BoardColumn title="On site" empty="Nothing on site." jobs={active} />
-      <BoardColumn title="Queued" empty="No scheduled or requested jobs." jobs={queued} />
+      <BoardColumn title="Today's board" empty="Nothing on the morning sheet for today." jobs={todayJobs} />
+      <BoardColumn title="Needs Attention" empty="Nothing flagged." jobs={needsAttention} />
+      <BoardColumn title="Active" empty="Nothing on site." jobs={active} />
+      <BoardColumn title="Ongoing" empty="No open follow-ups." jobs={ongoing} />
+
+      {tasks.length > 0 && (
+        <div>
+          <h2 className="mb-3 font-display text-lg font-bold">Open tasks</h2>
+          <div className="grid gap-3">
+            {tasks.map((task) => (
+              <div key={task.id} className="rounded-xl border border-white/8 bg-white/3 p-4">
+                <div className={itemTitleClass}>{task.title}</div>
+                <p className={itemSubClass}>{task.due_at ? stamp(task.due_at) : "No due date"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-white/8 bg-white/3 p-4">
         <div className={itemTitleClass}>Field note</div>
-        <p className={`${itemSubClass} mb-3 mt-1`}>Lands on this board and on the job. Does not invent a customer.</p>
+        <p className={`${itemSubClass} mb-3 mt-1`}>Updates this board first, then writes the CRM event. Does not invent a customer.</p>
         <FieldNoteForm
           jobs={openJobs.map((job) => ({
             id: job.id,
@@ -87,7 +111,7 @@ export default async function FieldBoardPage() {
       </div>
 
       <div>
-        <h2 className="mb-3 font-display text-lg font-bold">From the field</h2>
+        <h2 className="mb-3 font-display text-lg font-bold">Morning field sheet</h2>
         {!tableMissing && events.length === 0 && <p className={itemSubClass}>No notes yet. Log one above.</p>}
         <div className="grid gap-3">
           {events.map((event) => (
@@ -104,20 +128,6 @@ export default async function FieldBoardPage() {
           ))}
         </div>
       </div>
-
-      {done.length > 0 && (
-        <div>
-          <h2 className="mb-3 font-display text-lg font-bold">Finished</h2>
-          <div className="grid gap-3">
-            {done.map((job) => (
-              <div key={job.id} className="rounded-xl border border-white/8 bg-white/3 p-4">
-                <div className={itemTitleClass}>{job.customer ?? "Job"}</div>
-                <p className={itemSubClass}>{job.address ?? "No address"}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <details className="rounded-xl border border-white/8 bg-white/3 p-4">
         <summary className="cursor-pointer font-medium text-white">Bot hook (optional)</summary>
