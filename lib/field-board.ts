@@ -20,6 +20,7 @@ const JOB_STATUSES = new Set(["requested", "scheduled", "in_progress", "complete
 export function fieldBoardSecretStatus() {
   return {
     field_board_secret: Boolean(process.env.FIELD_BOARD_SECRET),
+    field_board_app_key: Boolean(process.env.FIELD_BOARD_APP_KEY),
     cron_secret: Boolean(process.env.CRON_SECRET),
     mcp_key: Boolean(process.env.MCP_API_KEY),
   };
@@ -29,9 +30,12 @@ export function fieldBoardAuthorized(request: Request) {
   const header = request.headers.get("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!token) return false;
-  const secrets = [process.env.FIELD_BOARD_SECRET, process.env.CRON_SECRET, process.env.MCP_API_KEY].filter(
-    (value): value is string => Boolean(value)
-  );
+  const secrets = [
+    process.env.FIELD_BOARD_SECRET,
+    process.env.FIELD_BOARD_APP_KEY,
+    process.env.CRON_SECRET,
+    process.env.MCP_API_KEY,
+  ].filter((value): value is string => Boolean(value));
   return secrets.includes(token);
 }
 
