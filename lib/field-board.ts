@@ -13,6 +13,8 @@ If a CRM job id is known, include it. If it is not known, still log the field no
 CRM sheet (read): ${CRM_HUB_URL}/api/field-board/sheet
 CRM events (write): ${CRM_HUB_URL}/api/field-board/events
 Auth: Authorization: Bearer <FIELD_BOARD_SECRET>
+On site / Active → crm_status in_progress, board_status active
+Done / Finished → crm_status complete, board_status finished
 `;
 
 const JOB_STATUSES = new Set(["requested", "scheduled", "in_progress", "complete", "cancelled"]);
@@ -97,6 +99,57 @@ export type FieldBoardEventBody = {
   crm_status?: string;
 };
 
+function searchToken(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((part) => part.length >= 4 && !/^(this|that|from|with|hold|open|done|job|install|service)$/.test(part));
+}
+
+async function resolveJobId(input: FieldBoardEventBody): Promise<string | null> {
+  const direct = input.job_id?.trim();
+  if (direct) {
+    const { data: job } = await supabase.from("jobs").select("id").eq("id", direct).maybeSingle();
+    if (job?.id) return job.id;
+  }
+
+  const ref = input.external_ref?.trim();
+  if (ref) {
+    const { data: prior } = await supabase
+      .from("field_board_events")
+      .select("job_id")
+      .eq("external_ref", ref)
+      .not("job_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prior?.job_id) return prior.job_id;
+  }
+
+  const haystack = `${input.title ?? ""} ${input.body ?? ""}`;
+  const tokens = searchToken(haystack);
+  if (tokens.length === 0) return null;
+
+  const { data: customers } = await supabase.from("customers").select("id, name").limit(200);
+  const hits = (customers ?? []).filter((customer) => {
+    const name = (customer.name ?? "").toLowerCase();
+    return tokens.some((token) => name.includes(token));
+  });
+  if (hits.length !== 1) return null;
+
+  const { data: jobs } = await supabase
+    .from("jobs")
+    .select("id, status")
+    .eq("customer_id", hits[0].id)
+    .not("status", "eq", "cancelled")
+    .order("scheduled_at", { ascending: false, nullsFirst: false })
+    .limit(5);
+  const open = (jobs ?? []).filter((job) => job.status !== "complete");
+  const pick = open[0] ?? jobs?.[0];
+  return pick?.id ?? null;
+}
+
 export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
   const title = input.title?.trim();
   const body = input.body?.trim() ?? "";
@@ -104,7 +157,7 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
     return { ok: false as const, status: 400, error: "title or body is required" };
   }
 
-  let jobId: string | null = input.job_id?.trim() || null;
+  let jobId = await resolveJobId(input);
   if (jobId) {
     const { data: job } = await supabase.from("jobs").select("id, notes, status").eq("id", jobId).maybeSingle();
     if (!job) {
@@ -116,6 +169,7 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
       const crmStatus = input.crm_status?.trim();
       const nextStatus = crmStatus && JOB_STATUSES.has(crmStatus) ? crmStatus : job.status;
       await supabase.from("jobs").update({ notes: nextNotes, status: nextStatus }).eq("id", job.id);
+      jobId = job.id;
     }
   }
 
@@ -140,6 +194,7 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
     ok: true as const,
     event_id: event.id,
     job_id: event.job_id,
+    matched: Boolean(event.job_id),
     field_board_url: FIELD_BOARD_URL,
     crm_job_href: event.job_id ? `${CRM_HUB_URL}/jobs` : null,
   };
