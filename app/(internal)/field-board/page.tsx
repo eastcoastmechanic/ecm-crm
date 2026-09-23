@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } from "@/lib/field-board";
-import { buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import FieldNoteForm from "./FieldNoteForm";
 import JobStatusButtons from "./JobStatusButtons";
 
@@ -82,9 +82,17 @@ export default async function FieldBoardPage() {
           <h1 className={headingClass}>Field Board</h1>
           <p className={subTextClass}>One truck app. Jobs and notes write the CRM hub.</p>
         </div>
-        <Link href="/jobs" className={buttonSecondaryClass}>
-          Jobs list
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/field-board/print" className={buttonClass}>
+            Print sheet
+          </Link>
+          <a href="/field-board/print/pdf" className={buttonSecondaryClass}>
+            PDF
+          </a>
+          <Link href="/jobs" className={buttonSecondaryClass}>
+            Jobs list
+          </Link>
+        </div>
       </div>
 
       {!secrets.field_board_secret && (
