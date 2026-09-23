@@ -29,6 +29,25 @@ function section(jobs: BoardJob[], statuses: string[]) {
   return jobs.filter((job) => statuses.includes(job.status));
 }
 
+function asBoardJobs(jobs: unknown): BoardJob[] {
+  if (!Array.isArray(jobs)) return [];
+  return jobs.flatMap((job) => {
+    if (!job || typeof job !== "object") return [];
+    const row = job as Record<string, unknown>;
+    if (typeof row.id !== "string" || typeof row.status !== "string") return [];
+    return [
+      {
+        id: row.id,
+        status: row.status,
+        scheduled_at: typeof row.scheduled_at === "string" ? row.scheduled_at : null,
+        notes: typeof row.notes === "string" ? row.notes : null,
+        customer: typeof row.customer === "string" ? row.customer : null,
+        address: typeof row.address === "string" ? row.address : null,
+      },
+    ];
+  });
+}
+
 export default async function FieldBoardPage() {
   const secrets = fieldBoardSecretStatus();
   let sheetError: string | null = null;
@@ -36,13 +55,20 @@ export default async function FieldBoardPage() {
     sheetError = err instanceof Error ? err.message : "Field sheet failed";
     return {
       jobs: [] as BoardJob[],
-      events: [] as { id: string; title: string; body: string | null; board_status: string | null; source: string; created_at: string }[],
+      events: [] as {
+        id: string;
+        title: string;
+        body: string | null;
+        board_status: string | null;
+        source: string;
+        created_at: string;
+      }[],
       tasks: [] as { id: string; title: string; due_at: string | null }[],
     };
   });
 
   const tableMissing = Boolean(sheetError && /field_board_events/i.test(sheetError));
-  const jobs = (sheet.jobs ?? []) as BoardJob[];
+  const jobs = asBoardJobs(sheet.jobs);
   const events = sheet.events ?? [];
   const active = section(jobs, ["in_progress"]);
   const queued = section(jobs, ["requested", "scheduled"]);

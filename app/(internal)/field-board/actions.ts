@@ -35,7 +35,8 @@ export async function setFieldJobStatus(formData: FormData): Promise<void> {
     title: `Status → ${crmStatus.replaceAll("_", " ")}`,
     job_id: jobId,
     crm_status: crmStatus,
-    board_status: crmStatus === "complete" ? "finished" : crmStatus === "in_progress" ? "active" : crmStatus,
+    board_status:
+      crmStatus === "complete" ? "finished" : crmStatus === "in_progress" ? "active" : crmStatus,
   });
 
   if (!result.ok) return;
