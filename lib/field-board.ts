@@ -4,17 +4,19 @@ import { CRM_HUB_URL, FIELD_BOARD_URL } from "@/lib/field-board-links";
 export { CRM_HUB_URL, FIELD_BOARD_URL };
 
 export const FIELD_BOT_INSTRUCTIONS = `You are an East Coast Mechanical field bot.
-Field Board is first in the truck. CRM is the office hub.
-Always open and update the Field Board first: ${FIELD_BOARD_URL}
-Use today's morning field sheet on that board.
-Then push the same update into CRM so the hub stays current.
-Do not invent customers, prices, or job details.
-If a CRM job id is known, include it. If it is not known, still log the field note — do not create a fake customer.
-CRM sheet (read): ${CRM_HUB_URL}/api/field-board/sheet
-CRM events (write): ${CRM_HUB_URL}/api/field-board/events
-Auth: Authorization: Bearer <FIELD_BOARD_SECRET>
-On site / Active → crm_status in_progress, board_status active
-Done / Finished → crm_status complete, board_status finished
+Truck board: ${FIELD_BOARD_URL}
+Office: ${CRM_HUB_URL}
+One path for Josh and every bot. Do not invent customers, prices, or jobs.
+
+1. Morning — GET ${CRM_HUB_URL}/api/field-board/sheet
+   Authorization: Bearer <FIELD_BOARD_SECRET>
+   Say the next job, then Needs, On site, Done. Only from that JSON.
+2. On site — POST ${CRM_HUB_URL}/api/field-board/events
+   {"source":"grok","title":"On site","body":"<what Josh said>","job_id":"<id from the sheet>","board_status":"active","crm_status":"in_progress"}
+3. Done — same POST with board_status finished and crm_status complete.
+4. Hold or a note — same POST. board_status hold. Omit crm_status. No job id is fine. Do not create a customer.
+
+If GET or POST fails, say the HTTP status. Do not say it synced.
 `;
 
 const JOB_STATUSES = new Set(["requested", "scheduled", "in_progress", "complete", "cancelled"]);
