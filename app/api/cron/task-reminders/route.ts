@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse } from "next/server";
 import { listOpenPlannerTasks } from "@/lib/planner-connector";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
@@ -11,8 +12,7 @@ const OWNER_EMAIL = process.env.OWNER_EMAIL;
 // up in the digest every day until it's completed in Planner, instead of
 // once. Ask if you'd rather have the old one-and-done behavior back.
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

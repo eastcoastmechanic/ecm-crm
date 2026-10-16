@@ -1,3 +1,4 @@
+import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
@@ -5,8 +6,7 @@ import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
