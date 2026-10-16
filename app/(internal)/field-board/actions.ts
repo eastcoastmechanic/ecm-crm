@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ingestFieldBoardEvent } from "@/lib/field-board";
-import { markOnWay, updateJobStatus } from "../jobs/actions";
+import { addJobPhotos, markOnWay, updateJobStatus } from "../jobs/actions";
 
 export async function logFieldNote(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
@@ -59,4 +59,15 @@ export async function truckSetStatus(formData: FormData): Promise<void> {
   if (!String(formData.get("id") ?? "").trim() || !["in_progress", "complete"].includes(status)) return;
   await updateJobStatus(formData);
   revalidatePath("/field-board");
+}
+
+// One photo per call: each request stays well under Vercel's 4.5MB body cap.
+export async function truckAddPhoto(formData: FormData): Promise<{ error?: string }> {
+  try {
+    await addJobPhotos(formData);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Photo upload failed" };
+  }
+  revalidatePath("/field-board");
+  return {};
 }

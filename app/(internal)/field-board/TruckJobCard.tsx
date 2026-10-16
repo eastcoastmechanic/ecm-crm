@@ -1,4 +1,5 @@
 import SubmitButton from "../SubmitButton";
+import PhotoButtons, { type PhotoCounts } from "./PhotoButtons";
 import { truckOnMyWay, truckSetStatus } from "./actions";
 
 export type TruckJob = {
@@ -11,6 +12,7 @@ export type TruckJob = {
   customer: string | null;
   phone: string | null;
   address: string | null;
+  photoCounts: PhotoCounts;
 };
 
 const bigButton =
@@ -105,6 +107,12 @@ export default function TruckJobCard({ job, primary = false }: { job: TruckJob; 
               Call
             </a>
           )}
+        </div>
+      )}
+
+      {(primary || job.status === "in_progress") && (
+        <div className="mt-3">
+          <PhotoButtons jobId={job.id} counts={job.photoCounts} />
         </div>
       )}
 
