@@ -23,6 +23,8 @@ const INTERNAL_PATH_PREFIXES = [
   "/conversations",
   "/payments",
   "/field-board",
+  "/tech-hub",
+  "/procurement",
   "/api/twilio/recordings",
 ];
 
@@ -188,6 +190,10 @@ export const config = {
     "/payments",
     "/field-board/:path*",
     "/field-board",
+    "/tech-hub/:path*",
+    "/tech-hub",
+    "/procurement/:path*",
+    "/procurement",
     "/api/twilio/recordings/:path*",
     "/api/internal-chat",
     "/api/ingest/readings",
