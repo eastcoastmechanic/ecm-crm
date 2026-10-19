@@ -32,6 +32,16 @@ function stamp(value: string | null) {
 type RelatedName = { name: string | null; phone?: string | null } | { name: string | null; phone?: string | null }[] | null;
 type RelatedAddress = { address: string | null } | { address: string | null }[] | null;
 
+function countPhotos(photos: unknown): TruckJob["photoCounts"] {
+  const counts = { arrival: 0, during: 0, completion: 0 };
+  if (!Array.isArray(photos)) return counts;
+  for (const photo of photos) {
+    const phase = (photo as { phase?: string } | null)?.phase;
+    if (phase === "arrival" || phase === "during" || phase === "completion") counts[phase] += 1;
+  }
+  return counts;
+}
+
 function one<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0] ?? null : value;
@@ -45,7 +55,7 @@ async function getTruckJobs(): Promise<TruckJob[]> {
   const { data } = await supabase
     .from("jobs")
     .select(
-      "id, status, scheduled_at, notes, job_type, on_way_at, customers(name, phone), properties(address)"
+      "id, status, scheduled_at, notes, job_type, on_way_at, photos, customers(name, phone), properties(address)"
     )
     .or(`status.eq.in_progress,and(scheduled_at.gte.${from},scheduled_at.lte.${to})`)
     .neq("status", "cancelled")
@@ -65,6 +75,7 @@ async function getTruckJobs(): Promise<TruckJob[]> {
       customer: customer?.name ?? null,
       phone: customer?.phone ?? null,
       address: property?.address ?? null,
+      photoCounts: countPhotos(row.photos),
     };
   });
 }
