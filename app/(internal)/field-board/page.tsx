@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } from "@/lib/field-board";
@@ -81,6 +82,7 @@ async function getTruckJobs(): Promise<TruckJob[]> {
 }
 
 export default async function FieldBoardPage() {
+  const isTech = (await headers()).get("x-staff-role") === "tech";
   const secrets = fieldBoardSecretStatus();
   const [sheetResult, allJobs] = await Promise.all([
     getFieldBoardSheet()
@@ -135,20 +137,22 @@ export default async function FieldBoardPage() {
             {open.length} left{done.length > 0 ? ` · ${done.length} done` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/field-board/print" className={buttonClass}>
-            Print sheet
-          </Link>
-          <a href="/field-board/print/pdf" className={buttonSecondaryClass}>
-            PDF
-          </a>
-          <Link href="/jobs" className={buttonSecondaryClass}>
-            Jobs list
-          </Link>
-        </div>
+        {!isTech && (
+          <div className="flex flex-wrap gap-2">
+            <Link href="/field-board/print" className={buttonClass}>
+              Print sheet
+            </Link>
+            <a href="/field-board/print/pdf" className={buttonSecondaryClass}>
+              PDF
+            </a>
+            <Link href="/jobs" className={buttonSecondaryClass}>
+              Jobs list
+            </Link>
+          </div>
+        )}
       </div>
 
-      {!secrets.field_board_secret && (
+      {!isTech && !secrets.field_board_secret && (
         <p className="text-sm text-accent">
           FIELD_BOARD_SECRET is not on this production deploy. Add it in Vercel for Production, then Redeploy.
         </p>
@@ -241,10 +245,12 @@ export default async function FieldBoardPage() {
         </div>
       </details>
 
-      <details className="rounded-xl border border-white/8 bg-white/3 p-4">
-        <summary className="cursor-pointer font-medium text-white">Bot hook (optional)</summary>
-        <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-g300">{FIELD_BOT_INSTRUCTIONS}</pre>
-      </details>
+      {!isTech && (
+        <details className="rounded-xl border border-white/8 bg-white/3 p-4">
+          <summary className="cursor-pointer font-medium text-white">Bot hook (optional)</summary>
+          <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-g300">{FIELD_BOT_INSTRUCTIONS}</pre>
+        </details>
+      )}
     </div>
   );
 }
