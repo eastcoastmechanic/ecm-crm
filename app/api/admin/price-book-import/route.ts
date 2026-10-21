@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { bearerAuthorized } from "@/lib/bearer-auth";
 import { supabase } from "@/lib/supabase";
 import { syncPriceBookItemToGraph } from "@/lib/graph-connector";
 import catalog from "@/scripts/data/ecm-price-book-2026-08.json";
@@ -34,8 +35,7 @@ function computeName(item: CatalogItem): string {
 }
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!bearerAuthorized(request, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

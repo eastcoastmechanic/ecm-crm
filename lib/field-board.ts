@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { bearerToken, tokenMatches } from "@/lib/bearer-auth";
 import { CRM_HUB_URL, FIELD_BOARD_URL } from "@/lib/field-board-links";
 
 export { CRM_HUB_URL, FIELD_BOARD_URL };
@@ -29,16 +30,17 @@ export function fieldBoardSecretStatus() {
 }
 
 export function fieldBoardAuthorized(request: Request) {
-  const header = request.headers.get("authorization") ?? "";
-  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  const token = bearerToken(request);
   if (!token) return false;
   const secrets = [
     process.env.FIELD_BOARD_SECRET,
     process.env.FIELD_BOARD_APP_KEY,
     process.env.CRON_SECRET,
     process.env.MCP_API_KEY,
-  ].filter((value): value is string => Boolean(value));
-  return secrets.includes(token);
+  ];
+  // Check every secret (no early exit) so timing does not reveal which matched.
+  // tokenMatches fails closed on unset/empty values.
+  return secrets.reduce((ok, secret) => tokenMatches(token, secret) || ok, false);
 }
 
 type RelatedName = { name: string | null } | { name: string | null }[] | null;
