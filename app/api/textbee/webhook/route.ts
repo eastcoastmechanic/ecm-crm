@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { sendTextBeeSms } from "@/lib/textbee";
 import { respondToSms } from "@/lib/receptionist/sms-agent";
+import { handleSmsKeyword, canText } from "@/lib/sms-consent";
 import { findCustomerByPhone } from "@/lib/receptionist/customer-lookup";
 
 // TextBee bridges Josh's real number (774-343-6369) into the CRM -- an
@@ -59,13 +60,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // STOP/START/HELP come first, for known customers too, and never reach the AI.
+  const keywordReply = await handleSmsKeyword(from, body);
+  if (keywordReply) {
+    await sendTextBeeSms(from, keywordReply);
+    return NextResponse.json({ ok: true, keyword: true });
+  }
+
   const matchedCustomer = await findCustomerByPhone(from);
   if (matchedCustomer) {
     return NextResponse.json({ ok: true, knownCustomer: true });
   }
 
+  if (!(await canText(from, { allowUnknown: true }))) {
+    return NextResponse.json({ ok: true, optedOut: true });
+  }
+
   const reply = await respondToSms({ fromPhone: from, body });
-  await sendTextBeeSms(from, reply);
+  const sent = await sendTextBeeSms(from, reply);
+  if (!sent.ok) return NextResponse.json({ ok: false, error: sent.error }, { status: 502 });
 
   return NextResponse.json({ ok: true });
 }

@@ -46,12 +46,16 @@ export async function GET(request: Request) {
     });
 
     try {
-      await sendSMS(
+      const result = await sendSMS(
         customer.phone,
         `East Coast Mechanical: reminder — you're scheduled for ${when}${
           property?.address ? ` at ${property.address}` : ""
         }. Reply STOP to opt out.`
       );
+      if (!result.ok) {
+        errors.push(`job ${job.id}: ${result.error ?? "send failed"}`);
+        continue;
+      }
       await supabase
         .from("jobs")
         .update({ appointment_reminder_sent_at: new Date().toISOString() })

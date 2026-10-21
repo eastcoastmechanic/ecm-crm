@@ -81,7 +81,8 @@ async function sendScheduleNotifications(jobId: string) {
   }
 
   if (customer?.phone && customer?.sms_consent) {
-    await sendSMS(customer.phone, `East Coast Mechanical: You're scheduled for ${when}${whereText}.`);
+    const sent = await sendSMS(customer.phone, `East Coast Mechanical: You're scheduled for ${when}${whereText}.`);
+    if (!sent.ok) console.error(`Schedule confirmation text failed: ${sent.error}`);
   }
 
   if (OWNER_EMAIL) {
@@ -240,7 +241,8 @@ export async function markOnWay(jobId: string) {
   }
 
   if (customer?.phone && customer?.sms_consent) {
-    await sendSMS(customer.phone, message);
+    const sent = await sendSMS(customer.phone, message);
+    if (!sent.ok) console.error(`On-the-way text failed: ${sent.error}`);
   }
 
   revalidatePath("/jobs");

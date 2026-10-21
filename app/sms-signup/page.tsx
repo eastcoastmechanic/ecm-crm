@@ -30,8 +30,9 @@ export default async function SmsSignupPage({
 
         {success ? (
           <div className="rounded-xl border border-green/30 bg-green/10 p-4 text-white">
-            You&apos;re signed up! You&apos;ll receive text updates about your appointments at the
-            number you provided. Reply STOP at any time to opt out.
+            Almost done! We just sent a text to the number you provided. Reply YES to confirm and
+            start receiving appointment updates. Until you reply YES, we won&apos;t send you
+            anything else. Reply STOP at any time to opt out.
           </div>
         ) : (
           <>
@@ -65,7 +66,7 @@ export default async function SmsSignupPage({
                 <span>
                   I agree to receive text messages from East Coast Mechanical about my service
                   appointments. Message frequency varies based on my activity. Message and data
-                  rates may apply. Reply STOP at any time to opt out, or HELP for help. See our{" "}
+                  rates may apply. I will reply YES to the confirmation text to finish signing up. Reply STOP at any time to opt out, or HELP for help. See our{" "}
                   <Link href="/privacy" className="underline">
                     Privacy Policy
                   </Link>{" "}
@@ -81,7 +82,7 @@ export default async function SmsSignupPage({
                 type="submit"
                 className="w-fit rounded-lg bg-gradient-to-br from-accent to-accent-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90"
               >
-                Sign Up for Text Updates
+                Send Confirmation Text
               </button>
             </form>
           </>
