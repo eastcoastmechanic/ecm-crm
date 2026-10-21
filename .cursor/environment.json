@@ -1,0 +1,17 @@
+{
+  "name": "ECM CRM",
+  "user": "ubuntu",
+  "install": "bash scripts/dev/cloud-install.sh",
+  "start": "bash scripts/dev/cloud-start.sh",
+  "terminals": [
+    {
+      "name": "next-dev",
+      "command": "npm run dev",
+      "description": "Next.js dev server for the ECM CRM. Serves the app at http://localhost:3000 (internal app + customer portal + marketing)."
+    }
+  ],
+  "ports": [
+    { "name": "app", "port": 3000 },
+    { "name": "supabase-api", "port": 54321 }
+  ]
+}
