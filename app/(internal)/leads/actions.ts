@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
+import { canText } from "@/lib/sms-consent";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { syncLeadToGraph, deleteLeadFromGraph } from "@/lib/graph-connector";
 import { createPlannerTask } from "@/lib/planner-connector";
@@ -147,7 +148,14 @@ export async function sendLeadOutreach(formData: FormData) {
   if (lead.channel === "sms") {
     const to = lead.phone_number ?? customer?.phone;
     if (!to) throw new Error("No phone number on file for this lead");
-    await sendSMS(to, draft_message);
+    // A lead with no customer record needs an explicit opt-in on file.
+    if (!(await canText(to))) {
+      throw new Error(
+        "Can't text this lead: no SMS consent on file (or they opted out). Email them instead."
+      );
+    }
+    const sent = await sendSMS(to, draft_message);
+    if (!sent.ok) throw new Error(sent.error ?? "Text failed to send");
   } else if (lead.channel === "email") {
     if (!customer?.email) throw new Error("No email on file for this lead");
     const { error: sendError } = await resend.emails.send({
