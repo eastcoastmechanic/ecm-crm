@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { toE164, phoneKey } from "@/lib/phone";
 import { sendSMS } from "@/lib/sms";
-import { OPT_IN_CONFIRM_REQUEST, requestOptIn } from "@/lib/sms-consent";
+import { OPT_IN_CONFIRM_REQUEST, clearPendingOptIn, requestOptIn } from "@/lib/sms-consent";
 
 // Double opt-in: the form only records a pending request and texts the number.
 // Consent (customers.sms_consent / sms_optins) is written only when the owner
@@ -20,7 +20,11 @@ export async function signUpForSms(formData: FormData) {
   const shouldSend = await requestOptIn(phone, name);
   if (shouldSend) {
     const sent = await sendSMS(toE164(phone), OPT_IN_CONFIRM_REQUEST);
-    if (!sent.ok) throw new Error("We couldn't send the confirmation text. Please try again or call us.");
+    if (!sent.ok) {
+      // Don't let a failed send block the next attempt for 10 minutes.
+      await clearPendingOptIn(phone);
+      throw new Error("We couldn't send the confirmation text. Please try again or call us.");
+    }
   }
 
   redirect("/sms-signup?success=1");

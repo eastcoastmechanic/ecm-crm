@@ -32,21 +32,24 @@ export function parseSmsKeyword(body: string): SmsKeyword | null {
 type CustomerRow = { id: string; phone: string | null; sms_consent: boolean };
 
 async function customersForPhone(key: string): Promise<CustomerRow[]> {
-  const { data } = await supabase.from("customers").select("id, phone, sms_consent");
+  const { data, error } = await supabase.from("customers").select("id, phone, sms_consent");
+  if (error) throw new Error(`sms-consent: customers read failed: ${error.message}`);
   return ((data ?? []) as CustomerRow[]).filter((c) => c.phone && phoneKey(c.phone) === key);
 }
 
 async function excludedRowsForPhone(key: string) {
-  const { data } = await supabase.from("sms_excluded_numbers").select("id, phone_number, label");
+  const { data, error } = await supabase.from("sms_excluded_numbers").select("id, phone_number, label");
+  if (error) throw new Error(`sms-consent: exclusions read failed: ${error.message}`);
   return (data ?? []).filter((r) => phoneKey(r.phone_number) === key);
 }
 
 async function getOptin(key: string) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("sms_optins")
     .select("status, name, requested_at")
     .eq("phone_key", key)
     .maybeSingle();
+  if (error) throw new Error(`sms-consent: opt-in read failed: ${error.message}`);
   return data as { status: "pending" | "opted_in" | "opted_out"; name: string | null; requested_at: string } | null;
 }
 
@@ -66,46 +69,58 @@ export async function canText(
   const key = phoneKey(phone);
   if (!key) return false;
 
-  if ((await excludedRowsForPhone(key)).length > 0) return false;
+  // Fail closed: if we can't read consent state, we don't text.
+  try {
+    if ((await excludedRowsForPhone(key)).length > 0) return false;
 
-  const optin = await getOptin(key);
-  if (optin?.status === "opted_out") return false;
+    const optin = await getOptin(key);
+    if (optin?.status === "opted_out") return false;
 
-  const customers = await customersForPhone(key);
-  if (customers.length > 0) return customers.every((c) => c.sms_consent);
+    const customers = await customersForPhone(key);
+    if (customers.length > 0) return customers.every((c) => c.sms_consent);
 
-  if (optin?.status === "opted_in") return true;
-  return !!opts.allowUnknown;
+    if (optin?.status === "opted_in") return true;
+    return !!opts.allowUnknown;
+  } catch (err) {
+    console.error("[sms-consent] canText failed closed:", err);
+    return false;
+  }
 }
 
 async function setCustomerConsent(key: string, consent: boolean) {
   const customers = await customersForPhone(key);
   if (customers.length === 0) return;
-  await supabase
+  const { error } = await supabase
     .from("customers")
     .update({ sms_consent: consent, sms_consent_at: new Date().toISOString() })
     .in(
       "id",
       customers.map((c) => c.id)
     );
+  if (error) throw new Error(`sms-consent: customer update failed: ${error.message}`);
 }
 
 async function optOut(phone: string) {
   const key = phoneKey(phone);
   const now = new Date().toISOString();
-  await supabase
+  // Every step must succeed before we confirm the unsubscribe to the sender.
+  const { error } = await supabase
     .from("sms_optins")
     .upsert({ phone_key: key, phone: toE164(phone), status: "opted_out", updated_at: now });
+  if (error) throw new Error(`sms-consent: opt-out save failed: ${error.message}`);
   await setCustomerConsent(key, false);
   if ((await excludedRowsForPhone(key)).length === 0) {
-    await supabase.from("sms_excluded_numbers").insert({ phone_number: toE164(phone), label: OPT_OUT_LABEL });
+    const { error: exError } = await supabase
+      .from("sms_excluded_numbers")
+      .insert({ phone_number: toE164(phone), label: OPT_OUT_LABEL });
+    if (exError) throw new Error(`sms-consent: exclusion save failed: ${exError.message}`);
   }
 }
 
 async function optIn(phone: string, name: string | null, createCustomerIfMissing: boolean) {
   const key = phoneKey(phone);
   const now = new Date().toISOString();
-  await supabase.from("sms_optins").upsert({
+  const { error: optinError } = await supabase.from("sms_optins").upsert({
     phone_key: key,
     phone: toE164(phone),
     name,
@@ -113,26 +128,29 @@ async function optIn(phone: string, name: string | null, createCustomerIfMissing
     confirmed_at: now,
     updated_at: now,
   });
+  if (optinError) throw new Error(`sms-consent: opt-in save failed: ${optinError.message}`);
   const rows = (await excludedRowsForPhone(key)).filter((r) => r.label === OPT_OUT_LABEL);
   if (rows.length > 0) {
-    await supabase
+    const { error: delError } = await supabase
       .from("sms_excluded_numbers")
       .delete()
       .in(
         "id",
         rows.map((r) => r.id)
       );
+    if (delError) throw new Error(`sms-consent: exclusion removal failed: ${delError.message}`);
   }
   const customers = await customersForPhone(key);
   if (customers.length > 0) {
     await setCustomerConsent(key, true);
   } else if (createCustomerIfMissing) {
-    await supabase.from("customers").insert({
+    const { error: custError } = await supabase.from("customers").insert({
       name: name ?? "Unknown (SMS Signup)",
       phone: toE164(phone),
       sms_consent: true,
       sms_consent_at: now,
     });
+    if (custError) throw new Error(`sms-consent: customer create failed: ${custError.message}`);
   }
 }
 
@@ -151,6 +169,16 @@ export async function requestOptIn(phone: string, name: string | null): Promise<
     .upsert({ phone_key: key, phone: toE164(phone), name, status: "pending", requested_at: now, updated_at: now });
   if (error) throw new Error(error.message);
   return true;
+}
+
+/** Drop a pending request (e.g. the confirmation text failed to send) so the next attempt can retry. */
+export async function clearPendingOptIn(phone: string): Promise<void> {
+  const { error } = await supabase
+    .from("sms_optins")
+    .delete()
+    .eq("phone_key", phoneKey(phone))
+    .eq("status", "pending");
+  if (error) console.error("[sms-consent] could not clear pending opt-in:", error.message);
 }
 
 export const OPT_IN_CONFIRM_REQUEST = `${COMPANY_NAME}: Reply YES to confirm you want appointment text updates. Msg frequency varies. Msg&data rates may apply. Reply STOP to opt out, HELP for help.`;
