@@ -53,6 +53,7 @@ export async function routeToCrm(documentId: string): Promise<RouteResult> {
 
 type DocRow = StoredDocument & {
   id: string;
+  status: string | null;
   routed_to: string | null;
   square_invoice_id: string | null;
   customer_id: string | null;
@@ -75,7 +76,7 @@ export async function routeToSquare(documentId: string): Promise<RouteResult> {
   const { data, error: readError } = await supabase
     .from("documents")
     .select(
-      "id, doc_number, subtotal, tax, total, line_items, routed_to, square_invoice_id, customer_id, customers(id, name, email, phone, square_customer_id)"
+      "id, doc_number, status, subtotal, tax, total, line_items, routed_to, square_invoice_id, customer_id, customers(id, name, email, phone, square_customer_id)"
     )
     .eq("id", documentId)
     .eq("type", "estimate")
@@ -86,6 +87,20 @@ export async function routeToSquare(documentId: string): Promise<RouteResult> {
 
   if (doc.routed_to === "square") return { ok: true };
   if (doc.routed_to === "crm") return { error: "Already kept in the CRM." };
+  // Only drafts go to Square. A stale inbox must not invoice something already sent or paid.
+  if (doc.status !== "draft") {
+    return { error: `This estimate is already ${doc.status ?? "processed"}. Refresh the list.` };
+  }
+  if (doc.square_invoice_id) {
+    // A Square invoice is already linked (e.g. by the sync). Just record the routing.
+    await supabase
+      .from("documents")
+      .update({ routed_to: "square", routed_at: new Date().toISOString() })
+      .eq("id", doc.id)
+      .is("routed_to", null);
+    refresh();
+    return { ok: true };
+  }
 
   if (!isSquareConfigured()) return { error: "Square isn't set up yet (no access token on Vercel)." };
   const locationId = getSquareLocationId();
@@ -134,7 +149,7 @@ export async function routeToSquare(documentId: string): Promise<RouteResult> {
   });
   if (!invoice.ok) return { error: invoice.error };
 
-  const { error: saveError } = await supabase
+  const { data: saved, error: saveError } = await supabase
     .from("documents")
     .update({
       square_invoice_id: invoice.value,
@@ -142,10 +157,25 @@ export async function routeToSquare(documentId: string): Promise<RouteResult> {
       routed_at: new Date().toISOString(),
     })
     .eq("id", doc.id)
-    .is("routed_to", null);
+    .is("routed_to", null)
+    .select("id");
   if (saveError) {
     return {
       error: `Draft invoice is in Square but the CRM couldn't save the link (${saveError.message}). Tap again to retry; it won't duplicate.`,
+    };
+  }
+  if (!saved || saved.length === 0) {
+    // Someone routed this estimate in another tab while Square was working. Never lose the
+    // link to the invoice we just created: store it, then tell Josh plainly.
+    await supabase
+      .from("documents")
+      .update({ square_invoice_id: invoice.value })
+      .eq("id", doc.id)
+      .is("square_invoice_id", null);
+    refresh();
+    return {
+      error:
+        "This estimate was routed in another tab while the Square draft was being made. The draft invoice exists in Square and is linked here; delete it in Square if you don't want it.",
     };
   }
 

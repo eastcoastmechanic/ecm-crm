@@ -50,7 +50,17 @@ export type OrderLinesResult =
 export function mapLineItems(doc: StoredDocument): OrderLinesResult {
   const items = doc.line_items?.items ?? [];
   if (items.length === 0) return { ok: false, error: "This estimate has no line items." };
-  if (doc.line_items?.pricing_mode && doc.line_items.pricing_mode !== "flat") {
+  // Flat only. A stored pricing_mode that isn't "flat" is tiered. If no mode was stored at all,
+  // treat it as tiered whenever any line has a Good or Best price that differs from Better, so
+  // an unlabeled tiered estimate can never silently go out at the Better price.
+  const mode = doc.line_items?.pricing_mode;
+  const hasDistinctTiers = items.some((item) => {
+    const better = item.better ?? null;
+    return (
+      (item.good != null && item.good !== better) || (item.best != null && item.best !== better)
+    );
+  });
+  if ((mode && mode !== "flat") || (!mode && hasDistinctTiers)) {
     return { ok: false, error: "This estimate has Good/Better/Best options. Open it and pick one first." };
   }
 
