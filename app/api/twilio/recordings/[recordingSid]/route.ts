@@ -12,6 +12,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ rec
   }
 
   const { recordingSid } = await params;
+  if (!/^RE[0-9a-f]{32}$/.test(recordingSid)) {
+    return NextResponse.json({ error: "Invalid recording id" }, { status: 400 });
+  }
   const basicAuth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
   const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`,
