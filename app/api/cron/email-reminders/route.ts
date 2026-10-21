@@ -312,11 +312,6 @@ async function sendWarrantyAlerts() {
   return { sent, errors };
 }
 
-// Renewal price is not stored per contract (no column in db/migrations), so
-// this is the flat HVAC Basic Plan price from the price book ($299). Move it
-// onto service_contracts when plans can differ in price.
-const MAINTENANCE_RENEWAL_PRICE_CENTS = 29900;
-
 // Plans renew for one year; end_date is a plain YYYY-MM-DD.
 function addOneYear(isoDate: string) {
   const d = new Date(`${isoDate}T00:00:00Z`);
@@ -330,8 +325,15 @@ async function sendMaintenancePlanCharges() {
 
   const { data: contracts, error } = await supabase
     .from("service_contracts")
-    .select("id, plan_name, end_date, customers(id, name, email, stripe_customer_id)")
+    .select(
+      "id, plan_name, end_date, renewal_price_cents, stripe_payment_method_id, customers(id, name, email, stripe_customer_id)"
+    )
     .eq("status", "active")
+    // Only contracts where the customer agreed to automatic renewal, at a price on the
+    // contract (migration 0046). A saved card alone is NOT consent: checkout saves the
+    // card for every online payment.
+    .not("auto_renew_authorized_at", "is", null)
+    .gt("renewal_price_cents", 0)
     .gte("end_date", todayISODate())
     .lte("end_date", in7Days.toISOString().slice(0, 10))
     .is("auto_billed_at", null);
@@ -353,11 +355,14 @@ async function sendMaintenancePlanCharges() {
     }
 
     try {
-      const paymentMethods = await stripe.paymentMethods.list({
-        customer: customer.stripe_customer_id,
-        type: "card",
-      });
-      const paymentMethodId = paymentMethods.data[0]?.id;
+      const paymentMethodId =
+        contract.stripe_payment_method_id ??
+        (
+          await stripe.paymentMethods.list({
+            customer: customer.stripe_customer_id,
+            type: "card",
+          })
+        ).data[0]?.id;
       if (!paymentMethodId) {
         skipped++;
         continue;
@@ -365,7 +370,7 @@ async function sendMaintenancePlanCharges() {
 
       const intent = await stripe.paymentIntents.create(
         {
-          amount: MAINTENANCE_RENEWAL_PRICE_CENTS,
+          amount: contract.renewal_price_cents as number,
           currency: "usd",
           customer: customer.stripe_customer_id,
           payment_method: paymentMethodId,
