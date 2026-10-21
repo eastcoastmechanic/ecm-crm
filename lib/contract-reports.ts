@@ -30,6 +30,8 @@ export async function getContractForPdf(id: string): Promise<{
       scope_of_work: lineData.scopeOfWork,
       payment_terms: lineData.paymentTerms,
       warranty_terms: lineData.warrantyTerms,
+      auto_renew_price_cents: lineData.autoRenewPriceCents ?? null,
+      auto_renew_authorized_at: lineData.autoRenewAuthorizedAt ?? null,
       start_date: lineData.startDate,
       estimated_completion: lineData.estimatedCompletion,
       notes: lineData.notes,
