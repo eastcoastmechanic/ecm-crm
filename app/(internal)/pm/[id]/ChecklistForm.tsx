@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { filePmReport, savePmChecklist, uploadChecklistPhoto } from "../actions";
 import { downscaleImage } from "@/lib/downscale-image";
-import { temperatureSplit } from "@/lib/pm/report";
+import { applyReadingChange } from "@/lib/pm/report";
 import type { PmChecklistItem, PmResult } from "@/lib/pm/types";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass } from "../../ui";
 
@@ -159,18 +159,10 @@ export default function ChecklistForm({
                         value={row.readings[field.key] ?? ""}
                         onChange={(e) => {
                           const value = e.target.value;
-                          patch(row.item_key, (current) => {
-                            const readings = { ...current.readings, [field.key]: value };
-                            if (
-                              current.item_key === "supply_return" &&
-                              (field.key === "supply_f" || field.key === "return_f") &&
-                              !(current.readings.split_f ?? "").trim()
-                            ) {
-                              const split = temperatureSplit(readings.supply_f ?? "", readings.return_f ?? "");
-                              if (split) readings.split_f = split;
-                            }
-                            return { ...current, readings };
-                          });
+                          patch(row.item_key, (current) => ({
+                            ...current,
+                            readings: applyReadingChange(current.item_key, current.readings, field.key, value),
+                          }));
                         }}
                         className={inputClass}
                       />

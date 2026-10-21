@@ -59,6 +59,29 @@ export function temperatureSplit(supply: string, returnAir: string): string | nu
   return String(Math.round(Math.abs(returnN - supplyN) * 10) / 10);
 }
 
+/**
+ * Writes one reading. Supply and return keep the temperature split in step
+ * while it still matches the previous pair (or is blank). A split the tech
+ * typed by hand is left alone.
+ */
+export function applyReadingChange(
+  itemKey: string,
+  readings: Record<string, string>,
+  fieldKey: string,
+  value: string,
+): Record<string, string> {
+  const next = { ...readings, [fieldKey]: value };
+  if (itemKey !== "supply_return" || (fieldKey !== "supply_f" && fieldKey !== "return_f")) return next;
+
+  const previousAuto = temperatureSplit(readings.supply_f ?? "", readings.return_f ?? "");
+  const currentSplit = (readings.split_f ?? "").trim();
+  const typedByHand = currentSplit !== "" && currentSplit !== (previousAuto ?? "");
+  if (typedByHand) return next;
+
+  next.split_f = temperatureSplit(next.supply_f ?? "", next.return_f ?? "") ?? "";
+  return next;
+}
+
 export function openItemLabels(items: PmChecklistItem[]): string[] {
   return items.filter((item) => item.result == null).map((item) => item.label);
 }

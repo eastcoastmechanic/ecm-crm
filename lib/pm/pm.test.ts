@@ -8,7 +8,7 @@ import {
   RESIDENTIAL_PM_ITEMS,
 } from "@/lib/pm/templates";
 import { itemsFromTemplate, parseTemplateItems } from "@/lib/pm/schema";
-import { buildReportModel, documentSnapshot, temperatureSplit, toReportItem } from "@/lib/pm/report";
+import { applyReadingChange, buildReportModel, documentSnapshot, temperatureSplit, toReportItem } from "@/lib/pm/report";
 import { truckPmPayload, TRUCK_PM_HOOK_VERSION } from "@/lib/pm/truck-hook";
 
 describe("PM templates", () => {
@@ -51,6 +51,19 @@ describe("report model", () => {
   it("lists failures, hides blank readings, and computes a cooling split", () => {
     expect(temperatureSplit("55", "75")).toBe("20");
     expect(temperatureSplit("", "75")).toBeNull();
+
+    const cleared = applyReadingChange("supply_return", { supply_f: "55", return_f: "75", split_f: "20" }, "split_f", "");
+    const supply = applyReadingChange("supply_return", cleared, "supply_f", "58");
+    const both = applyReadingChange("supply_return", supply, "return_f", "76");
+    expect(both.split_f).toBe("18");
+
+    const overridden = applyReadingChange(
+      "supply_return",
+      { supply_f: "55", return_f: "75", split_f: "12" },
+      "supply_f",
+      "58",
+    );
+    expect(overridden.split_f).toBe("12");
 
     const [filters, coil] = itemsFromTemplate(RESIDENTIAL_PM_ITEMS.filter((item) => item.key === "filters" || item.key === "evaporator_coil"));
     filters.result = "fail";
