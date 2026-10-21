@@ -2,6 +2,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { formatEtTime } from "@/lib/tz";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
@@ -33,10 +34,7 @@ export async function GET(request: Request) {
   for (const job of jobs ?? []) {
     const customer = job.customers as unknown as { name: string | null } | null;
     const property = job.properties as unknown as { address: string | null } | null;
-    const when = new Date(job.scheduled_at).toLocaleString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    const when = formatEtTime(job.scheduled_at);
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
