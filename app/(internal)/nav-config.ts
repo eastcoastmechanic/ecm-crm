@@ -42,6 +42,7 @@ export const navEntries: NavEntry[] = [
     label: "Operations",
     items: [
       { href: "/jobs", label: "Jobs" },
+      { href: "/pm", label: "Maintenance" },
       { href: "/diagnostics", label: "Diagnostics" },
       { href: "/tasks", label: "Tasks" },
       { href: "/inventory", label: "Inventory" },
@@ -57,8 +58,9 @@ export const navEntries: NavEntry[] = [
   },
 ];
 
-// Techs get the truck screen and nothing else. Keep in sync with TECH_ALLOWED_PATHS in proxy.ts.
-export const TECH_VISIBLE_PATHS = ["/field-board"];
+// Techs get the truck screen and the PM checklists they fill on site.
+// Keep in sync with TECH_ALLOWED_PATHS in proxy.ts.
+export const TECH_VISIBLE_PATHS = ["/field-board", "/pm"];
 
 export const STAFF_TABS: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: "home" },
@@ -67,7 +69,10 @@ export const STAFF_TABS: NavItem[] = [
   { href: "/field-board", label: "Field", icon: "hub" },
 ];
 
-export const TECH_TABS: NavItem[] = [{ href: "/field-board", label: "Field", icon: "hub" }];
+export const TECH_TABS: NavItem[] = [
+  { href: "/field-board", label: "Field", icon: "hub" },
+  { href: "/pm", label: "PM", icon: "jobs" },
+];
 
 export function flattenNavItems(entries: NavEntry[] = navEntries): NavItem[] {
   return entries.flatMap((entry) => (isGroup(entry) ? entry.items : [entry]));

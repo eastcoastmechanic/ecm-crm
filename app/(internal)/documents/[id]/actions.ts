@@ -10,6 +10,7 @@ import { getWarrantyReportForPdf } from "@/lib/warranty-reports";
 import { renderWarrantyReportPdf } from "@/lib/warranty-report-pdf";
 import { getContractForPdf } from "@/lib/contract-reports";
 import { renderContractPdf } from "@/lib/contract-pdf";
+import { sendPmReportToCustomer } from "@/lib/pm/send";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { markDocumentPaid } from "@/lib/document-paid";
 import { requireOffice } from "@/lib/require-role";
@@ -301,6 +302,13 @@ export async function sendDocumentEmail(formData: FormData) {
       .eq("id", id);
     if (updateError) throw new Error(updateError.message);
 
+    revalidatePath(`/documents/${id}`);
+    revalidatePath("/documents");
+    return;
+  }
+
+  if (docType?.type === "pm_report") {
+    await sendPmReportToCustomer(id);
     revalidatePath(`/documents/${id}`);
     revalidatePath("/documents");
     return;

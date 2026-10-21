@@ -33,10 +33,14 @@ ecm-crm/
     ROADMAP.md            # Phased build plan
 ```
 
-## Build Order (see docs/ROADMAP.md for detail)
-1. Data backbone: Customers, Properties, Equipment, Price Book
-2. AI-generated Estimates/Invoices/Proposals
-3. Diagnostic tool (equipment specs + readings → Claude analysis)
-4. Client portal + Stripe payments
-5. Email automation
-6. Scheduling/dispatch
+## Preventive maintenance
+
+Maintenance visits use checklists stored in Postgres, not hardcoded in the page. Apply `db/migrations/0048_preventive_maintenance.sql` before using the screens. The migration is not applied by the deploy.
+
+- **Checklists.** Maintenance → New checklist. Pick the job (maintenance jobs are listed first), the equipment on that property, and the residential or commercial template. Each item is pass, fail, or N/A, with the readings that item needs (µF, psig, °F, amps, ppm, inches of water column), a note, and a photo. Photos go in the private `pm-photos` bucket. Save as you go. Filing the report requires a technician name and a result on every item. Office staff can edit template items under Maintenance → Edit templates; a checklist already started keeps the copy it was created with.
+- **Data plate.** On an equipment row, Scan data plate takes a photo and proposes manufacturer, model, serial, and manufacture date. The date is the one printed on the plate, or a Carrier-family week/year or Goodman-family year/month decode when the brand is one of those and no date is printed. Nothing is written until Save confirmed plate. A value already on the equipment is kept unless Replace is checked. New equipment uses the same rule: the add form is a proposal until Add Equipment. OCR is Claude vision through `ANTHROPIC_API_KEY` (already used for nameplates). There is no second key and nothing is hardcoded.
+- **Report.** File report writes a `documents` row with `type = pm_report`, linked to the job, customer, and property. The printable page is `/pm/<id>/report` and the PDF is `/pm/<id>/report/pdf`. The header is East Coast Mechanical, the tagline BUILT WITH PRIDE, INSTALLED WITH PRECISION, (774) 343-6369, and joshcrowleyecm@outlook.com. The document is inserted as `draft`, so the customer portal's "not a draft" policy does not show it until someone emails it. The portal page renders a PM report on its own and does not treat it as an estimate.
+- **Truck CRM.** Nothing calls ecm-field.grok.me. The read hook is `GET /api/integrations/truck-crm/pm?job_id=<uuid>` with `Authorization: Bearer` set to the same secret the field board already accepts (`FIELD_BOARD_SECRET`, `FIELD_BOARD_APP_KEY`, `CRON_SECRET`, or `MCP_API_KEY`). The JSON is version 1: checklist id, status, template, tech, summary counts, failures, and the CRM paths for the checklist and the report.
+
+Techs signed in with the tech role can open `/pm` on a phone. The field-board APIs are unchanged.
+

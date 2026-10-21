@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { signStoredPhotos } from "@/lib/photo-urls";
@@ -121,6 +121,12 @@ export default async function DocumentPage({
     .single();
 
   if (error || !doc) notFound();
+
+  if (doc.type === "pm_report") {
+    const checklistId = (doc.line_items as { checklist_id?: string } | null)?.checklist_id;
+    if (checklistId) redirect(`/pm/${checklistId}/report`);
+    notFound();
+  }
 
   if (doc.type === "assessment") {
     // Assessment photos live in a private bucket and hang off each item, so

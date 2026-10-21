@@ -17,6 +17,7 @@ const typeLabel: Record<string, string> = {
   invoice: "Invoice",
   proposal: "Proposal",
   contract: "Contract",
+  pm_report: "Maintenance report",
 };
 
 const statusClass: Record<string, string> = {

@@ -26,3 +26,6 @@ export const HIC_REGISTRATION_NUMBER = "";
 /** Same face-of-contract requirement as the HIC number above — fill in before issuing a real contract. */
 export const COMPANY_ADDRESS = "37 Plaza Way, Unit 2304, Plymouth, MA 02360";
 export const COMPANY_PHONE = "774-343-6369";
+/** Parenthesized form used on the preventive-maintenance report. */
+export const COMPANY_PHONE_DISPLAY = "(774) 343-6369";
+export const COMPANY_EMAIL = "joshcrowleyecm@outlook.com";

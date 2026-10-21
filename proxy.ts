@@ -25,13 +25,15 @@ const INTERNAL_PATH_PREFIXES = [
   "/field-board",
   "/tech-hub",
   "/procurement",
+  "/pm",
   "/api/twilio/recordings",
 ];
 
-// The "tech" role is the truck app only. Everything else (money, customers, analytics,
-// documents, the assistant) is blocked here on the server, not just hidden from the menu.
+// Techs use the truck screen and the PM checklists they fill on a phone.
+// Everything else (money, customers, analytics, documents, the assistant) is
+// blocked here on the server, not just hidden from the menu.
 // The print sheet is excluded on purpose: it lists unpaid invoice amounts.
-const TECH_ALLOWED_PATHS = ["/field-board"];
+const TECH_ALLOWED_PATHS = ["/field-board", "/pm"];
 const TECH_BLOCKED_PATHS = ["/field-board/print"];
 
 function techMayAccess(pathname: string) {
@@ -222,6 +224,8 @@ export const config = {
     "/tech-hub",
     "/procurement/:path*",
     "/procurement",
+    "/pm/:path*",
+    "/pm",
     "/api/twilio/recordings/:path*",
     "/api/internal-chat",
     "/api/ingest/readings",
