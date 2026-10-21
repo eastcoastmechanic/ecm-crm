@@ -91,7 +91,14 @@ async function checkStaffSession(
 
 export async function proxy(request: NextRequest) {
   if (isInternalPath(request.nextUrl.pathname)) {
-    if (hasValidBasicAuth(request)) return NextResponse.next();
+    if (hasValidBasicAuth(request)) {
+      // The shared Basic-auth login is treated as owner. Drop any client-sent
+      // x-staff-role first so it can never be spoofed on this path.
+      const basicHeaders = new Headers(request.headers);
+      basicHeaders.delete("x-staff-role");
+      basicHeaders.set("x-staff-role", "owner");
+      return NextResponse.next({ request: { headers: basicHeaders } });
+    }
 
     const { role, response } = await checkStaffSession(request);
     if (!role) {

@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { idsWhere, idsWhereIn, unique, cascadeUnlinkEquipment, cascadeUnlinkJobs, cascadeUnlinkDocuments } from "@/lib/cascade-delete";
 import { syncCustomerToGraph, deleteCustomerFromGraph, deleteJobFromGraph, deleteDocumentFromGraph } from "@/lib/graph-connector";
+import { requireOffice } from "@/lib/require-role";
 
 export async function addCustomer(formData: FormData) {
+  await requireOffice();
   const name = (formData.get("name") as string)?.trim();
   const email = (formData.get("email") as string)?.trim();
   const phone = (formData.get("phone") as string)?.trim();
@@ -43,6 +45,7 @@ export async function addCustomer(formData: FormData) {
 }
 
 export async function updateCustomer(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const name = (formData.get("name") as string)?.trim();
   const email = (formData.get("email") as string)?.trim();
@@ -76,6 +79,7 @@ export async function updateCustomer(formData: FormData) {
 }
 
 export async function deleteCustomer(id: string): Promise<{ error?: string }> {
+  await requireOffice();
   if (!id) return { error: "Missing customer id" };
 
   try {

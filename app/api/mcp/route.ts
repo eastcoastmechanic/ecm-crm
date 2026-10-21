@@ -4,6 +4,7 @@ import type { AuthInfo } from "@modelcontextprotocol/server";
 import { buildMcpTools } from "@/lib/internal-assistant/tools-mcp";
 import { supabase } from "@/lib/supabase";
 import { hashToken } from "@/lib/oauth";
+import { runAsStaffRole } from "@/lib/require-role";
 
 /**
  * The MCP endpoint Josh's own Claude client connects to directly -- a third
@@ -86,4 +87,8 @@ const verifyToken = async (_req: Request, bearerToken?: string): Promise<AuthInf
 
 const authHandler = withMcpAuth(handler, verifyToken, { required: true });
 
-export { authHandler as GET, authHandler as POST, authHandler as DELETE };
+// Reached only with the static MCP key or a valid OAuth token (Josh's own
+// client), neither of which passes proxy.ts, so tool calls run as owner.
+const asOwner = (request: Request) => runAsStaffRole("owner", () => authHandler(request));
+
+export { asOwner as GET, asOwner as POST, asOwner as DELETE };

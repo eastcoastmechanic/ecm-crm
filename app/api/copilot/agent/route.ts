@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { respondToInternalChat, type ChatMessage } from "@/lib/internal-assistant/agent";
 import { isRateLimited } from "@/lib/rate-limit";
+import { runAsStaffRole } from "@/lib/require-role";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TURNS = 60;
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
 
   const startedAt = Date.now();
   try {
-    const reply = await respondToInternalChat(messages, { fast: true });
+    const reply = await runAsStaffRole("owner", () => respondToInternalChat(messages, { fast: true }));
     console.log(`[copilot/agent] total ${Date.now() - startedAt}ms`);
     return NextResponse.json({ reply });
   } catch (err) {
