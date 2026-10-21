@@ -5,8 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FIELD_BOARD_URL } from "@/lib/field-board-links";
 import { pageTitle } from "./nav-config";
+import { staffSignOut } from "./sign-out";
 
-export default function AppHeader() {
+export default function AppHeader({ role }: { role?: string | null }) {
+  const isTech = role === "tech";
   const pathname = usePathname();
   const title = pageTitle(pathname);
 
@@ -20,21 +22,35 @@ export default function AppHeader() {
         <div className="min-w-0 flex-1">
           <div className="truncate font-display text-base font-bold tracking-wide">{title}</div>
         </div>
-        <a
-          href={FIELD_BOARD_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="hidden h-9 shrink-0 items-center rounded-full border border-white/10 bg-white/6 px-3 text-[11px] font-bold uppercase tracking-wide text-g300 hover:bg-white/10 hover:text-white sm:flex"
-        >
-          Board
-        </a>
-        <Link
-          href="/account"
-          aria-label="Account"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/6 text-xs font-bold text-g300 hover:bg-white/10 hover:text-white"
-        >
-          Me
-        </Link>
+        {isTech ? (
+          // Techs get the truck screen only: no external board, no account page.
+          <form action={staffSignOut}>
+            <button
+              type="submit"
+              className="flex h-9 shrink-0 items-center rounded-full border border-white/10 bg-white/6 px-3 text-[11px] font-bold uppercase tracking-wide text-g300 hover:bg-white/10 hover:text-white"
+            >
+              Sign out
+            </button>
+          </form>
+        ) : (
+          <>
+            <a
+              href={FIELD_BOARD_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="hidden h-9 shrink-0 items-center rounded-full border border-white/10 bg-white/6 px-3 text-[11px] font-bold uppercase tracking-wide text-g300 hover:bg-white/10 hover:text-white sm:flex"
+            >
+              Board
+            </a>
+            <Link
+              href="/account"
+              aria-label="Account"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/6 text-xs font-bold text-g300 hover:bg-white/10 hover:text-white"
+            >
+              Me
+            </Link>
+          </>
+        )}
       </div>
     </header>
   );

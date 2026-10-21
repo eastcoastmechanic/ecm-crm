@@ -14,6 +14,7 @@ import {
 import { syncJobToGraph } from "@/lib/graph-connector";
 import { syncJobToPlanner } from "@/lib/planner-connector";
 import { applyJobStatus, sendScheduleNotifications } from "@/lib/job-lifecycle";
+import { requireOffice } from "@/lib/require-role";
 
 export async function createServiceCall() {
   const { data: job, error } = await supabase
@@ -55,6 +56,7 @@ export async function updateJobStatus(formData: FormData) {
 }
 
 export async function rescheduleJob(jobId: string, newDate: string) {
+  await requireOffice();
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
     .select("scheduled_at")
