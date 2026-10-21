@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { extractFromImage } from "@/lib/vision-extract";
 import { cascadeUnlinkEquipment } from "@/lib/cascade-delete";
+import { requireOffice } from "@/lib/require-role";
 
 const NameplateSchema = z.object({
   type: z.string().nullable(),
@@ -136,6 +137,7 @@ export async function updateEquipment(formData: FormData) {
 
 // Deletes equipment and its diagnostics; unlinks any leads that reference it.
 export async function deleteEquipment(id: string): Promise<{ error?: string }> {
+  await requireOffice();
   await cascadeUnlinkEquipment([id]);
 
   const { error } = await supabase.from("equipment").delete().eq("id", id);

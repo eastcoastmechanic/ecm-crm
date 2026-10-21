@@ -7,6 +7,7 @@ import { renderServiceReportPdf } from "@/lib/service-report-pdf";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createInvoiceDirect, type DirectLineItem } from "@/lib/document-generation";
+import { requireOffice } from "@/lib/require-role";
 
 export async function assignCustomer(formData: FormData) {
   const diagnosticId = formData.get("diagnostic_id") as string;
@@ -157,6 +158,7 @@ export async function finishServiceReport(formData: FormData) {
   let invoiceDocumentId: string | null = diagnostic.invoice_document_id ?? null;
 
   if (createInvoice && !invoiceDocumentId) {
+    await requireOffice();
     if (!customerId) throw new Error("Assign a customer before creating an invoice");
 
     const actualPartsUsed = (diagnostic.actual_parts_used ?? []) as {
@@ -223,6 +225,7 @@ export async function finishServiceReport(formData: FormData) {
 }
 
 export async function sendServiceReportEmail(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
 
   const { data, customerEmail, error } = await getServiceReportForPdf(id);

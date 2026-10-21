@@ -6,8 +6,10 @@ import { sendSMS } from "@/lib/sms";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { syncLeadToGraph, deleteLeadFromGraph } from "@/lib/graph-connector";
 import { createPlannerTask } from "@/lib/planner-connector";
+import { requireOffice } from "@/lib/require-role";
 
 export async function updateLeadDraft(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const draft_message = (formData.get("draft_message") as string) ?? "";
 
@@ -20,6 +22,7 @@ export async function updateLeadDraft(formData: FormData) {
 }
 
 export async function markContacted(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
 
   const { error } = await supabase
@@ -34,6 +37,7 @@ export async function markContacted(formData: FormData) {
 }
 
 export async function dismissLead(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
 
   const { error } = await supabase
@@ -48,6 +52,7 @@ export async function dismissLead(formData: FormData) {
 }
 
 export async function addManualLead(formData: FormData) {
+  await requireOffice();
   const contact_name = (formData.get("contact_name") as string)?.trim();
   const phone_number = (formData.get("phone_number") as string)?.trim() || null;
   const email = (formData.get("email") as string)?.trim() || null;
@@ -94,6 +99,7 @@ export async function addManualLead(formData: FormData) {
 }
 
 export async function setLeadStage(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const status = formData.get("status") as string;
 
@@ -110,6 +116,7 @@ export async function setLeadStage(formData: FormData) {
 }
 
 export async function deleteLead(id: string): Promise<{ error?: string }> {
+  await requireOffice();
   const { error } = await supabase.from("leads").delete().eq("id", id);
   if (error) return { error: error.message };
 
@@ -120,6 +127,7 @@ export async function deleteLead(id: string): Promise<{ error?: string }> {
 }
 
 export async function sendLeadOutreach(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const draft_message = (formData.get("draft_message") as string) ?? "";
 

@@ -7,6 +7,7 @@ import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { extractFromImage } from "@/lib/vision-extract";
 import { createMassSaveRebateForCustomer, type MassSaveEquipmentInput } from "@/lib/mass-save-rebate-creation";
 import { NEW_CUSTOMER_VALUE, NEW_PROPERTY_VALUE } from "../../../intake-constants";
+import { requireOffice } from "@/lib/require-role";
 
 const LabelSchema = z.object({
   brand: z.string().nullable(),
@@ -42,6 +43,7 @@ function firstOrNull(formData: FormData, key: string): string | null {
 }
 
 export async function submitMassSaveRebate(formData: FormData) {
+  await requireOffice();
   let customer_id = formData.get("customer_id") as string;
   let property_id = formData.get("property_id") as string;
   const rowCount = Number(formData.get("equipment_row_count") ?? 0);
