@@ -117,7 +117,7 @@ export default function ContractView({
       {doc.status === "sent" && <ContractSignaturePad documentId={doc.id} />}
       {doc.status === "signed" && (
         <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">
-          Signed{doc.signed_at ? ` on ${new Date(doc.signed_at).toLocaleString()}` : ""}. We'll be
+          Signed{doc.signed_at ? ` on ${new Date(doc.signed_at).toLocaleString()}` : ""}. We&apos;ll be
           in touch to schedule the work.
         </div>
       )}

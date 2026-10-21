@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { syncInventoryItemToGraph } from "@/lib/graph-connector";
+import { requireOffice } from "@/lib/require-role";
 
 export async function addInventoryItem(formData: FormData) {
+  await requireOffice();
   const price_book_item_id = (formData.get("price_book_item_id") as string) || null;
   const qty_on_hand = Number(formData.get("qty_on_hand")) || 0;
   const reorder_threshold = formData.get("reorder_threshold")
@@ -30,6 +32,7 @@ export async function addInventoryItem(formData: FormData) {
 }
 
 export async function adjustInventoryQty(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const qty_on_hand = Number(formData.get("qty_on_hand"));
 

@@ -13,8 +13,8 @@ export default function ServicesPage() {
     <div className="mx-auto max-w-6xl px-6 py-16">
       <h1 className="font-display text-3xl font-extrabold tracking-wide sm:text-4xl">Our Services</h1>
       <p className="mt-3 max-w-2xl text-sm text-g300 sm:text-base">
-        Whatever's keeping your home from feeling right, we handle it. Pick a service below for more
-        detail, or just book online and tell us what's going on.
+        Whatever&apos;s keeping your home from feeling right, we handle it. Pick a service below for more
+        detail, or just book online and tell us what&apos;s going on.
       </p>
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

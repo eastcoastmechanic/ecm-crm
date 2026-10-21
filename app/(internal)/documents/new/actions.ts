@@ -4,8 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { generateDocumentForCustomer } from "@/lib/document-generation";
 import { NEW_CUSTOMER_VALUE } from "../../intake-constants";
+import { requireOffice } from "@/lib/require-role";
 
 export async function generateDocument(formData: FormData) {
+  await requireOffice();
   const customer_id = formData.get("customer_id") as string;
   const property_id = (formData.get("property_id") as string) || null;
   const type = formData.get("type") as "estimate" | "invoice" | "proposal";

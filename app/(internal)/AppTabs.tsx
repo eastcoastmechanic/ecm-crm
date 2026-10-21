@@ -92,9 +92,13 @@ export default function AppTabs({ role }: { role?: string | null }) {
     moreOpen ||
     (!tabs.some((tab) => isNavActive(tab.href, pathname)) && pathname !== "/account");
 
-  useEffect(() => {
+  // Close the menu on navigation. Adjusting state during render (rather than
+  // in an effect) avoids an extra committed render with the stale menu open.
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname);
     setMoreOpen(false);
-  }, [pathname]);
+  }
 
   useEffect(() => {
     if (!moreOpen) return;

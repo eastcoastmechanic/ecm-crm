@@ -5,8 +5,10 @@ import { revalidatePath } from "next/cache";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createWarrantyForCustomer, type WarrantyEquipmentInput } from "@/lib/warranty-creation";
 import { NEW_CUSTOMER_VALUE, NEW_PROPERTY_VALUE } from "../../../intake-constants";
+import { requireOffice } from "@/lib/require-role";
 
 export async function submitWarranty(formData: FormData) {
+  await requireOffice();
   let customer_id = formData.get("customer_id") as string;
   let property_id = formData.get("property_id") as string;
   const rowCount = Number(formData.get("row_count") ?? 0);

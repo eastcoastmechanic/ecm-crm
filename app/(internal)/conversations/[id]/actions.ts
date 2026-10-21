@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
+import { requireOffice } from "@/lib/require-role";
 
 type TranscriptEntry = { role: "user" | "assistant"; content: string };
 
 export async function sendManualReply(formData: FormData) {
+  await requireOffice();
   const conversationId = formData.get("conversation_id") as string;
   const message = (formData.get("message") as string)?.trim();
   if (!message) throw new Error("Message can't be empty");
