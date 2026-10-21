@@ -9,6 +9,13 @@ export default async function DocumentsPage() {
     .select("*, customers(name)")
     .order("created_at", { ascending: false });
 
+  const { count: waiting } = await supabase
+    .from("documents")
+    .select("id", { count: "exact", head: true })
+    .eq("type", "estimate")
+    .eq("status", "draft")
+    .is("routed_to", null);
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -19,6 +26,9 @@ export default async function DocumentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/documents/inbox" className={buttonSecondaryClass}>
+            Estimates to review{waiting ? ` (${waiting})` : ""}
+          </Link>
           <Link href="/documents/mass-save-rebate/new" className={buttonSecondaryClass}>
             + New Mass Save Rebate
           </Link>

@@ -31,6 +31,7 @@ export const navEntries: NavEntry[] = [
     items: [
       { href: "/leads", label: "Leads" },
       { href: "/documents", label: "Documents" },
+      { href: "/documents/inbox", label: "Estimates to review" },
       { href: "/payments", label: "Payments" },
       { href: "/catalog", label: "Catalog" },
       { href: "/price-book", label: "Price Book" },
