@@ -2,6 +2,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
+import { addDaysToDateKey, etDateKey, etDayRange, formatEtDateTime } from "@/lib/tz";
 
 type CustomerContact = { name: string | null; phone: string | null; sms_consent: boolean } | null;
 
@@ -10,18 +11,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const tomorrowStart = new Date();
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-  tomorrowStart.setHours(0, 0, 0, 0);
-  const tomorrowEnd = new Date(tomorrowStart);
-  tomorrowEnd.setHours(23, 59, 59, 999);
+  // "Tomorrow" is the New York calendar day, not the server's (UTC) day.
+  const tomorrow = etDayRange(addDaysToDateKey(etDateKey(), 1));
 
   const { data: jobs, error } = await supabase
     .from("jobs")
     .select("id, scheduled_at, customers(name, phone, sms_consent), properties(address)")
     .in("status", ["scheduled", "in_progress"])
-    .gte("scheduled_at", tomorrowStart.toISOString())
-    .lte("scheduled_at", tomorrowEnd.toISOString())
+    .gte("scheduled_at", tomorrow.start.toISOString())
+    .lt("scheduled_at", tomorrow.end.toISOString())
     .is("appointment_reminder_sent_at", null);
 
   if (error) return NextResponse.json({ sent: 0, errors: [error.message] });
@@ -39,7 +37,7 @@ export async function GET(request: Request) {
       continue;
     }
 
-    const when = new Date(job.scheduled_at).toLocaleString("en-US", {
+    const when = formatEtDateTime(job.scheduled_at, {
       weekday: "short",
       hour: "numeric",
       minute: "2-digit",

@@ -180,41 +180,53 @@ async function sendStaleEstimateFollowUps() {
 
   for (const estimate of estimates ?? []) {
     const customer = estimate.customers as unknown as CustomerContact;
-
-    // First time this estimate shows up stale, flag it for staff too --
-    // the customer email below repeats every 7 days, but one Planner card
-    // per estimate is enough; it isn't going anywhere until someone acts on it.
-    if (!estimate.last_reminder_sent_at) {
-      await createPlannerTask({
-        title: `Follow up: ${customer?.name ?? "Customer"} — estimate ${estimate.doc_number ?? ""}`,
-        notes: `Sitting at "sent" with no response for 5+ days.`,
-        bucket: "tasks",
-      });
-    }
-
+    const isFirstReminder = !estimate.last_reminder_sent_at;
     const email = customer?.email;
-    if (!email) continue;
 
-    const { error: sendError } = await resend.emails.send({
-      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
-      replyTo: RESEND_REPLY_TO,
-      to: email,
-      subject: `Following up on estimate ${estimate.doc_number ?? ""}`,
-      text: `Hi ${customer?.name ?? ""},\n\nJust checking in on estimate ${estimate.doc_number ?? ""} for ${formatPrice(
-        estimate.total ?? 0
-      )}. Let us know if you have any questions or would like to move forward — happy to help either way.\n\nEast Coast Mechanical`,
-    });
+    if (email) {
+      const { error: sendError } = await resend.emails.send({
+        from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+        replyTo: RESEND_REPLY_TO,
+        to: email,
+        subject: `Following up on estimate ${estimate.doc_number ?? ""}`,
+        text: `Hi ${customer?.name ?? ""},\n\nJust checking in on estimate ${estimate.doc_number ?? ""} for ${formatPrice(
+          estimate.total ?? 0
+        )}. Let us know if you have any questions or would like to move forward — happy to help either way.\n\nEast Coast Mechanical`,
+      });
 
-    if (sendError) {
-      errors.push(`estimate ${estimate.id}: ${sendError.message}`);
-      continue;
+      if (sendError) {
+        errors.push(`estimate ${estimate.id}: ${sendError.message}`);
+        continue;
+      }
     }
 
-    await supabase
+    // The marker is written whether or not there was an email to send, and
+    // before the Planner card, so a customer with no email address doesn't
+    // get a new card every day and a failed card can't be created twice.
+    const { error: updateError } = await supabase
       .from("documents")
       .update({ last_reminder_sent_at: new Date().toISOString() })
       .eq("id", estimate.id);
-    sent++;
+    if (updateError) {
+      errors.push(`estimate ${estimate.id}: ${updateError.message}`);
+      continue;
+    }
+    if (email) sent++;
+
+    // First time this estimate shows up stale, flag it for staff too --
+    // the customer email repeats every 7 days, but one Planner card
+    // per estimate is enough; it isn't going anywhere until someone acts on it.
+    if (isFirstReminder) {
+      try {
+        await createPlannerTask({
+          title: `Follow up: ${customer?.name ?? "Customer"} — estimate ${estimate.doc_number ?? ""}`,
+          notes: `Sitting at "sent" with no response for 5+ days.`,
+          bucket: "tasks",
+        });
+      } catch (err) {
+        errors.push(`estimate ${estimate.id} planner card: ${err instanceof Error ? err.message : "failed"}`);
+      }
+    }
   }
 
   return { sent, errors };
@@ -239,12 +251,8 @@ async function sendMassSaveStallAlerts() {
   for (const rebate of rebates ?? []) {
     const customer = rebate.customers as unknown as CustomerContact;
 
-    await createPlannerTask({
-      title: `Mass Save stalled: ${customer?.name ?? "Customer"} — ${rebate.doc_number ?? ""}`,
-      notes: `Submitted 14+ days ago with no status update. Check on approval.`,
-      bucket: "tasks",
-    });
-
+    // Flag first: if the card fails we log it, but the next run can't
+    // create a second card for the same rebate.
     const { error: updateError } = await supabase
       .from("documents")
       .update({ last_reminder_sent_at: new Date().toISOString() })
@@ -254,6 +262,16 @@ async function sendMassSaveStallAlerts() {
       continue;
     }
     flagged++;
+
+    try {
+      await createPlannerTask({
+        title: `Mass Save stalled: ${customer?.name ?? "Customer"} — ${rebate.doc_number ?? ""}`,
+        notes: `Submitted 14+ days ago with no status update. Check on approval.`,
+        bucket: "tasks",
+      });
+    } catch (err) {
+      errors.push(`rebate ${rebate.id} planner card: ${err instanceof Error ? err.message : "failed"}`);
+    }
   }
 
   return { flagged, errors };
@@ -385,31 +403,30 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [
-    invoiceReminders,
-    contractRenewals,
-    jobFollowUps,
-    estimateFollowUps,
-    massSaveStallAlerts,
-    warrantyAlerts,
-    maintenancePlanCharges,
-  ] = await Promise.all([
-    sendOverdueInvoiceReminders(),
-    sendContractRenewalNotices(),
-    sendJobFollowUps(),
-    sendStaleEstimateFollowUps(),
-    sendMassSaveStallAlerts(),
-    sendWarrantyAlerts(),
-    sendMaintenancePlanCharges(),
-  ]);
+  // One failing job must not throw away the results (and already-sent emails)
+  // of the others, so settle them all and report each outcome.
+  const jobs = {
+    invoiceReminders: sendOverdueInvoiceReminders,
+    contractRenewals: sendContractRenewalNotices,
+    jobFollowUps: sendJobFollowUps,
+    estimateFollowUps: sendStaleEstimateFollowUps,
+    massSaveStallAlerts: sendMassSaveStallAlerts,
+    warrantyAlerts: sendWarrantyAlerts,
+    maintenancePlanCharges: sendMaintenancePlanCharges,
+  };
+  const names = Object.keys(jobs) as (keyof typeof jobs)[];
+  const settled = await Promise.allSettled(names.map((name) => jobs[name]()));
 
-  return NextResponse.json({
-    invoiceReminders,
-    contractRenewals,
-    jobFollowUps,
-    estimateFollowUps,
-    massSaveStallAlerts,
-    warrantyAlerts,
-    maintenancePlanCharges,
+  const body: Record<string, unknown> = {};
+  settled.forEach((outcome, i) => {
+    if (outcome.status === "fulfilled") {
+      body[names[i]] = outcome.value;
+    } else {
+      const message = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+      console.error(`[email-reminders] ${names[i]} failed:`, outcome.reason);
+      body[names[i]] = { errors: [message], failed: true };
+    }
   });
+
+  return NextResponse.json(body);
 }
