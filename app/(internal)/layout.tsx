@@ -12,7 +12,7 @@ export default async function InternalLayout({
 
   return (
     <div className="app-shell min-h-dvh md:pl-52">
-      <AppHeader />
+      <AppHeader role={staffRole} />
       <main className="mx-auto max-w-6xl px-4 py-5 pb-[calc(6.25rem+env(safe-area-inset-bottom))] md:px-6 md:py-8 md:pb-8">
         {children}
       </main>

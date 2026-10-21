@@ -58,10 +58,12 @@ async function getTruckJobs(): Promise<TruckJob[]> {
     .select(
       "id, status, scheduled_at, notes, job_type, on_way_at, photos, customers(name, phone), properties(address)"
     )
-    .or(`status.eq.in_progress,and(scheduled_at.gte.${from},scheduled_at.lte.${to})`)
+    // Every job that isn't finished or cancelled (so the tech can pick any of them),
+    // plus anything scheduled in the recent/upcoming window.
+    .or(`status.neq.complete,and(scheduled_at.gte.${from},scheduled_at.lte.${to})`)
     .neq("status", "cancelled")
     .order("scheduled_at", { ascending: true, nullsFirst: false })
-    .limit(60);
+    .limit(150);
 
   return (data ?? []).map((row) => {
     const customer = one(row.customers as RelatedName);
@@ -117,9 +119,9 @@ export default async function FieldBoardPage() {
   const done = todays.filter((job) => job.status === "complete");
   const next = open[0] ?? null;
   const rest = open.slice(1);
-  const comingUp = allJobs.filter(
-    (job) => !isToday(job) && job.status !== "complete" && job.scheduled_at && etDate(job.scheduled_at) > today
-  );
+  // Every other open job (any date, or unscheduled), to pick from the full list.
+  const otherJobs = allJobs.filter((job) => !isToday(job) && job.status !== "complete");
+  const noteJobs = [...open, ...otherJobs];
 
   return (
     <div className="flex flex-col gap-6">
@@ -191,22 +193,28 @@ export default async function FieldBoardPage() {
         <div className={itemTitleClass}>Field note</div>
         <p className={`${itemSubClass} mb-3 mt-1`}>Lands on this board and on the job. Does not invent a customer.</p>
         <FieldNoteForm
-          jobs={open.map((job) => ({
+          jobs={noteJobs.map((job) => ({
             id: job.id,
             label: [job.customer, job.address, job.status.replaceAll("_", " ")].filter(Boolean).join(" · ") || job.id.slice(0, 8),
           }))}
         />
       </div>
 
-      {comingUp.length > 0 && (
+      {otherJobs.length > 0 && (
         <details className="rounded-xl border border-white/8 bg-white/3 p-4">
-          <summary className="cursor-pointer font-medium text-white">Coming up ({comingUp.length})</summary>
+          <summary className="cursor-pointer font-medium text-white">All jobs ({otherJobs.length})</summary>
+          <p className={`${itemSubClass} mt-2`}>Tap a job to open it.</p>
           <div className="mt-3 grid gap-2">
-            {comingUp.map((job) => (
-              <div key={job.id} className="flex items-baseline justify-between gap-3">
-                <div className={itemTitleClass}>{job.customer ?? "Job"}</div>
-                <div className={itemSubClass}>{stamp(job.scheduled_at)}</div>
-              </div>
+            {otherJobs.map((job) => (
+              <details key={job.id} className="rounded-xl border border-white/8 bg-white/3">
+                <summary className="flex cursor-pointer items-baseline justify-between gap-3 px-3 py-3">
+                  <span className={itemTitleClass}>{job.customer ?? "Job"}</span>
+                  <span className={itemSubClass}>{stamp(job.scheduled_at)}</span>
+                </summary>
+                <div className="px-3 pb-3">
+                  <TruckJobCard job={job} />
+                </div>
+              </details>
             ))}
           </div>
         </details>
