@@ -23,7 +23,11 @@ function safeRedirectPath(value: string | null): string {
   try {
     const parsed = new URL(value, "http://x");
     if (parsed.origin !== "http://x") return "/dashboard";
-    return parsed.pathname + parsed.search + parsed.hash;
+    // Dot segments can normalize to a protocol-relative path ("/a/..//evil.com"
+    // becomes "//evil.com"), so check the normalized result too.
+    const normalized = parsed.pathname + parsed.search + parsed.hash;
+    if (normalized.startsWith("//")) return "/dashboard";
+    return normalized;
   } catch {
     return "/dashboard";
   }
