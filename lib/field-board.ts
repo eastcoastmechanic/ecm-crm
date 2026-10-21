@@ -242,13 +242,16 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
   }
 
   let statusApplied = false;
+  let statusError: string | null = null;
   if (job && resolved) {
+    let noteWritten = false;
     try {
       const stamp = new Date().toISOString();
       const line = `[Field Board ${stamp}] ${input.board_status ? `${input.board_status} · ` : ""}${title ?? body}`;
       const nextNotes = [job.notes, line, body && body !== title ? body : null].filter(Boolean).join("\n");
       const { error: notesError } = await supabase.from("jobs").update({ notes: nextNotes }).eq("id", job.id);
       if (notesError) throw new Error(notesError.message);
+      noteWritten = true;
 
       // Status goes through the same lifecycle as the Jobs page so arrived_at,
       // completed_at, tracked_hours, Planner/Graph sync and notifications run.
@@ -258,7 +261,13 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
         statusApplied = true;
       }
     } catch (err) {
-      // Release the ref so the caller's retry can run the whole thing again.
+      if (noteWritten) {
+        // The note is already on the job. Keep the event (and its ref) so a retry
+        // is seen as a duplicate instead of appending the note a second time.
+        statusError = err instanceof Error ? err.message : "Status change failed";
+        return { ...result(event, { status_applied: false }), status_error: statusError };
+      }
+      // Nothing was written: release the ref so the caller's retry can run it all again.
       await supabase.from("field_board_events").delete().eq("id", event.id);
       return {
         ok: false as const,
