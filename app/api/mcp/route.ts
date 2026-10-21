@@ -4,6 +4,7 @@ import type { AuthInfo } from "@modelcontextprotocol/server";
 import { buildMcpTools } from "@/lib/internal-assistant/tools-mcp";
 import { supabase } from "@/lib/supabase";
 import { hashToken } from "@/lib/oauth";
+import { tokenMatches } from "@/lib/bearer-auth";
 
 /**
  * The MCP endpoint Josh's own Claude client connects to directly -- a third
@@ -63,7 +64,7 @@ const verifyToken = async (_req: Request, bearerToken?: string): Promise<AuthInf
   // add --header`) that don't need the OAuth dance -- already verified
   // end-to-end in production; adding OAuth alongside it doesn't weaken it,
   // it's an independent secret.
-  if (process.env.MCP_API_KEY && bearerToken === process.env.MCP_API_KEY) {
+  if (tokenMatches(bearerToken, process.env.MCP_API_KEY)) {
     return { token: bearerToken, clientId: "josh-static", scopes: [] };
   }
 
