@@ -13,6 +13,7 @@ import { renderContractPdf } from "@/lib/contract-pdf";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { flagReferralRewardIfEligible } from "@/lib/referral";
 import { movePlannerTaskForJob } from "@/lib/planner-connector";
+import { requireOffice } from "@/lib/require-role";
 
 type LineItem = {
   category: string;
@@ -69,6 +70,7 @@ type WarrantyActionItem = {
 };
 
 export async function updateWarranty(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const technician_name = (formData.get("technician_name") as string)?.trim() || null;
   const itemCount = Number(formData.get("item_count") ?? 0);
@@ -153,6 +155,7 @@ export async function updateWarranty(formData: FormData) {
 }
 
 export async function updateDocument(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const status = formData.get("status") as string;
   const itemCount = Number(formData.get("item_count") ?? 0);
@@ -245,6 +248,7 @@ function formatPrice(value: number) {
 }
 
 export async function sendDocumentEmail(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
 
   const { data: docType } = await supabase.from("documents").select("type").eq("id", id).single();

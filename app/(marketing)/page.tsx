@@ -123,7 +123,7 @@ export default function MarketingHome() {
             <div>
               <h2 className="font-display text-2xl font-extrabold tracking-wide sm:text-3xl">Our Services</h2>
               <p className="mt-2 max-w-xl text-sm text-g300">
-                Whatever's keeping your home from feeling right, we handle it.
+                Whatever&apos;s keeping your home from feeling right, we handle it.
               </p>
             </div>
             <Link href="/services" className="text-sm font-bold text-accent hover:underline">

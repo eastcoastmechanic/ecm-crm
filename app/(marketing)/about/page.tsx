@@ -72,7 +72,7 @@ export default function AboutPage() {
         <p className="mt-2 text-sm text-g300">
           We install and service equipment from Bosch, Lochinvar, Mitsubishi Electric, LG, Carrier, A.O.
           Smith, and Kohler, among others. Ask us about the specific licensing and certifications behind
-          your project — we're happy to walk through it when we quote your job.
+          your project — we&apos;re happy to walk through it when we quote your job.
         </p>
       </div>
 

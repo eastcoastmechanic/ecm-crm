@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
+import { requireOffice } from "@/lib/require-role";
 
 export async function createPurchaseOrder(formData: FormData) {
+  await requireOffice();
   const vendor = (formData.get("vendor") as string)?.trim();
   const po_number = (formData.get("po_number") as string)?.trim() || null;
   const job_id = (formData.get("job_id") as string) || null;
@@ -32,6 +34,7 @@ export async function createPurchaseOrder(formData: FormData) {
 }
 
 export async function updatePoStatus(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const status = formData.get("status") as string;
 
@@ -60,6 +63,7 @@ export async function updatePoStatus(formData: FormData) {
 }
 
 export async function deletePurchaseOrder(id: string): Promise<{ error?: string }> {
+  await requireOffice();
   const { error } = await supabase.from("purchase_orders").delete().eq("id", id);
   if (error) return { error: error.message };
 

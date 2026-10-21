@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { syncPriceBookItemToGraph, deletePriceBookItemFromGraph } from "@/lib/graph-connector";
+import { requireOffice } from "@/lib/require-role";
 
 export async function addPriceBookItem(formData: FormData) {
+  await requireOffice();
   const category = (formData.get("category") as string)?.trim();
   const tier = formData.get("tier") as string;
   const name = (formData.get("name") as string)?.trim();
@@ -44,6 +46,7 @@ export async function addPriceBookItem(formData: FormData) {
 }
 
 export async function updatePriceBookItem(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const category = (formData.get("category") as string)?.trim();
   const tier = formData.get("tier") as string;
@@ -81,6 +84,7 @@ export async function updatePriceBookItem(formData: FormData) {
 }
 
 export async function deletePriceBookItem(id: string): Promise<{ error?: string }> {
+  await requireOffice();
   const { error } = await supabase.from("price_book_items").delete().eq("id", id);
   if (error) return { error: error.message };
 

@@ -9,6 +9,7 @@ import { claude, CLAUDE_MODEL_BALANCED } from "@/lib/claude";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { EQUIPMENT_LIFESPAN_REFERENCE } from "@/lib/equipment-lifespan-reference";
 import { NEW_CUSTOMER_VALUE, NEW_PROPERTY_VALUE } from "../../../intake-constants";
+import { requireOffice } from "@/lib/require-role";
 
 const AssessmentItemSchema = z.object({
   condition_summary: z.string(),
@@ -51,6 +52,7 @@ function computeAgeYears(installDate: string | null): number | null {
 }
 
 export async function submitAssessment(formData: FormData) {
+  await requireOffice();
   let customer_id = formData.get("customer_id") as string;
   let property_id = formData.get("property_id") as string;
   const rowCount = Number(formData.get("row_count") ?? 0);

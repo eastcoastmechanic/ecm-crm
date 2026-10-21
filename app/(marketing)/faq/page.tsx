@@ -39,7 +39,7 @@ export default function FaqPage() {
         Frequently Asked Questions
       </h1>
       <p className="mt-3 text-sm text-g300">
-        Don't see your question here?{" "}
+        Don&apos;t see your question here?{" "}
         <Link href="/contact" className="font-bold text-accent hover:underline">
           Contact us
         </Link>{" "}

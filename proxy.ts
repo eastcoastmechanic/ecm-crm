@@ -28,6 +28,17 @@ const INTERNAL_PATH_PREFIXES = [
   "/api/twilio/recordings",
 ];
 
+// The "tech" role is the truck app only. Everything else (money, customers, analytics,
+// documents, the assistant) is blocked here on the server, not just hidden from the menu.
+// The print sheet is excluded on purpose: it lists unpaid invoice amounts.
+const TECH_ALLOWED_PATHS = ["/field-board"];
+const TECH_BLOCKED_PATHS = ["/field-board/print"];
+
+function techMayAccess(pathname: string) {
+  if (TECH_BLOCKED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return false;
+  return TECH_ALLOWED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize", "/api/ingest/readings", "/api/ingest/quote"];
 
 function isInternalPath(pathname: string) {
@@ -91,7 +102,14 @@ async function checkStaffSession(
 
 export async function proxy(request: NextRequest) {
   if (isInternalPath(request.nextUrl.pathname)) {
-    if (hasValidBasicAuth(request)) return NextResponse.next();
+    if (hasValidBasicAuth(request)) {
+      // The shared Basic-auth login is treated as owner. Drop any client-sent
+      // x-staff-role first so it can never be spoofed on this path.
+      const basicHeaders = new Headers(request.headers);
+      basicHeaders.delete("x-staff-role");
+      basicHeaders.set("x-staff-role", "owner");
+      return NextResponse.next({ request: { headers: basicHeaders } });
+    }
 
     const { role, response } = await checkStaffSession(request);
     if (!role) {
@@ -103,6 +121,16 @@ export async function proxy(request: NextRequest) {
       url.pathname = "/login";
       url.search = "";
       url.searchParams.set("redirect", redirectTarget);
+      return NextResponse.redirect(url);
+    }
+
+    if (role === "tech" && !techMayAccess(request.nextUrl.pathname)) {
+      if (request.nextUrl.pathname.startsWith("/api/")) {
+        return new NextResponse("Forbidden", { status: 403 });
+      }
+      const url = request.nextUrl.clone();
+      url.pathname = "/field-board";
+      url.search = "";
       return NextResponse.redirect(url);
     }
 

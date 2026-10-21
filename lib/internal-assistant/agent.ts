@@ -1,5 +1,6 @@
 import { claude, CLAUDE_MODEL } from "@/lib/claude";
 import { buildInternalTools } from "./tools";
+import type { StaffRole } from "@/lib/require-role";
 
 export type ChatAttachment = { name: string; mediaType: string; base64: string };
 export type ChatMessage = { role: "user" | "assistant"; content: string; attachments?: ChatAttachment[] };
@@ -89,7 +90,7 @@ Unlike a customer-facing assistant, when you take an action here it's real and f
 // for better judgment on tricky asks.
 export async function respondToInternalChat(
   messages: ChatMessage[],
-  options?: { fast?: boolean }
+  options?: { fast?: boolean; staffRole?: StaffRole }
 ): Promise<string> {
   // Attachments only ever ride along on the turn they're sent on, not
   // resent from history on every later turn — a 30MB plan set re-embedded
@@ -126,7 +127,7 @@ export async function respondToInternalChat(
       system: buildSystemPrompt(),
       thinking: { type: "adaptive" },
       output_config: { effort: options?.fast ? "low" : "medium" },
-      tools: buildInternalTools({ fast: options?.fast, attachmentFiles }),
+      tools: buildInternalTools({ fast: options?.fast, attachmentFiles, staffRole: options?.staffRole }),
       messages: apiMessages,
     });
   } catch (err) {

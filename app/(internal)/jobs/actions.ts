@@ -14,6 +14,7 @@ import {
 } from "@/lib/job-photos";
 import { syncJobToGraph } from "@/lib/graph-connector";
 import { syncJobToPlanner } from "@/lib/planner-connector";
+import { requireOffice } from "@/lib/require-role";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
@@ -168,6 +169,7 @@ export async function updateJobStatus(formData: FormData) {
 }
 
 export async function rescheduleJob(jobId: string, newDate: string) {
+  await requireOffice();
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
     .select("scheduled_at")
