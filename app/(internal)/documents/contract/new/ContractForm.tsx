@@ -92,6 +92,15 @@ export default function ContractForm({
       </label>
 
       <label className="flex flex-col gap-1 text-xs text-g300">
+        Yearly renewal price, $ (optional — maintenance plans only)
+        <input type="number" name="auto_renew_price" min="0" step="0.01" className={inputClass} />
+        <span className="text-g300">
+          Leave blank unless this contract is a maintenance plan. If filled in, the customer can tick a box when
+          signing to allow automatic yearly renewal at this price.
+        </span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-xs text-g300">
         Warranty terms
         <textarea name="warranty_terms" rows={3} defaultValue={defaultWarrantyTerms} className={inputClass} />
       </label>

@@ -18,6 +18,7 @@ export async function submitContract(formData: FormData) {
   const start_date = (formData.get("start_date") as string) || null;
   const estimated_completion = (formData.get("estimated_completion") as string) || null;
   const notes = (formData.get("notes") as string)?.trim() || null;
+  const auto_renew_price = Number(formData.get("auto_renew_price")) || null;
   const from_document_id = (formData.get("from_document_id") as string) || null;
 
   if (!customer_id) throw new Error("Customer is required");
@@ -58,6 +59,7 @@ export async function submitContract(formData: FormData) {
     estimatedCompletion: estimated_completion,
     notes,
     fromDocumentId: from_document_id,
+    autoRenewPrice: auto_renew_price,
   });
 
   revalidatePath("/documents");

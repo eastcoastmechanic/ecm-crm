@@ -4,11 +4,18 @@ import { useRef, useState } from "react";
 import { signContract } from "./actions";
 import { buttonClass, subTextClass } from "../../../(internal)/ui";
 
-export default function ContractSignaturePad({ documentId }: { documentId: string }) {
+export default function ContractSignaturePad({
+  documentId,
+  offersAutoRenew = false,
+}: {
+  documentId: string;
+  offersAutoRenew?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [autoRenew, setAutoRenew] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +63,7 @@ export default function ContractSignaturePad({ documentId }: { documentId: strin
       formData.set("document_id", documentId);
       formData.set("signature_data", dataUrl);
       formData.set("agreed", "on");
+      if (offersAutoRenew && autoRenew) formData.set("auto_renew", "on");
       await signContract(formData);
     } catch (err) {
       if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) throw err;
@@ -73,6 +81,15 @@ export default function ContractSignaturePad({ documentId }: { documentId: strin
           notice above.
         </span>
       </label>
+      {offersAutoRenew && (
+        <label className="flex items-start gap-2 text-xs text-g300">
+          <input type="checkbox" className="mt-0.5" checked={autoRenew} onChange={(e) => setAutoRenew(e.target.checked)} />
+          <span>
+            Optional: I authorize automatic yearly renewal of my maintenance plan, charged to the card I paid with,
+            as described under Automatic Annual Renewal above. I can cancel before any renewal.
+          </span>
+        </label>
+      )}
       <p className={subTextClass}>Sign below to accept this contract.</p>
       <canvas
         ref={canvasRef}
