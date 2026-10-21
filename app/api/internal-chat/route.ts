@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import { respondToInternalChat, type ChatMessage } from "@/lib/internal-assistant/agent";
 import { isRateLimited } from "@/lib/rate-limit";
+import { getStaffRole } from "@/lib/require-role";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TURNS = 60;
 
 export async function POST(request: Request) {
+  // proxy.ts sets x-staff-role for every authenticated internal request.
+  // Techs have no business with the assistant (it can reach money and customer data).
+  const staffRole = await getStaffRole();
+  if (!staffRole || staffRole === "tech") {
+    return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  }
+
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (isRateLimited(ip, 60)) {
     return NextResponse.json({ error: "Too many requests. Please slow down." }, { status: 429 });
@@ -38,7 +46,7 @@ export async function POST(request: Request) {
   const fast = body?.fast === true;
 
   try {
-    const reply = await respondToInternalChat(messages, { fast });
+    const reply = await respondToInternalChat(messages, { fast, staffRole });
     return NextResponse.json({ reply });
   } catch (err) {
     console.error("Internal chat error:", err);

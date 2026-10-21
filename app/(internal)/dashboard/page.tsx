@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getSquareRevenue, getSquareMoneyOwed } from "@/lib/square";
+import { getStaffRole } from "@/lib/require-role";
 import {
   buttonClass,
   buttonSecondaryClass,
@@ -23,6 +24,23 @@ const jobStatusClass: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
+  // Revenue, money owed and invoice totals are owner/office only. Techs get a
+  // minimal view and never trigger the Square or invoice queries below.
+  const role = await getStaffRole();
+  if (role === "tech") {
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className={headingClass}>Dashboard</h1>
+        <p className={subTextClass}>Your work for today is on the field board.</p>
+        <div>
+          <Link href="/field-board" className={buttonClass}>
+            Today&apos;s Jobs
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const today = new Date().toISOString().slice(0, 10);
   const in30Days = new Date();
   in30Days.setDate(in30Days.getDate() + 30);

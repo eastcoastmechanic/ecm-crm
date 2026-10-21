@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { idsWhere, cascadeUnlinkEquipment, cascadeUnlinkJobs, cascadeUnlinkDocuments } from "@/lib/cascade-delete";
 import { NEW_CUSTOMER_VALUE } from "../intake-constants";
+import { requireOffice } from "@/lib/require-role";
 
 export async function addProperty(formData: FormData) {
   let customer_id = formData.get("customer_id") as string;
@@ -72,6 +73,7 @@ export async function updateProperty(formData: FormData) {
 // Deletes a property and everything hanging off it — equipment, jobs,
 // documents, install reports, and service contracts — mirroring deleteCustomer's cascade.
 export async function deleteProperty(id: string): Promise<{ error?: string }> {
+  await requireOffice();
   const jobIds = await idsWhere("jobs", "property_id", id);
   const equipmentIds = await idsWhere("equipment", "property_id", id);
 

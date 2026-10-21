@@ -266,11 +266,14 @@ export default function CatalogApp({ items }: { items: CatalogItem[] }) {
     }
   }
 
+  // Restore the saved cart after mount. localStorage does not exist during SSR,
+  // so a lazy useState initializer here would cause a hydration mismatch.
   useEffect(() => {
     try {
       const raw = localStorage.getItem("ecm-catalog-cart");
       if (raw) {
         const parsed = JSON.parse(raw) as { cart: CartLine[]; laborHours: number };
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time post-hydration restore from localStorage
         if (parsed.cart) setCart(parsed.cart);
         if (parsed.laborHours) setLaborHours(parsed.laborHours);
       }

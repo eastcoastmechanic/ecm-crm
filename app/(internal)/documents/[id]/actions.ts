@@ -11,8 +11,8 @@ import { renderWarrantyReportPdf } from "@/lib/warranty-report-pdf";
 import { getContractForPdf } from "@/lib/contract-reports";
 import { renderContractPdf } from "@/lib/contract-pdf";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
-import { flagReferralRewardIfEligible } from "@/lib/referral";
-import { movePlannerTaskForJob } from "@/lib/planner-connector";
+import { markDocumentPaid } from "@/lib/document-paid";
+import { requireOffice } from "@/lib/require-role";
 
 type LineItem = {
   category: string;
@@ -69,6 +69,7 @@ type WarrantyActionItem = {
 };
 
 export async function updateWarranty(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const technician_name = (formData.get("technician_name") as string)?.trim() || null;
   const itemCount = Number(formData.get("item_count") ?? 0);
@@ -153,6 +154,7 @@ export async function updateWarranty(formData: FormData) {
 }
 
 export async function updateDocument(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const status = formData.get("status") as string;
   const itemCount = Number(formData.get("item_count") ?? 0);
@@ -160,7 +162,7 @@ export async function updateDocument(formData: FormData) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("documents")
-    .select("line_items, type, due_date, customer_id, job_id")
+    .select("line_items, type, due_date, customer_id, job_id, status")
     .eq("id", id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
@@ -204,7 +206,9 @@ export async function updateDocument(formData: FormData) {
   const { error } = await supabase
     .from("documents")
     .update({
-      status,
+      // "paid" goes through markDocumentPaid below (idempotent + post-paid steps).
+      // (undefined = leave the column alone, so a concurrent webhook's "paid" is never overwritten by a stale read.)
+      status: status === "paid" ? undefined : status,
       line_items: {
         ...existingData,
         items,
@@ -215,19 +219,15 @@ export async function updateDocument(formData: FormData) {
       tax: 0,
       total: totals.better,
       sent_at: status === "sent" ? new Date().toISOString() : undefined,
-      paid_at: status === "paid" ? new Date().toISOString() : undefined,
       due_date: status === "sent" ? dueDateForSend(existing.type, existing.due_date) : undefined,
     })
     .eq("id", id);
 
   if (error) throw new Error(error.message);
 
-  if (status === "paid" && existing.customer_id) {
-    await flagReferralRewardIfEligible(existing.customer_id, existing.type);
-  }
-
-  if (status === "paid" && existing.type === "invoice" && existing.job_id) {
-    await movePlannerTaskForJob(existing.job_id, "billed");
+  if (status === "paid") {
+    const paid = await markDocumentPaid(id, { source: "manual" });
+    if (paid.error) throw new Error(paid.error);
   }
 
   revalidatePath(`/documents/${id}`);
@@ -245,6 +245,7 @@ function formatPrice(value: number) {
 }
 
 export async function sendDocumentEmail(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
 
   const { data: docType } = await supabase.from("documents").select("type").eq("id", id).single();

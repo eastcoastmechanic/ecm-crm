@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { sendSMS } from "@/lib/sms";
+import { handleSmsKeyword, canText } from "@/lib/sms-consent";
 import { respondToSms } from "@/lib/receptionist/sms-agent";
 import { isExcludedFromAi } from "@/lib/receptionist/customer-lookup";
 
@@ -51,12 +52,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  // STOP/START/HELP come first, before the exclusion check and the AI.
+  const keywordReply = await handleSmsKeyword(from, body);
+  if (keywordReply) {
+    await sendSMS(from, keywordReply);
+    return NextResponse.json({ ok: true, keyword: true });
+  }
+
   if (await isExcludedFromAi(from)) {
     return NextResponse.json({ ok: true, excluded: true });
   }
 
+  if (!(await canText(from, { allowUnknown: true }))) {
+    return NextResponse.json({ ok: true, optedOut: true });
+  }
+
   const reply = await respondToSms({ fromPhone: from, body });
-  await sendSMS(from, reply);
+  const sent = await sendSMS(from, reply);
+  if (!sent.ok) return NextResponse.json({ ok: false, error: sent.error }, { status: 502 });
 
   return NextResponse.json({ ok: true });
 }

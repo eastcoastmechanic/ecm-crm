@@ -8,12 +8,15 @@ import {
   type SquareCustomer,
   type SquareInvoice,
 } from "@/lib/square";
+import { markDocumentPaid } from "@/lib/document-paid";
 
 export type SquareSyncResult = {
   invoicesUpserted: number;
   paymentsUpserted: number;
   customersLinked: number;
   documentsUpdated: number;
+  /** Linked CRM documents whose Square invoice was refunded/canceled/failed. Not changed; needs a human look. */
+  needsReview?: string[];
   error?: string;
 };
 
@@ -97,37 +100,31 @@ function matchCustomer(
   return null;
 }
 
-function matchDocument(documents: CrmDocument[], invoice: SquareInvoice, customerId: string | null) {
+// Only strong matches link a CRM document to a Square invoice: the document is
+// already linked to this exact Square invoice, or the invoice number equals the
+// document number. Customer + same total is NOT enough: two unrelated jobs can
+// share an amount, and a wrong link used to flip a paid invoice back to sent.
+// No strong match leaves the Square invoice unlinked (visible, but not applied).
+function matchDocument(documents: CrmDocument[], invoice: SquareInvoice) {
   if (!invoice.id) return null;
   const byId = documents.find((doc) => doc.square_invoice_id === invoice.id);
   if (byId) return byId;
 
   const invoiceNumber = invoice.invoice_number?.trim();
-  if (invoiceNumber) {
-    const byNumber = documents.find(
-      (doc) => (doc.doc_number ?? "").trim().toLowerCase() === invoiceNumber.toLowerCase()
-    );
-    if (byNumber) return byNumber;
-  }
-
-  if (!customerId) return null;
-  const totalDollars = invoiceTotals(invoice).total / 100;
-  const candidates = documents.filter((doc) => {
-    if (doc.customer_id !== customerId) return false;
-    if (doc.type !== "invoice") return false;
-    if (doc.total == null) return false;
-    return Math.abs(Number(doc.total) - totalDollars) < 0.01;
-  });
-  return candidates.length === 1 ? candidates[0] : null;
+  if (!invoiceNumber) return null;
+  return (
+    documents.find(
+      (doc) =>
+        doc.type === "invoice" &&
+        !doc.square_invoice_id &&
+        (doc.doc_number ?? "").trim().toLowerCase() === invoiceNumber.toLowerCase()
+    ) ?? null
+  );
 }
 
-function crmStatusFromSquare(status: string, current: string) {
-  if (status === "PAID") return "paid";
-  if (status === "UNPAID" || status === "PARTIALLY_PAID" || status === "SCHEDULED") {
-    return current === "paid" ? "sent" : current === "draft" ? "sent" : current;
-  }
-  return current;
-}
+// Square states that mean the money did not stay received. We record them in
+// square_invoices but never rewrite a CRM document's paid history from them.
+const REVERSED_SQUARE_STATUSES = new Set(["REFUNDED", "PARTIALLY_REFUNDED", "CANCELED", "FAILED"]);
 
 export async function syncSquarePayments(): Promise<SquareSyncResult> {
   if (!isSquareConfigured()) {
@@ -216,7 +213,17 @@ export async function syncSquarePayments(): Promise<SquareSyncResult> {
   }
 
   const invoiceRows: Record<string, unknown>[] = [];
-  const documentUpdates: Array<{ id: string; square_invoice_id: string; status: string; paid_at: string | null }> = [];
+  const documentLinks: Array<{ id: string; square_invoice_id: string }> = [];
+  const draftToSent: string[] = [];
+  const documentPaid: Array<{ id: string; paid_at: string }> = [];
+  const needsReview: string[] = [];
+  // Payment's own time (latest completed payment on the invoice's order).
+  const completedPaymentAtByOrderId = new Map<string, string>();
+  for (const payment of payments) {
+    if (payment.status !== "COMPLETED" || !payment.order_id || !payment.created_at) continue;
+    const prev = completedPaymentAtByOrderId.get(payment.order_id);
+    if (!prev || payment.created_at > prev) completedPaymentAtByOrderId.set(payment.order_id, payment.created_at);
+  }
   const invoiceIdByOrderId = new Map<string, string>();
 
   for (const invoice of invoices) {
@@ -237,8 +244,10 @@ export async function syncSquarePayments(): Promise<SquareSyncResult> {
     });
 
     const totals = invoiceTotals(invoice);
-    const paidAt = paidAtFromInvoice(invoice, totals.paid);
-    const matchedDoc = matchDocument(documents, invoice, customerId);
+    const paidAt =
+      (invoice.order_id ? completedPaymentAtByOrderId.get(invoice.order_id) : null) ??
+      paidAtFromInvoice(invoice, totals.paid);
+    const matchedDoc = matchDocument(documents, invoice);
     if (invoice.order_id) invoiceIdByOrderId.set(invoice.order_id, invoice.id);
 
     invoiceRows.push({
@@ -264,22 +273,28 @@ export async function syncSquarePayments(): Promise<SquareSyncResult> {
     });
 
     if (!matchedDoc) continue;
-    const nextStatus = crmStatusFromSquare(invoice.status, matchedDoc.status);
-    const nextPaidAt = nextStatus === "paid" ? (matchedDoc.paid_at ?? paidAt ?? now) : matchedDoc.paid_at;
-    const needsUpdate =
-      matchedDoc.square_invoice_id !== invoice.id ||
-      matchedDoc.status !== nextStatus ||
-      matchedDoc.paid_at !== nextPaidAt;
-    if (!needsUpdate) continue;
-    matchedDoc.square_invoice_id = invoice.id;
-    matchedDoc.status = nextStatus;
-    matchedDoc.paid_at = nextPaidAt;
-    documentUpdates.push({
-      id: matchedDoc.id,
-      square_invoice_id: invoice.id,
-      status: nextStatus,
-      paid_at: nextPaidAt,
-    });
+    if (matchedDoc.square_invoice_id !== invoice.id) {
+      matchedDoc.square_invoice_id = invoice.id;
+      documentLinks.push({ id: matchedDoc.id, square_invoice_id: invoice.id });
+    }
+
+    if (invoice.status === "PAID") {
+      if (matchedDoc.status !== "paid") {
+        const when = paidAt ?? now;
+        matchedDoc.status = "paid";
+        matchedDoc.paid_at = when;
+        documentPaid.push({ id: matchedDoc.id, paid_at: when });
+      }
+    } else if (REVERSED_SQUARE_STATUSES.has(invoice.status)) {
+      if (matchedDoc.status === "paid") {
+        needsReview.push(`${matchedDoc.doc_number ?? matchedDoc.id}: Square invoice ${invoice.status}`);
+      }
+    } else if (matchedDoc.status === "draft" && invoice.status !== "DRAFT") {
+      // Outstanding in Square (UNPAID/SCHEDULED/PARTIALLY_PAID): a CRM draft is
+      // really out to the customer. A Square DRAFT has not been published yet. Never touches a paid or already-sent document.
+      draftToSent.push(matchedDoc.id);
+      matchedDoc.status = "sent";
+    }
   }
 
   const paymentRows: Record<string, unknown>[] = [];
@@ -348,16 +363,20 @@ export async function syncSquarePayments(): Promise<SquareSyncResult> {
   }
 
   let documentsUpdated = 0;
-  for (const update of documentUpdates) {
+  for (const link of documentLinks) {
     const { error } = await supabase
       .from("documents")
-      .update({
-        square_invoice_id: update.square_invoice_id,
-        status: update.status,
-        paid_at: update.paid_at,
-      })
-      .eq("id", update.id);
+      .update({ square_invoice_id: link.square_invoice_id })
+      .eq("id", link.id);
     if (!error) documentsUpdated += 1;
+  }
+  for (const id of draftToSent) {
+    const { error } = await supabase.from("documents").update({ status: "sent" }).eq("id", id).eq("status", "draft");
+    if (!error) documentsUpdated += 1;
+  }
+  for (const paid of documentPaid) {
+    const result = await markDocumentPaid(paid.id, { source: "square", paidAt: paid.paid_at });
+    if (result.updated) documentsUpdated += 1;
   }
 
   return {
@@ -365,5 +384,6 @@ export async function syncSquarePayments(): Promise<SquareSyncResult> {
     paymentsUpserted: paymentRows.length,
     customersLinked,
     documentsUpdated,
+    ...(needsReview.length ? { needsReview } : {}),
   };
 }

@@ -247,3 +247,156 @@ export async function bulkRetrieveSquareCustomers(customerIds: string[]): Promis
 
   return found;
 }
+
+// ---------------------------------------------------------------------------
+// Write helpers (estimate inbox). Everything here creates DRAFT records only;
+// nothing is published or sent to the customer. Needs a token with
+// CUSTOMERS_READ/WRITE, ORDERS_WRITE and INVOICES_WRITE.
+// ---------------------------------------------------------------------------
+
+export type SquareWriteResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+type SquareError = { category?: string; code?: string; detail?: string };
+
+function plainSquareError(status: number, errors: SquareError[] | undefined, what: string): string {
+  const codes = (errors ?? []).map((e) => e.code).filter(Boolean);
+  if (status === 401 || codes.includes("UNAUTHORIZED") || codes.includes("ACCESS_TOKEN_EXPIRED")) {
+    return "Square rejected the token. Check SQUARE_ACCESS_TOKEN on Vercel.";
+  }
+  if (status === 403 || codes.includes("INSUFFICIENT_SCOPES") || codes.includes("FORBIDDEN")) {
+    return `The Square token can't ${what}. It needs CUSTOMERS_WRITE, ORDERS_WRITE and INVOICES_WRITE.`;
+  }
+  const detail = (errors ?? [])[0]?.detail;
+  return `Square said no (${what}): ${detail ?? `HTTP ${status}`}`;
+}
+
+async function squarePost<T>(path: string, body: unknown, what: string): Promise<SquareWriteResult<T>> {
+  const headers = squareHeaders();
+  if (!headers) return { ok: false, error: "Square isn't set up (SQUARE_ACCESS_TOKEN missing)." };
+  let res: Response;
+  try {
+    res = await fetch(`${SQUARE_BASE_URL}${path}`, {
+      method: "POST",
+      headers,
+      cache: "no-store",
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return { ok: false, error: "Couldn't reach Square. Try again." };
+  }
+  const json = (await res.json().catch(() => ({}))) as T & { errors?: SquareError[] };
+  if (!res.ok) {
+    // Log status and error codes only -- never headers, tokens, or request bodies.
+    console.error(`Square ${what} failed (${res.status}):`, (json.errors ?? []).map((e) => e.code).join(","));
+    return { ok: false, error: plainSquareError(res.status, json.errors, what) };
+  }
+  return { ok: true, value: json };
+}
+
+export type SquareCustomerInput = {
+  idempotencyKey: string;
+  referenceId: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+/** Find a Square customer by exact email, then phone; create one if none. */
+export async function findOrCreateSquareCustomer(
+  input: SquareCustomerInput
+): Promise<SquareWriteResult<string>> {
+  const filters: Array<Record<string, unknown>> = [];
+  if (input.email) filters.push({ email_address: { exact: input.email.trim() } });
+  if (input.phone) filters.push({ phone_number: { exact: input.phone.trim() } });
+
+  for (const filter of filters) {
+    const found = await squarePost<{ customers?: SquareCustomer[] }>(
+      "/v2/customers/search",
+      { query: { filter }, limit: 1 },
+      "look up the customer"
+    );
+    if (!found.ok) return found;
+    const id = found.value.customers?.[0]?.id;
+    if (id) return { ok: true, value: id };
+  }
+
+  const parts = (input.name ?? "").trim().split(/\s+/).filter(Boolean);
+  const created = await squarePost<{ customer?: SquareCustomer }>(
+    "/v2/customers",
+    {
+      idempotency_key: input.idempotencyKey,
+      reference_id: input.referenceId,
+      given_name: parts[0] ?? undefined,
+      family_name: parts.length > 1 ? parts.slice(1).join(" ") : undefined,
+      email_address: input.email?.trim() || undefined,
+      phone_number: input.phone?.trim() || undefined,
+    },
+    "create the customer"
+  );
+  if (!created.ok) return created;
+  const id = created.value.customer?.id;
+  return id ? { ok: true, value: id } : { ok: false, error: "Square didn't return a customer id." };
+}
+
+export async function createSquareOrder(input: {
+  idempotencyKey: string;
+  locationId: string;
+  customerId: string;
+  referenceId: string;
+  lineItems: Array<{ name: string; quantity: string; base_price_money: { amount: number; currency: string } }>;
+}): Promise<SquareWriteResult<string>> {
+  const res = await squarePost<{ order?: { id?: string } }>(
+    "/v2/orders",
+    {
+      idempotency_key: input.idempotencyKey,
+      order: {
+        location_id: input.locationId,
+        customer_id: input.customerId,
+        reference_id: input.referenceId,
+        line_items: input.lineItems,
+      },
+    },
+    "create the order"
+  );
+  if (!res.ok) return res;
+  const id = res.value.order?.id;
+  return id ? { ok: true, value: id } : { ok: false, error: "Square didn't return an order id." };
+}
+
+/**
+ * Create the invoice as a DRAFT. Square leaves new invoices in DRAFT; we never
+ * call /publish, so nothing goes to the customer until Josh sends it in Square.
+ */
+export async function createSquareDraftInvoice(input: {
+  idempotencyKey: string;
+  locationId: string;
+  orderId: string;
+  customerId: string;
+  title: string;
+  hasEmail: boolean;
+  paymentRequests: unknown[];
+}): Promise<SquareWriteResult<string>> {
+  const res = await squarePost<{ invoice?: { id?: string; status?: string } }>(
+    "/v2/invoices",
+    {
+      idempotency_key: input.idempotencyKey,
+      invoice: {
+        location_id: input.locationId,
+        order_id: input.orderId,
+        primary_recipient: { customer_id: input.customerId },
+        title: input.title,
+        delivery_method: input.hasEmail ? "EMAIL" : "SHARE_MANUALLY",
+        payment_requests: input.paymentRequests,
+        accepted_payment_methods: { card: true },
+      },
+    },
+    "create the invoice"
+  );
+  if (!res.ok) return res;
+  const id = res.value.invoice?.id;
+  if (!id) return { ok: false, error: "Square didn't return an invoice id." };
+  if (res.value.invoice?.status && res.value.invoice.status !== "DRAFT") {
+    return { ok: false, error: `Square made the invoice as ${res.value.invoice.status}, not a draft. Check Square.` };
+  }
+  return { ok: true, value: id };
+}

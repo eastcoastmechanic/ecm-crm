@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { supabase } from "@/lib/supabase";
 import { claude, CLAUDE_MODEL_FAST } from "@/lib/claude";
+import { requireOffice } from "@/lib/require-role";
 
 function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
@@ -65,6 +66,7 @@ const SYSTEM_PROMPT = `You are a direct-mail copywriter for East Coast Mechanica
 End with a clear call to action driving them to respond themselves -- either "Book your free check online at eastcoastmechanical.org/book" or "Call us at (774) 343-6369" (use one or both). Do not imply ECM already has their phone number or email, and don't ask them to reply by mail. Keep it brief — this is a postcard/letter, not an email.`;
 
 export async function importMlsCsv(formData: FormData) {
+  await requireOffice();
   const file = formData.get("csv") as File | null;
   if (!file || file.size === 0) throw new Error("Choose a CSV file to import");
 

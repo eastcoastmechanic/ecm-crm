@@ -13,6 +13,7 @@ import { deleteDocument } from "@/app/(internal)/documents/actions";
 import { deletePriceBookItem } from "@/app/(internal)/price-book/actions";
 import { deletePurchaseOrder } from "@/app/(internal)/procurement/actions";
 import { createPlannerTask, listOpenPlannerTasks, completePlannerTask } from "@/lib/planner-connector";
+import type { StaffRole } from "@/lib/require-role";
 import { opsTools, buildJobPhotoTools } from "./tools-ops";
 import { fieldTools } from "./tools-field";
 import { referenceTools } from "./tools-reference";
@@ -759,10 +760,14 @@ const completeTaskTool = betaZodTool({
   },
 });
 
-export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?: File[] }) {
+// Tools that delete, send to customers, or move money. Only the owner gets
+// them in the internal chat; other roles can still read and do routine edits.
+const OWNER_ONLY_TOOL = /^(delete_|send_|propose_|confirm_action$|create_payment_link$)/;
+
+export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?: File[]; staffRole?: StaffRole }) {
   const fast = options?.fast;
   const attachmentFiles = options?.attachmentFiles;
-  return [
+  const tools = [
     addCustomerTool,
     findCustomerTool,
     updateCustomerTool,
@@ -799,4 +804,9 @@ export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?:
     // PT charts, superheat/subcooling, ECM's diagnostic guide -- tools-reference.ts.
     ...referenceTools,
   ];
+  // Callers that pass no staffRole (bearer-key bridges for the owner) keep the full set.
+  if (options?.staffRole && options.staffRole !== "owner") {
+    return tools.filter((t) => !OWNER_ONLY_TOOL.test(t.name));
+  }
+  return tools;
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCopilotActionTools } from "@/lib/copilot-actions";
+import { runAsStaffRole } from "@/lib/require-role";
 
 /**
  * The endpoint Copilot Studio's custom connector calls, one action per
@@ -43,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
   }
 
   try {
-    const result = await tool.run(input);
+    const result = await runAsStaffRole("owner", () => tool.run(input));
     return NextResponse.json({ result });
   } catch (err) {
     return NextResponse.json(

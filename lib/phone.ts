@@ -8,3 +8,8 @@ export function toE164(raw: string) {
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   return raw;
 }
+
+// Last 10 digits -- the stable key used to match a phone number across formats.
+export function phoneKey(raw: string) {
+  return raw.replace(/\D/g, "").slice(-10);
+}

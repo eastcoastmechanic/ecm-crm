@@ -160,8 +160,8 @@ export default function ChatWidget() {
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
             {messages.length === 0 && (
               <p className="text-sm text-g300">
-                Try: "Add a customer named Jane Doe, phone 555-1234" or "Make an estimate
-                for Jane Doe — replacing a leaking water heater".
+                Try: &quot;Add a customer named Jane Doe, phone 555-1234&quot; or &quot;Make an estimate
+                for Jane Doe — replacing a leaking water heater&quot;.
               </p>
             )}
             {messages.map((m, i) => (
