@@ -221,7 +221,7 @@ create index tasks_due_at_idx on tasks(due_at);
 -- insert into storage.buckets (id, name, public) values ('diagnostic-photos', 'diagnostic-photos', true);
 
 -- RLS: tables were created with "internal full access" (all ops, role anon);
--- 0042_lock_down_anon_access.sql REMOVED all anon policies/grants. Internal
+-- 0045_lock_down_anon_access.sql REMOVED all anon policies/grants. Internal
 -- code uses the service-role key; only `authenticated` policies remain.
 -- 0003 additionally scopes read-only policies to the `authenticated` role
 -- for the customer portal (own-customer-only, via auth_customer_id()):

@@ -1,4 +1,4 @@
--- 0042_lock_down_anon_access.sql
+-- 0045_lock_down_anon_access.sql
 --
 -- WHY: Earlier migrations (0003, 0006, 0008, 0011, 0013, 0016, 0019, 0025,
 -- 0029, 0032, 0034, 0036, 0040, 0041, ...) created "internal full access"
