@@ -289,9 +289,9 @@ export async function syncSquarePayments(): Promise<SquareSyncResult> {
       if (matchedDoc.status === "paid") {
         needsReview.push(`${matchedDoc.doc_number ?? matchedDoc.id}: Square invoice ${invoice.status}`);
       }
-    } else if (matchedDoc.status === "draft") {
+    } else if (matchedDoc.status === "draft" && invoice.status !== "DRAFT") {
       // Outstanding in Square (UNPAID/SCHEDULED/PARTIALLY_PAID): a CRM draft is
-      // really out to the customer. Never touches a paid or already-sent document.
+      // really out to the customer. A Square DRAFT has not been published yet. Never touches a paid or already-sent document.
       draftToSent.push(matchedDoc.id);
       matchedDoc.status = "sent";
     }

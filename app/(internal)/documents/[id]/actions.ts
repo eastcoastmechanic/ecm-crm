@@ -204,7 +204,8 @@ export async function updateDocument(formData: FormData) {
     .from("documents")
     .update({
       // "paid" goes through markDocumentPaid below (idempotent + post-paid steps).
-      status: status === "paid" ? existing.status : status,
+      // (undefined = leave the column alone, so a concurrent webhook's "paid" is never overwritten by a stale read.)
+      status: status === "paid" ? undefined : status,
       line_items: {
         ...existingData,
         items,
