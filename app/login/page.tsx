@@ -12,15 +12,30 @@ import {
   errorClass,
 } from "../(internal)/ui";
 
+// Only ever follow a same-origin relative path -- the param is attacker-controllable
+// (it comes straight from the URL). Browsers treat "\" like "/", so "/\evil.com"
+// acts as "//evil.com"; reject backslashes and control characters, then confirm
+// by parsing against a dummy origin.
+function safeRedirectPath(value: string | null): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f]/.test(value)) {
+    return "/dashboard";
+  }
+  try {
+    const parsed = new URL(value, "http://x");
+    if (parsed.origin !== "http://x") return "/dashboard";
+    // Dot segments can normalize to a protocol-relative path ("/a/..//evil.com"
+    // becomes "//evil.com"), so check the normalized result too.
+    const normalized = parsed.pathname + parsed.search + parsed.hash;
+    if (normalized.startsWith("//")) return "/dashboard";
+    return normalized;
+  } catch {
+    return "/dashboard";
+  }
+}
+
 function useRedirectTarget() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect");
-  // Only ever follow a same-site relative path -- the param is attacker-controllable
-  // (it comes straight from the URL), so reject anything that could send the
-  // browser off-site (a bare "//host/..." is parsed as protocol-relative).
-  return redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
-    ? redirectTo
-    : "/dashboard";
+  return safeRedirectPath(searchParams.get("redirect"));
 }
 
 export default function StaffLoginPage() {

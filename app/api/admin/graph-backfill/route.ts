@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { bearerAuthorized } from "@/lib/bearer-auth";
 import { supabase } from "@/lib/supabase";
 import {
   syncCustomerToGraph,
@@ -57,8 +58,7 @@ async function runBatched(items: Syncable[]): Promise<{ ok: number; failed: numb
 }
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!bearerAuthorized(request, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
