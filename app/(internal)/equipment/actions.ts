@@ -6,6 +6,18 @@ import { supabase } from "@/lib/supabase";
 import { extractFromImage } from "@/lib/vision-extract";
 import { cascadeUnlinkEquipment } from "@/lib/cascade-delete";
 import { requireOffice } from "@/lib/require-role";
+import { readDataPlate } from "@/lib/pm/ocr";
+import { NAMEPLATE_PHOTO_BUCKET, uploadPrivatePhoto } from "@/lib/pm/photos";
+import {
+  blankToNull,
+  conflictMessage,
+  mergeNameplateExtras,
+  mergeNameplateIdentity,
+  NAMEPLATE_FIELDS,
+  type NameplateExtras,
+  type NameplateField,
+  type NameplateIdentity,
+} from "@/lib/pm/nameplate";
 
 const NameplateSchema = z.object({
   type: z.string().nullable(),
@@ -68,6 +80,7 @@ export async function addEquipment(formData: FormData) {
   const barcode = (formData.get("barcode") as string)?.trim();
   // JSON blob of everything else on the rating plate (voltage, BTU, SEER, ...)
   const nameplateRaw = (formData.get("nameplate") as string)?.trim();
+  const manufactureDate = blankToNull(formData.get("manufacture_date") as string);
 
   if (!property_id) {
     throw new Error("Property is required");
@@ -75,6 +88,9 @@ export async function addEquipment(formData: FormData) {
   if (!type) {
     throw new Error("Equipment type is required");
   }
+
+  let nameplate: NameplateExtras | null = nameplateRaw ? JSON.parse(nameplateRaw) : null;
+  if (manufactureDate) nameplate = { ...(nameplate ?? {}), manufacture_date: manufactureDate };
 
   const { error } = await supabase.from("equipment").insert({
     property_id,
@@ -86,7 +102,7 @@ export async function addEquipment(formData: FormData) {
     install_date: install_date || null,
     warranty_expiration: warranty_expiration || null,
     barcode: barcode || null,
-    nameplate: nameplateRaw ? JSON.parse(nameplateRaw) : null,
+    nameplate,
   });
 
   if (error) {
@@ -100,35 +116,21 @@ export async function updateEquipment(formData: FormData) {
   const id = formData.get("id") as string;
   const property_id = formData.get("property_id") as string;
   const type = (formData.get("type") as string)?.trim();
-  const brand = (formData.get("brand") as string)?.trim();
-  const model = (formData.get("model") as string)?.trim();
-  const serial_number = (formData.get("serial_number") as string)?.trim();
-  const refrigerant_type = (formData.get("refrigerant_type") as string)?.trim();
-  const install_date = formData.get("install_date") as string;
-  const warranty_expiration = formData.get("warranty_expiration") as string;
-  const barcode = (formData.get("barcode") as string)?.trim();
-  // JSON blob of everything else on the rating plate (voltage, BTU, SEER, ...)
-  const nameplateRaw = (formData.get("nameplate") as string)?.trim();
-
   if (!id) throw new Error("Missing equipment id");
   if (!property_id) throw new Error("Property is required");
   if (!type) throw new Error("Equipment type is required");
 
-  const { error } = await supabase
-    .from("equipment")
-    .update({
-      property_id,
-      type,
-      brand: brand || null,
-      model: model || null,
-      serial_number: serial_number || null,
-      refrigerant_type: refrigerant_type || null,
-      install_date: install_date || null,
-      warranty_expiration: warranty_expiration || null,
-      barcode: barcode || null,
-      nameplate: nameplateRaw ? JSON.parse(nameplateRaw) : null,
-    })
-    .eq("id", id);
+  // Only columns present on the form are written. The edit form does not send
+  // refrigerant, barcode, or nameplate, and clearing those here would wipe a
+  // data plate the tech already confirmed.
+  const patch: Record<string, string | null> = { property_id, type };
+  const optional = ["brand", "model", "serial_number", "refrigerant_type", "install_date", "warranty_expiration", "barcode"] as const;
+  for (const key of optional) {
+    if (!formData.has(key)) continue;
+    patch[key] = (formData.get(key) as string)?.trim() || null;
+  }
+
+  const { error } = await supabase.from("equipment").update(patch).eq("id", id);
 
   if (error) throw new Error(error.message);
 
@@ -145,5 +147,79 @@ export async function deleteEquipment(id: string): Promise<{ error?: string }> {
 
   revalidatePath("/equipment");
   revalidatePath("/properties");
+  return {};
+}
+
+export async function scanDataPlate(equipmentId: string, formData: FormData) {
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) return { error: "Choose a photo of the data plate." };
+  if (!photo.type.startsWith("image/")) return { error: "That file is not a photo." };
+  if (photo.size > 4_500_000) return { error: "That photo is too large. Take it again." };
+  try {
+    const proposal = await readDataPlate(photo);
+    const photoPath = await uploadPrivatePhoto(NAMEPLATE_PHOTO_BUCKET, photo, equipmentId);
+    return { proposal, photoPath };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not read the plate" };
+  }
+}
+
+function postedIdentity(formData: FormData): NameplateIdentity {
+  const identity = {} as NameplateIdentity;
+  for (const field of NAMEPLATE_FIELDS) identity[field] = blankToNull(formData.get(field) as string);
+  return identity;
+}
+
+export async function confirmDataPlate(equipmentId: string, formData: FormData): Promise<{ error?: string }> {
+  const { data, error } = await supabase
+    .from("equipment")
+    .select("brand, model, serial_number, type, refrigerant_type, nameplate")
+    .eq("id", equipmentId)
+    .single();
+  if (error || !data) return { error: error?.message ?? "Equipment not found" };
+
+  const stored = (data.nameplate ?? {}) as NameplateExtras;
+  const existing: NameplateIdentity = {
+    brand: data.brand,
+    model: data.model,
+    serial_number: data.serial_number,
+    manufacture_date: blankToNull(stored.manufacture_date == null ? null : String(stored.manufacture_date)),
+    type: data.type,
+    refrigerant_type: data.refrigerant_type,
+  };
+  const confirmed = new Set<NameplateField>(
+    NAMEPLATE_FIELDS.filter((field) => formData.get(`confirm_${field}`) === "1")
+  );
+  const merged = mergeNameplateIdentity(existing, postedIdentity(formData), confirmed);
+  if (merged.conflicts.length > 0) return { error: conflictMessage(merged.conflicts) };
+
+  let extras: NameplateExtras = {};
+  const extrasRaw = formData.get("extras");
+  if (typeof extrasRaw === "string" && extrasRaw.trim()) {
+    try {
+      const parsed = JSON.parse(extrasRaw) as NameplateExtras;
+      if (parsed && typeof parsed === "object") extras = parsed;
+    } catch {
+      extras = {};
+    }
+  }
+  const photoPath = blankToNull(formData.get("photo_path") as string);
+  const nameplate = mergeNameplateExtras(stored, extras, photoPath);
+  nameplate.manufacture_date = merged.next.manufacture_date;
+
+  const { error: updateError } = await supabase
+    .from("equipment")
+    .update({
+      brand: merged.next.brand,
+      model: merged.next.model,
+      serial_number: merged.next.serial_number,
+      type: merged.next.type || data.type,
+      refrigerant_type: merged.next.refrigerant_type,
+      nameplate,
+    })
+    .eq("id", equipmentId);
+  if (updateError) return { error: updateError.message };
+
+  revalidatePath("/equipment");
   return {};
 }

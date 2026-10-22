@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { deleteEquipment, updateEquipment } from "./actions";
+import NameplateScan from "./NameplateScan";
 import SubmitButton from "../SubmitButton";
 import {
   buttonClass,
@@ -19,9 +20,11 @@ type Equipment = {
   brand: string | null;
   model: string | null;
   serial_number: string | null;
+  refrigerant_type: string | null;
   install_date: string | null;
   warranty_expiration: string | null;
   property_id: string | null;
+  nameplate: { manufacture_date?: string | null } | null;
   properties: { address: string; customers: { name: string } | null } | null;
 };
 
@@ -197,12 +200,24 @@ export default function EquipmentList({
                 <div className={itemSubClass}>
                   {[
                     item.serial_number ? `SN ${item.serial_number}` : null,
+                    item.nameplate?.manufacture_date ? `Mfr ${item.nameplate.manufacture_date}` : null,
                     item.install_date ? `Installed ${item.install_date}` : null,
                     item.warranty_expiration ? `Warranty until ${item.warranty_expiration}` : null,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
                 </div>
+                <NameplateScan
+                  equipmentId={item.id}
+                  current={{
+                    brand: item.brand,
+                    model: item.model,
+                    serial_number: item.serial_number,
+                    manufacture_date: item.nameplate?.manufacture_date ?? null,
+                    type: item.type,
+                    refrigerant_type: item.refrigerant_type,
+                  }}
+                />
                 {errors[item.id] && <p className={`mt-1 ${errorClass}`}>{errors[item.id]}</p>}
               </div>
               <div className="flex flex-shrink-0 items-center gap-2">

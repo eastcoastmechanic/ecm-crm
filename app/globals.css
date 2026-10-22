@@ -55,6 +55,14 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+@media print {
+  html,
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
+
 .app-shell {
   min-height: 100dvh;
   overscroll-behavior-y: contain;

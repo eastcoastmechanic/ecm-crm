@@ -61,6 +61,43 @@ export default async function PortalDocumentPage({
     return <ContractView doc={doc} />;
   }
 
+  if (doc.type === "pm_report") {
+    const snapshot = doc.line_items as {
+      recommendations?: string | null;
+      failures?: { key?: string; section?: string; label?: string; notes?: string | null }[];
+      summary?: { pass?: number; fail?: number; na?: number };
+    } | null;
+    const failures = snapshot?.failures ?? [];
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className={headingClass}>Maintenance report {doc.doc_number ?? ""}</h1>
+          <p className={subTextClass}>
+            {doc.properties?.address ? `${doc.properties.address} · ` : ""}
+            {new Date(doc.created_at).toLocaleDateString()}
+          </p>
+        </div>
+        {snapshot?.summary && (
+          <p className={subTextClass}>
+            Pass {snapshot.summary.pass ?? 0} · Fail {snapshot.summary.fail ?? 0} · N/A {snapshot.summary.na ?? 0}
+          </p>
+        )}
+        {failures.length > 0 && (
+          <ul className="grid gap-2 text-sm">
+            {failures.map((item) => (
+              <li key={item.key ?? item.label}>
+                {item.section ? `${item.section} — ` : ""}
+                {item.label}
+                {item.notes ? `. ${item.notes}` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+        {snapshot?.recommendations ? <p className="text-sm text-white">{snapshot.recommendations}</p> : null}
+      </div>
+    );
+  }
+
   const lineData = doc.line_items as {
     items: LineItem[];
     brand: { good: string | null; better: string | null; best: string | null };

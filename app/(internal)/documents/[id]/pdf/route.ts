@@ -10,6 +10,8 @@ import { getMassSaveRebateFillData } from "@/lib/mass-save-reports";
 import { fillMassSaveRebateForm } from "@/lib/mass-save-pdf-fill";
 import { getContractForPdf } from "@/lib/contract-reports";
 import { renderContractPdf } from "@/lib/contract-pdf";
+import { checklistReport, getChecklist, getChecklistIdForDocument } from "@/lib/pm/db";
+import { renderPmReportPdf } from "@/lib/pm/report-pdf";
 
 export async function GET(
   _request: Request,
@@ -57,6 +59,21 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${docNumber ?? "mass-save-rebate"}.pdf"`,
+      },
+    });
+  }
+
+  if (docType?.type === "pm_report") {
+    const checklistId = await getChecklistIdForDocument(id);
+    if (!checklistId) return NextResponse.json({ error: "PM report not found" }, { status: 404 });
+    const { row, error } = await getChecklist(checklistId);
+    if (error || !row) return NextResponse.json({ error: error ?? "PM report not found" }, { status: 404 });
+    const report = await checklistReport(row);
+    const pdfBuffer = await renderPmReportPdf(report);
+    return new NextResponse(new Uint8Array(pdfBuffer), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${report.doc_number ?? "pm-report"}.pdf"`,
       },
     });
   }

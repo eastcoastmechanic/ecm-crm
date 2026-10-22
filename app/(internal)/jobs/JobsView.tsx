@@ -27,6 +27,7 @@ type Task = {
 
 type Job = {
   id: string;
+  job_type?: string | null;
   scheduled_at: string | null;
   status: string;
   notes: string | null;
@@ -398,6 +399,11 @@ export default function JobsView({
                 ) : (
                   <Link href={`/diagnostics/new?job_id=${job.id}`} className={buttonSecondaryClass}>
                     + Report
+                  </Link>
+                )}
+                {job.job_type === "maintenance" && (
+                  <Link href={`/pm/new?job_id=${job.id}`} className={buttonSecondaryClass}>
+                    PM
                   </Link>
                 )}
                 {job.install_reports && job.install_reports.length > 0 ? (

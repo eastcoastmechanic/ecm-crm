@@ -25,6 +25,11 @@ const tiles = [
     description: "Lineset charge calc, nitrogen pressure test, vacuum/decay, startup checklist, sign-off.",
   },
   {
+    href: "/pm/new",
+    title: "PM Checklist",
+    description: "Residential or commercial preventive maintenance, readings, photos, and a filed report.",
+  },
+  {
     href: "/tech-hub/pt-charts",
     title: "PT Charts",
     description: "Pressure/temperature saturation tables for R-410A, R-22, R-32, R-454B.",

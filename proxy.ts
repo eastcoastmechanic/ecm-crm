@@ -25,13 +25,15 @@ const INTERNAL_PATH_PREFIXES = [
   "/field-board",
   "/tech-hub",
   "/procurement",
+  "/pm",
   "/api/twilio/recordings",
 ];
 
-// The "tech" role is the truck app only. Everything else (money, customers, analytics,
-// documents, the assistant) is blocked here on the server, not just hidden from the menu.
+// Techs use the truck screen and the PM checklists they fill on a phone.
+// Everything else (money, customers, analytics, documents, the assistant) is
+// blocked here on the server, not just hidden from the menu.
 // The print sheet is excluded on purpose: it lists unpaid invoice amounts.
-const TECH_ALLOWED_PATHS = ["/field-board"];
+const TECH_ALLOWED_PATHS = ["/field-board", "/pm"];
 const TECH_BLOCKED_PATHS = ["/field-board/print"];
 
 function techMayAccess(pathname: string) {
@@ -45,6 +47,12 @@ function isInternalPath(pathname: string) {
   if (INTERNAL_API_PATHS.includes(pathname)) return true;
   return INTERNAL_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
+// Sample checklist for local review. The page 404s in production, and this
+// skip is development-only, so it never opens the route on Vercel.
+function isPreviewPath(pathname: string) {
+  return process.env.NODE_ENV === "development" && pathname === "/pm/preview";
+}
+
 
 function hasValidBasicAuth(request: NextRequest) {
   const header = request.headers.get("authorization");
@@ -102,6 +110,11 @@ async function checkStaffSession(
 
 export async function proxy(request: NextRequest) {
   if (isInternalPath(request.nextUrl.pathname)) {
+    if (isPreviewPath(request.nextUrl.pathname)) {
+      const previewHeaders = new Headers(request.headers);
+      previewHeaders.set("x-staff-role", "owner");
+      return NextResponse.next({ request: { headers: previewHeaders } });
+    }
     if (hasValidBasicAuth(request)) {
       // The shared Basic-auth login is treated as owner. Drop any client-sent
       // x-staff-role first so it can never be spoofed on this path.
@@ -222,6 +235,8 @@ export const config = {
     "/tech-hub",
     "/procurement/:path*",
     "/procurement",
+    "/pm/:path*",
+    "/pm",
     "/api/twilio/recordings/:path*",
     "/api/internal-chat",
     "/api/ingest/readings",

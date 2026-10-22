@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { addEquipment, scanNameplate, type ScannedNameplate } from "./actions";
+import { decodeManufactureDate } from "@/lib/pm/nameplate";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, buttonSecondaryClass, cardClass, errorClass, inputClass } from "../ui";
 
@@ -50,7 +51,9 @@ export default function EquipmentForm({ properties }: { properties: Property[] }
         {scanning && <p className="text-xs text-g300">Reading nameplate…</p>}
         {scanError && <p className={errorClass}>{scanError}</p>}
         {extracted && !scanning && (
-          <p className="text-xs text-g300">Fields below pre-filled — review before saving.</p>
+          <p className="text-xs text-g300">
+            Fields below are a proposal. Nothing is saved until you add the equipment.
+          </p>
         )}
       </div>
 
@@ -104,6 +107,22 @@ export default function EquipmentForm({ properties }: { properties: Property[] }
           className={inputClass}
         />
       </label>
+      <label className="flex flex-col gap-1 text-xs text-g300">
+        Manufacture date
+        <input
+          name="manufacture_date"
+          placeholder="From the plate, or decoded from the serial"
+          defaultValue={
+            extracted?.nameplate?.manufacture_date ||
+            decodeManufactureDate(extracted?.brand, extracted?.serial_number) ||
+            ""
+          }
+          className={inputClass}
+        />
+      </label>
+      {extracted?.nameplate && (
+        <input type="hidden" name="nameplate" value={JSON.stringify(extracted.nameplate)} />
+      )}
       <label className="flex flex-col gap-1 text-xs text-g300">
         Install date
         <input name="install_date" type="date" className={inputClass} />
