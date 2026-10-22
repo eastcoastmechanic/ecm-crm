@@ -157,7 +157,8 @@ export default async function DocumentPage({
   }
 
   if (doc.type === "contract") {
-    return <ContractDetail doc={doc} hasEmail={!!doc.customers?.email} />;
+    const { data: contractJobs } = await supabase.from("jobs").select("id").eq("document_id", doc.id).limit(1);
+    return <ContractDetail doc={doc} hasEmail={!!doc.customers?.email} hasJob={(contractJobs?.length ?? 0) > 0} />;
   }
 
   const rawLineData = doc.line_items as {

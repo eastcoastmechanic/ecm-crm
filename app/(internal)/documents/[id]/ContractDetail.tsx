@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { sendDocumentEmail } from "./actions";
 import SubmitButton from "../../SubmitButton";
-import { buttonClass, buttonSecondaryClass, subTextClass } from "../../ui";
+import { scheduleJobFromContract } from "../../jobs/actions";
+import { buttonClass, buttonSecondaryClass, inputClass, subTextClass } from "../../ui";
 import DocumentDeleteButton from "../DocumentDeleteButton";
 import { BrandedFormShell } from "@/lib/branded-form-shell";
 import { COMPANY_NAME, COMPANY_ADDRESS, COMPANY_PHONE, HIC_REGISTRATION_NUMBER } from "@/lib/brand";
@@ -30,6 +31,7 @@ const statusLabel: Record<string, string> = {
 export default function ContractDetail({
   doc,
   hasEmail,
+  hasJob = false,
 }: {
   doc: {
     id: string;
@@ -45,6 +47,7 @@ export default function ContractDetail({
     line_items: ContractLineItems;
   };
   hasEmail: boolean;
+  hasJob?: boolean;
 }) {
   const { scopeOfWork, paymentTerms, warrantyTerms, startDate, estimatedCompletion, notes } = doc.line_items;
   const transactionDate = formatDate(doc.created_at);
@@ -86,6 +89,30 @@ export default function ContractDetail({
         {statusLabel[doc.status] ?? doc.status}
         {doc.status === "signed" && doc.signed_at && ` on ${new Date(doc.signed_at).toLocaleString()}`}
       </div>
+
+      {doc.status === "signed" && (
+        <div className="rounded-xl border border-white/8 bg-white/3 p-4">
+          {hasJob ? (
+            <p className="text-sm text-g300">
+              A job is scheduled for this contract.{" "}
+              <Link href="/jobs" className="underline">
+                View jobs
+              </Link>
+            </p>
+          ) : (
+            <form action={scheduleJobFromContract} className="flex flex-wrap items-end gap-3">
+              <input type="hidden" name="document_id" value={doc.id} />
+              <label className="flex flex-col gap-1 text-xs text-g300">
+                Job date and time
+                <input type="datetime-local" name="scheduled_at" required className={inputClass} />
+              </label>
+              <SubmitButton className={buttonClass} pendingText="Scheduling…">
+                Schedule job
+              </SubmitButton>
+            </form>
+          )}
+        </div>
+      )}
 
       <BrandedFormShell docType="Contract" docNumber={doc.doc_number} date={transactionDate}>
         <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-highlight">Prepared for</p>

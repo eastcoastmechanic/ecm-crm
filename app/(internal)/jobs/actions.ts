@@ -15,6 +15,7 @@ import { syncJobToGraph } from "@/lib/graph-connector";
 import { syncJobToPlanner } from "@/lib/planner-connector";
 import { applyJobStatus, sendScheduleNotifications } from "@/lib/job-lifecycle";
 import { requireOffice } from "@/lib/require-role";
+import { parseEtLocal } from "@/lib/tz";
 
 export async function createServiceCall() {
   const { data: job, error } = await supabase
@@ -36,6 +37,49 @@ export async function createServiceCall() {
 
   revalidatePath("/jobs");
   redirect(`/diagnostics/new?job_id=${job.id}`);
+}
+
+/** Create the install job for a signed contract. One job per contract; a repeat just opens the existing one. */
+export async function scheduleJobFromContract(formData: FormData) {
+  await requireOffice();
+  const documentId = formData.get("document_id") as string;
+  const when = parseEtLocal(formData.get("scheduled_at") as string);
+  if (!when) throw new Error("Pick a date and time for the job");
+
+  const { data: doc, error: docError } = await supabase
+    .from("documents")
+    .select("id, type, status, customer_id, property_id, line_items")
+    .eq("id", documentId)
+    .single();
+  if (docError || !doc) throw new Error("Contract not found");
+  if (doc.type !== "contract" || doc.status !== "signed") throw new Error("Only a signed contract can be scheduled");
+
+  const { data: existing } = await supabase.from("jobs").select("id").eq("document_id", documentId).limit(1);
+  if (existing && existing.length > 0) redirect("/jobs");
+
+  const scope = ((doc.line_items as { scopeOfWork?: string } | null)?.scopeOfWork ?? "").trim();
+  const { data: job, error } = await supabase
+    .from("jobs")
+    .insert({
+      customer_id: doc.customer_id,
+      property_id: doc.property_id,
+      document_id: doc.id,
+      job_type: "install",
+      status: "scheduled",
+      scheduled_at: when.toISOString(),
+      notes: scope ? scope.slice(0, 500) : null,
+      created_via: "manual",
+    })
+    .select("id")
+    .single();
+  if (error || !job) throw new Error(error?.message ?? "Failed to schedule job");
+
+  await syncJobToPlanner(job.id, "scheduled");
+  await syncJobToGraph(job.id);
+
+  revalidatePath("/jobs");
+  revalidatePath(`/documents/${documentId}`);
+  redirect("/jobs");
 }
 
 type CustomerContact = {

@@ -49,6 +49,15 @@ function etMidnight(dateKey: string): Date {
   return new Date(guess);
 }
 
+/** Parse a datetime-local value ("2026-10-22T09:30") as New York wall-clock time. Null if unreadable. */
+export function parseEtLocal(value: string): Date | null {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value ?? "");
+  if (!m) return null;
+  const midnight = etMidnight(m[1]);
+  const when = new Date(midnight.getTime() + (Number(m[2]) * 60 + Number(m[3])) * 60000);
+  return Number.isNaN(when.getTime()) ? null : when;
+}
+
 /**
  * UTC instants bounding one New York calendar day: start is inclusive,
  * end is the next midnight and exclusive (use gte start / lt end).
