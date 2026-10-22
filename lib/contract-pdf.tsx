@@ -2,7 +2,7 @@ import path from "path";
 import { readFile } from "fs/promises";
 import { Document, Page, View, Text, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { COMPANY_NAME, COMPANY_SLOGAN, COMPANY_ADDRESS, COMPANY_PHONE, HIC_REGISTRATION_NUMBER } from "./brand";
-import { RIGHT_TO_CANCEL_NOTICE, ARBITRATION_NOTICE_TEXT, GOVERNING_TERMS_TEXT, noticeOfCancellationText } from "./contract-terms";
+import { autoRenewalText, RIGHT_TO_CANCEL_NOTICE, ARBITRATION_NOTICE_TEXT, GOVERNING_TERMS_TEXT, noticeOfCancellationText } from "./contract-terms";
 import { registerBrandFonts, BODY_FONT, DISPLAY_FONT } from "./pdf-fonts";
 
 export type ContractPdfData = {
@@ -22,6 +22,8 @@ export type ContractPdfData = {
   status: string;
   signed_at: string | null;
   signature_data: string | null;
+  auto_renew_price_cents?: number | null;
+  auto_renew_authorized_at?: string | null;
 };
 
 Font.registerHyphenationCallback((word) => [word]);
@@ -310,6 +312,18 @@ export function ContractPdf({ doc, logo }: { doc: ContractPdfData; logo: string 
             <Text style={styles.sectionTitle}>Warranty</Text>
             <Text style={styles.bodyText}>{doc.warranty_terms}</Text>
           </View>
+
+          {doc.auto_renew_price_cents ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Automatic Annual Renewal (optional)</Text>
+              <Text style={styles.bodyText}>{autoRenewalText(doc.auto_renew_price_cents)}</Text>
+              <Text style={styles.bodyText}>
+                {doc.auto_renew_authorized_at
+                  ? `Customer chose automatic renewal on ${formatDate(doc.auto_renew_authorized_at)}.`
+                  : "Customer did not choose automatic renewal."}
+              </Text>
+            </View>
+          ) : null}
 
           {doc.notes && (
             <View style={styles.section}>

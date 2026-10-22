@@ -19,7 +19,16 @@ export type ContractLineItems = {
   estimatedCompletion: string | null;
   notes: string | null;
   fromDocumentId?: string | null;
+  /** Optional yearly renewal price (cents). When set, the customer may opt in to automatic annual renewal when signing. */
+  autoRenewPriceCents?: number | null;
+  /** Set at signing when the customer ticked the automatic-renewal box. */
+  autoRenewAuthorizedAt?: string | null;
 };
+
+export function autoRenewalText(priceCents: number) {
+  const price = (priceCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  return `If you choose automatic renewal, your maintenance plan renews every year and East Coast Mechanical charges ${price} per year to the card you paid with, until you cancel. We email you a renewal notice before each renewal. You can cancel any time before a renewal by calling or emailing us. Checking the box is optional and does not affect this contract.`;
+}
 
 function money(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);

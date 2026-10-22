@@ -4,6 +4,7 @@ import { subTextClass } from "../../../(internal)/ui";
 import { BrandedFormShell } from "@/lib/branded-form-shell";
 import { COMPANY_NAME, COMPANY_ADDRESS, COMPANY_PHONE, HIC_REGISTRATION_NUMBER } from "@/lib/brand";
 import { RIGHT_TO_CANCEL_NOTICE, ARBITRATION_NOTICE_TEXT, GOVERNING_TERMS_TEXT, noticeOfCancellationText } from "@/lib/contract-terms";
+import { autoRenewalText } from "@/lib/contract-terms";
 import type { ContractLineItems } from "@/lib/contract-terms";
 
 function formatPrice(value: number | null) {
@@ -43,7 +44,8 @@ export default function ContractView({
     line_items: ContractLineItems;
   };
 }) {
-  const { scopeOfWork, paymentTerms, warrantyTerms, startDate, estimatedCompletion } = doc.line_items;
+  const { scopeOfWork, paymentTerms, warrantyTerms, startDate, estimatedCompletion, autoRenewPriceCents, autoRenewAuthorizedAt } =
+    doc.line_items;
   const transactionDate = formatDate(doc.created_at);
 
   return (
@@ -86,6 +88,12 @@ export default function ContractView({
             Start date: {formatDate(startDate)} · Estimated completion: {formatDate(estimatedCompletion)}
           </PaperSection>
           <PaperSection title="Warranty">{warrantyTerms}</PaperSection>
+          {autoRenewPriceCents ? (
+            <PaperSection title="Automatic Annual Renewal (optional)">
+              {autoRenewalText(autoRenewPriceCents)}
+              {autoRenewAuthorizedAt ? `\n\nYou chose automatic renewal on ${formatDate(autoRenewAuthorizedAt)}.` : ""}
+            </PaperSection>
+          ) : null}
         </div>
 
         <div className="mb-4 rounded-md border border-accent bg-[#fdf1ee] p-3">
@@ -114,7 +122,7 @@ export default function ContractView({
         </p>
       </BrandedFormShell>
 
-      {doc.status === "sent" && <ContractSignaturePad documentId={doc.id} />}
+      {doc.status === "sent" && <ContractSignaturePad documentId={doc.id} offersAutoRenew={!!autoRenewPriceCents} />}
       {doc.status === "signed" && (
         <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">
           Signed{doc.signed_at ? ` on ${new Date(doc.signed_at).toLocaleString()}` : ""}. We&apos;ll be

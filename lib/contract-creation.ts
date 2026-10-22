@@ -27,6 +27,8 @@ export type CreateContractInput = {
   notes?: string | null;
   fromDocumentId?: string | null;
   specialOrderMaterials?: number | null;
+  /** Optional yearly renewal price in dollars; enables the opt-in on the signing page. */
+  autoRenewPrice?: number | null;
 };
 
 export type CreateContractResult = { documentId: string; docNumber: string };
@@ -47,6 +49,8 @@ export async function createContract(input: CreateContractInput): Promise<Create
     estimatedCompletion: input.estimatedCompletion || null,
     notes: input.notes?.trim() || null,
     fromDocumentId: input.fromDocumentId || null,
+    autoRenewPriceCents:
+      input.autoRenewPrice && input.autoRenewPrice > 0 ? Math.round(input.autoRenewPrice * 100) : null,
   };
 
   const { data: document, error } = await supabase
