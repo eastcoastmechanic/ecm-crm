@@ -7,13 +7,15 @@ import SubmitButton from "../SubmitButton";
 import { buttonClass, errorClass, headingClass, subTextClass } from "../ui";
 
 export default async function JobsPage() {
-  const [{ data: jobs, error }, plannerTasks] = await Promise.all([
+  const [{ data: jobs, error }, plannerTasks, { data: staffRows }] = await Promise.all([
     supabase
       .from("jobs")
       .select("*, customers(name), properties(address), diagnostics(id), install_reports(id)")
       .order("scheduled_at", { ascending: false }),
     listOpenPlannerTasks(),
+    supabase.from("staff").select("id, name, email, role").order("name"),
   ]);
+  const staff = (staffRows ?? []).map((s) => ({ id: s.id as string, name: (s.name as string | null) || (s.email as string) }));
   const tasks = plannerTasks.map((t) => ({ id: t.id, title: t.title, notes: t.notes, due_at: t.dueDateTime }));
 
   // Photos live in a private bucket, so the server signs them here rather than
@@ -47,6 +49,7 @@ export default async function JobsPage() {
       <JobsView
         jobs={jobsWithPhotos}
         tasks={tasks ?? []}
+        staff={staff}
         hourlyRate={Number(process.env.HOURLY_LABOR_RATE) || null}
       />
     </div>
