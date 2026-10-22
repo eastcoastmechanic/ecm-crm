@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addJobPhotos, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
+import { addJobPhotos, assignJob, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
 import { addTask, completeTask } from "../tasks/actions";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
@@ -34,6 +34,7 @@ type Job = {
   on_way_at: string | null;
   tracked_hours: number | null;
   created_via: string | null;
+  assigned_staff_id?: string | null;
   customers: { name: string | null } | null;
   properties: { address: string | null } | null;
   diagnostics: { id: string }[] | null;
@@ -71,10 +72,12 @@ function monthGrid(cursor: Date) {
 export default function JobsView({
   jobs,
   tasks,
+  staff,
   hourlyRate,
 }: {
   jobs: Job[];
   tasks: Task[];
+  staff: { id: string; name: string }[];
   hourlyRate: number | null;
 }) {
   const router = useRouter();
@@ -444,6 +447,27 @@ export default function JobsView({
                 <SubmitButton className={buttonClass}>Save</SubmitButton>
               </div>
             </form>
+
+              <form action={assignJob} className="flex items-center gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <label className="flex items-center gap-2 text-[11px] text-g300">
+                  Assigned to
+                  <select
+                    name="staff_id"
+                    defaultValue={job.assigned_staff_id ?? ""}
+                    className={inputClass}
+                    aria-label="Assign job to"
+                  >
+                    <option value="">Unassigned</option>
+                    {staff.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <SubmitButton className={buttonSecondaryClass}>Assign</SubmitButton>
+              </form>
 
               {job.photos && job.photos.length > 0 && (
                 <div className="flex flex-wrap gap-2">

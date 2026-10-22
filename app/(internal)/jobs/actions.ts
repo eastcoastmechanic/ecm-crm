@@ -82,6 +82,20 @@ export async function scheduleJobFromContract(formData: FormData) {
   redirect("/jobs");
 }
 
+/** Assign a job to a staff member, or clear it (empty staff_id). */
+export async function assignJob(formData: FormData) {
+  await requireOffice();
+  const jobId = formData.get("job_id") as string;
+  const staffId = ((formData.get("staff_id") as string) || "").trim() || null;
+  if (!jobId) throw new Error("Job is required");
+
+  const { error } = await supabase.from("jobs").update({ assigned_staff_id: staffId }).eq("id", jobId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/jobs");
+  revalidatePath("/field-board");
+}
+
 type CustomerContact = {
   name: string | null;
   email: string | null;

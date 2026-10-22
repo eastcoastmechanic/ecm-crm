@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } from "@/lib/field-board";
 import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import FieldNoteForm from "./FieldNoteForm";
@@ -48,7 +49,22 @@ function one<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
-async function getTruckJobs(): Promise<TruckJob[]> {
+/** The signed-in staff member's id, so their assigned jobs can lead the list. Null for the shared owner login. */
+async function getMyStaffId(): Promise<string | null> {
+  try {
+    const authClient = await createPortalServerClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase.from("staff").select("id").eq("auth_user_id", user.id).maybeSingle();
+    return (data?.id as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
   const now = Date.now();
   const from = new Date(now - 36 * 3600000).toISOString();
   const to = new Date(now + 8 * 24 * 3600000).toISOString();
@@ -56,7 +72,7 @@ async function getTruckJobs(): Promise<TruckJob[]> {
   const { data } = await supabase
     .from("jobs")
     .select(
-      "id, status, scheduled_at, notes, job_type, on_way_at, photos, customers(name, phone), properties(address)"
+      "id, status, scheduled_at, notes, job_type, on_way_at, photos, assigned_staff_id, customers(name, phone), properties(address)"
     )
     // Every job that isn't finished or cancelled (so the tech can pick any of them),
     // plus anything scheduled in the recent/upcoming window.
@@ -79,6 +95,7 @@ async function getTruckJobs(): Promise<TruckJob[]> {
       phone: customer?.phone ?? null,
       address: property?.address ?? null,
       photoCounts: countPhotos(row.photos),
+      assignedToMe: myStaffId !== null && row.assigned_staff_id === myStaffId,
     };
   });
 }
@@ -86,6 +103,7 @@ async function getTruckJobs(): Promise<TruckJob[]> {
 export default async function FieldBoardPage() {
   const isTech = (await headers()).get("x-staff-role") === "tech";
   const secrets = fieldBoardSecretStatus();
+  const myStaffId = getMyStaffId();
   const [sheetResult, allJobs] = await Promise.all([
     getFieldBoardSheet()
       .then((sheet) => ({ events: sheet.events ?? [], error: null as string | null }))
@@ -100,7 +118,7 @@ export default async function FieldBoardPage() {
         }[],
         error: err instanceof Error ? err.message : "Field sheet failed",
       })),
-    getTruckJobs(),
+    myStaffId.then((id) => getTruckJobs(id)),
   ]);
   const sheetError = sheetResult.error;
 
@@ -115,12 +133,19 @@ export default async function FieldBoardPage() {
   const open = todays
     .filter((job) => job.status !== "complete")
     // On-site job first, then the run order by scheduled time.
-    .sort((a, b) => Number(b.status === "in_progress") - Number(a.status === "in_progress"));
+    // then jobs assigned to the signed-in tech. sort() is stable, so run order is kept within each group.
+    .sort(
+      (a, b) =>
+        Number(b.status === "in_progress") - Number(a.status === "in_progress") ||
+        Number(!!b.assignedToMe) - Number(!!a.assignedToMe)
+    );
   const done = todays.filter((job) => job.status === "complete");
   const next = open[0] ?? null;
   const rest = open.slice(1);
   // Every other open job (any date, or unscheduled), to pick from the full list.
-  const otherJobs = allJobs.filter((job) => !isToday(job) && job.status !== "complete");
+  const otherJobs = allJobs
+    .filter((job) => !isToday(job) && job.status !== "complete")
+    .sort((a, b) => Number(!!b.assignedToMe) - Number(!!a.assignedToMe));
   const noteJobs = [...open, ...otherJobs];
 
   return (

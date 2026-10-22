@@ -13,6 +13,7 @@ export type TruckJob = {
   phone: string | null;
   address: string | null;
   photoCounts: PhotoCounts;
+  assignedToMe?: boolean;
 };
 
 const bigButton =
@@ -91,6 +92,11 @@ export default function TruckJobCard({ job, primary = false }: { job: TruckJob; 
       </div>
       <div className={`mt-1 font-display font-bold text-white ${primary ? "text-2xl" : "text-lg"}`}>
         {job.customer ?? "Job"}
+        {job.assignedToMe && (
+          <span className="ml-2 rounded bg-accent/20 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-accent">
+            Yours
+          </span>
+        )}
       </div>
       <p className="text-sm text-g300">{job.address ?? "No address on this job"}</p>
       {primary && job.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-g300">{job.notes}</p>}
