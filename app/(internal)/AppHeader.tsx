@@ -23,15 +23,23 @@ export default function AppHeader({ role }: { role?: string | null }) {
           <div className="truncate font-display text-base font-bold tracking-wide">{title}</div>
         </div>
         {isTech ? (
-          // Techs get the truck screen only: no external board, no account page.
-          <form action={staffSignOut}>
-            <button
-              type="submit"
+          // Techs get the truck screen and their own account page (password change); no external board.
+          <>
+            <Link
+              href="/account"
               className="flex h-9 shrink-0 items-center rounded-full border border-white/10 bg-white/6 px-3 text-[11px] font-bold uppercase tracking-wide text-g300 hover:bg-white/10 hover:text-white"
             >
-              Sign out
-            </button>
-          </form>
+              Account
+            </Link>
+            <form action={staffSignOut}>
+              <button
+                type="submit"
+                className="flex h-9 shrink-0 items-center rounded-full border border-white/10 bg-white/6 px-3 text-[11px] font-bold uppercase tracking-wide text-g300 hover:bg-white/10 hover:text-white"
+              >
+                Sign out
+              </button>
+            </form>
+          </>
         ) : (
           <>
             <a

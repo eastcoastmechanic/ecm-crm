@@ -29,11 +29,11 @@ const INTERNAL_PATH_PREFIXES = [
   "/api/twilio/recordings",
 ];
 
-// Techs use the truck screen and the PM checklists they fill on a phone.
+// Techs use the truck screen, the PM checklists they fill on a phone, and their own account page (password change only).
 // Everything else (money, customers, analytics, documents, the assistant) is
 // blocked here on the server, not just hidden from the menu.
 // The print sheet is excluded on purpose: it lists unpaid invoice amounts.
-const TECH_ALLOWED_PATHS = ["/field-board", "/pm"];
+const TECH_ALLOWED_PATHS = ["/field-board", "/pm", "/account"];
 const TECH_BLOCKED_PATHS = ["/field-board/print"];
 
 function techMayAccess(pathname: string) {
