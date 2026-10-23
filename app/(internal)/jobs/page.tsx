@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { resolveJobPhotos } from "@/lib/job-photos";
-import { listOpenPlannerTasks } from "@/lib/planner-connector";
+import { listOpenPlannerTasksSafe } from "@/lib/planner-connector";
 import { createServiceCall } from "./actions";
 import JobsView from "./JobsView";
 import SubmitButton from "../SubmitButton";
@@ -12,11 +12,11 @@ export default async function JobsPage() {
       .from("jobs")
       .select("*, customers(id, name), properties(address), diagnostics(id), install_reports(id)")
       .order("scheduled_at", { ascending: false }),
-    listOpenPlannerTasks(),
+    listOpenPlannerTasksSafe(),
     supabase.from("staff").select("id, name, email, role").order("name"),
   ]);
   const staff = (staffRows ?? []).map((s) => ({ id: s.id as string, name: (s.name as string | null) || (s.email as string) }));
-  const tasks = plannerTasks.map((t) => ({ id: t.id, title: t.title, notes: t.notes, due_at: t.dueDateTime }));
+  const tasks = plannerTasks.tasks.map((t) => ({ id: t.id, title: t.title, notes: t.notes, due_at: t.dueDateTime }));
 
   // Photos live in a private bucket, so the server signs them here rather than
   // handing the client a path it cannot fetch. Legacy public-URL entries pass
