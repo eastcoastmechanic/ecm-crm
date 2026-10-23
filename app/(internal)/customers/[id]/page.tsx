@@ -31,7 +31,7 @@ export default async function CustomerProfilePage({
 
   const { data: properties } = await supabase
     .from("properties")
-    .select("id, address, property_type")
+    .select("id, address, property_type, access_notes")
     .eq("customer_id", id);
 
   const propertyIds = (properties ?? []).map((p) => p.id);
@@ -101,7 +101,7 @@ export default async function CustomerProfilePage({
           </Link>
           <h1 className={`${headingClass} mt-2`}>{customer.name}</h1>
           <p className={subTextClass}>
-            {[customer.email, customer.phone].filter(Boolean).join(" · ")}
+            {[customer.company_name, customer.email, customer.phone, customer.alt_phone].filter(Boolean).join(" · ")}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link href={`/documents/new?customer_id=${customer.id}`} className={buttonClass}>

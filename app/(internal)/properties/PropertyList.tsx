@@ -17,6 +17,7 @@ type Property = {
   id: string;
   address: string;
   property_type: string | null;
+  access_notes?: string | null;
   customer_id: string | null;
   customers: { name: string } | null;
 };
@@ -65,6 +66,10 @@ function EditPropertyForm({
       <label className="flex flex-col gap-1 text-xs text-g300 sm:col-span-2">
         Address
         <input name="address" required defaultValue={property.address} className={inputClass} />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-g300 sm:col-span-2">
+        Access notes (gate code, pets, parking, lockbox)
+        <textarea name="access_notes" defaultValue={property.access_notes ?? ""} className={inputClass} />
       </label>
       <div className="flex items-center gap-2 sm:col-span-2">
         <SubmitButton className={`${buttonClass} w-fit`} pendingText="Saving…">
@@ -169,6 +174,7 @@ export default function PropertyList({
                   {property.customers?.name}
                   {property.property_type ? ` · ${property.property_type}` : ""}
                 </div>
+                {property.access_notes && <div className={itemSubClass}>Access: {property.access_notes}</div>}
                 {errors[property.id] && <p className={`mt-1 ${errorClass}`}>{errors[property.id]}</p>}
               </div>
               <div className="flex flex-shrink-0 items-center gap-2">
