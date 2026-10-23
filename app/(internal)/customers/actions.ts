@@ -33,7 +33,7 @@ export async function addCustomer(formData: FormData) {
       name,
       email: email || null,
       phone: phone || null,
-      billing_address: billing_address || (billingSame && propertyAddress ? propertyAddress : null),
+      billing_address: (billingSame && propertyAddress ? propertyAddress : billing_address) || null,
       company_name: company_name || null,
       alt_phone: alt_phone || null,
       notes: notes || null,
