@@ -35,6 +35,7 @@ type Task = {
 
 type Job = {
   id: string;
+  invoices?: { id: string; doc_number: string | null; status: string; total: number | null }[];
   job_type?: string | null;
   scheduled_at: string | null;
   status: string;
@@ -75,6 +76,30 @@ function monthGrid(cursor: Date) {
     d.setDate(gridStart.getDate() + i);
     return d;
   });
+}
+
+function BillingLine({ status, invoices }: { status: string; invoices: NonNullable<Job["invoices"]> }) {
+  if (invoices.length === 0) {
+    if (status !== "complete") return null;
+    return <div className="mt-1 text-xs font-semibold text-amber-400">Finished — no invoice linked yet</div>;
+  }
+  const owed = invoices.filter((i) => i.status !== "paid" && i.status !== "void");
+  const owedTotal = owed.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+  if (owed.length === 0) return <div className="mt-1 text-xs text-emerald-400">Paid in full</div>;
+  return (
+    <div className="mt-1 text-xs font-semibold text-amber-400">
+      Owed ${owedTotal.toFixed(2)} —{" "}
+      {owed.map((i, n) => (
+        <span key={i.id}>
+          {n > 0 ? ", " : ""}
+          <Link href={`/documents/${i.id}`} className="underline">
+            {i.doc_number ?? "invoice"}
+          </Link>{" "}
+          ({i.status})
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export default function JobsView({
@@ -407,6 +432,7 @@ export default function JobsView({
                       }`
                     : ""}
                 </div>
+                <BillingLine status={job.status} invoices={job.invoices ?? []} />
               </div>
               <div className="flex items-center gap-2">
                 {job.diagnostics && job.diagnostics.length > 0 ? (

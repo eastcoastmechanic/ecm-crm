@@ -21,10 +21,26 @@ export default async function JobsPage() {
   // Photos live in a private bucket, so the server signs them here rather than
   // handing the client a path it cannot fetch. Legacy public-URL entries pass
   // through untouched.
+  const jobIds = (jobs ?? []).map((j) => j.id as string);
+  const { data: invoiceRows } = jobIds.length
+    ? await supabase
+        .from("documents")
+        .select("id, job_id, doc_number, status, total, square_invoice_id")
+        .eq("type", "invoice")
+        .in("job_id", jobIds)
+    : { data: [] };
+  const billingByJob = new Map<string, { id: string; doc_number: string | null; status: string; total: number | null }[]>();
+  for (const d of invoiceRows ?? []) {
+    const list = billingByJob.get(d.job_id as string) ?? [];
+    list.push({ id: d.id, doc_number: d.doc_number, status: d.status, total: d.total });
+    billingByJob.set(d.job_id as string, list);
+  }
+
   const jobsWithPhotos = await Promise.all(
     (jobs ?? []).map(async (job) => ({
       ...job,
       photos: await resolveJobPhotos(job.photos),
+      invoices: billingByJob.get(job.id as string) ?? [],
     }))
   );
 
