@@ -6,6 +6,7 @@ import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { stripe } from "@/lib/stripe";
 import { supabase as adminDb } from "@/lib/supabase";
 import type { ContractLineItems } from "@/lib/contract-terms";
+import { etDateKey } from "@/lib/tz";
 
 export async function createCheckoutSession(formData: FormData) {
   const documentId = formData.get("document_id") as string;
@@ -148,26 +149,46 @@ export async function signContract(formData: FormData) {
   if (updateError) throw new Error(updateError.message);
   if (!signed || signed.length === 0) throw new Error("This contract can't be signed right now");
 
-  // Record the consent on the customer's active plan (the renewal cron charges only these).
-  // Never fails the signing: the authorization is also stored on the signed contract above.
-  if (authorizeRenewal && doc.customer_id && doc.property_id) {
-    // Only when exactly one active plan matches: with several, one consent must not authorize them all.
-    const { data: plans, error: planError } = await adminDb
-      .from("service_contracts")
-      .select("id")
-      .eq("customer_id", doc.customer_id)
-      .eq("property_id", doc.property_id)
-      .eq("status", "active");
-    if (planError) {
-      console.error(`Could not look up plan for renewal authorization: ${planError.message}`);
-    } else if (plans?.length === 1) {
-      const { error: setError } = await adminDb
+  // A contract that offers yearly renewal is a maintenance plan: make sure the customer has an active plan
+  // record for this property, and record renewal consent on it. Never fails the signing: the authorization
+  // is also stored on the signed contract above.
+  if (renewalCents && renewalCents > 0 && doc.customer_id && doc.property_id) {
+    try {
+      const { data: plans, error: planError } = await adminDb
         .from("service_contracts")
-        .update({ auto_renew_authorized_at: signedAt, renewal_price_cents: renewalCents })
-        .eq("id", plans[0].id);
-      if (setError) console.error(`Could not record renewal authorization on plan: ${setError.message}`);
-    } else {
-      console.error(`Renewal authorization on contract ${documentId} not applied: ${plans?.length ?? 0} active plans match`);
+        .select("id")
+        .eq("customer_id", doc.customer_id)
+        .eq("property_id", doc.property_id)
+        .eq("status", "active");
+      if (planError) throw new Error(planError.message);
+
+      const consent = authorizeRenewal ? { auto_renew_authorized_at: signedAt, renewal_price_cents: renewalCents } : {};
+      if (!plans || plans.length === 0) {
+        const start = etDateKey(new Date(signedAt));
+        const end = new Date(`${start}T12:00:00Z`);
+        end.setUTCFullYear(end.getUTCFullYear() + 1);
+        const { error: createError } = await adminDb.from("service_contracts").insert({
+          customer_id: doc.customer_id,
+          property_id: doc.property_id,
+          plan_name: "Annual Maintenance Plan",
+          start_date: start,
+          end_date: end.toISOString().slice(0, 10),
+          status: "active",
+          terms: `Created automatically when contract ${documentId} was signed.`,
+          ...consent,
+        });
+        if (createError) throw new Error(createError.message);
+      } else if (plans.length === 1) {
+        // With several plans, one consent must not authorize them all, so only a single match is updated.
+        if (authorizeRenewal) {
+          const { error: setError } = await adminDb.from("service_contracts").update(consent).eq("id", plans[0].id);
+          if (setError) throw new Error(setError.message);
+        }
+      } else {
+        console.error(`Contract ${documentId} signed: ${plans.length} active plans match, none changed`);
+      }
+    } catch (err) {
+      console.error(`Could not create or update maintenance plan for contract ${documentId}: ${err instanceof Error ? err.message : err}`);
     }
   }
 
