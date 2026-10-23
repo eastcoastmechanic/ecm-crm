@@ -32,9 +32,9 @@ async function loadPrefill(estimateId: string) {
 export default async function NewContractPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; customer_id?: string }>;
 }) {
-  const { from } = await searchParams;
+  const { from, customer_id } = await searchParams;
 
   const [{ data: customers }, { data: properties }, prefill] = await Promise.all([
     supabase.from("customers").select("id, name").order("name"),
@@ -56,6 +56,7 @@ export default async function NewContractPage({
         customers={customers ?? []}
         properties={properties ?? []}
         prefill={prefill}
+        defaultCustomerId={customer_id ?? ""}
         defaultPaymentTerms={DEFAULT_PAYMENT_TERMS}
         defaultWarrantyTerms={DEFAULT_WARRANTY_TERMS}
       />

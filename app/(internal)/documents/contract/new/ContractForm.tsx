@@ -21,16 +21,18 @@ export default function ContractForm({
   customers,
   properties,
   prefill,
+  defaultCustomerId = "",
   defaultPaymentTerms,
   defaultWarrantyTerms,
 }: {
   customers: Customer[];
   properties: Property[];
   prefill: Prefill;
+  defaultCustomerId?: string;
   defaultPaymentTerms: string;
   defaultWarrantyTerms: string;
 }) {
-  const [customerId, setCustomerId] = useState(prefill?.customerId ?? "");
+  const [customerId, setCustomerId] = useState(prefill?.customerId ?? defaultCustomerId);
   const [propertyId, setPropertyId] = useState(prefill?.propertyId ?? "");
 
   return (

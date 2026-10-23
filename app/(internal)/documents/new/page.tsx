@@ -2,7 +2,12 @@ import { supabase } from "@/lib/supabase";
 import NewDocumentForm from "./NewDocumentForm";
 import { headingClass, subTextClass } from "../../ui";
 
-export default async function NewDocumentPage() {
+export default async function NewDocumentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customer_id?: string }>;
+}) {
+  const { customer_id } = await searchParams;
   const [{ data: customers }, { data: properties }] = await Promise.all([
     supabase.from("customers").select("id, name").order("name"),
     supabase
@@ -21,7 +26,11 @@ export default async function NewDocumentPage() {
         </p>
       </div>
 
-      <NewDocumentForm customers={customers ?? []} properties={properties ?? []} />
+      <NewDocumentForm
+        customers={customers ?? []}
+        properties={properties ?? []}
+        defaultCustomerId={customer_id ?? ""}
+      />
     </div>
   );
 }
