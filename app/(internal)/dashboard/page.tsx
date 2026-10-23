@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getSquareRevenue, getSquareMoneyOwed } from "@/lib/square";
 import { getStaffRole } from "@/lib/require-role";
+import { etDateKey, etDayRange, formatEtTime } from "@/lib/tz";
 import {
   buttonClass,
   buttonSecondaryClass,
@@ -22,6 +24,55 @@ const jobStatusClass: Record<string, string> = {
   complete: "bg-green-l text-green",
   cancelled: "bg-white/8 text-g300",
 };
+
+const statCardClass = "rounded-xl border border-white/8 bg-white/3 p-4";
+
+// The Square numbers come from live Square API calls, which are slow. They render
+// in their own boundary so the rest of the dashboard shows up immediately.
+async function SquareStats() {
+  const [squareRevenue, squareMoneyOwed] = await Promise.all([
+    getSquareRevenue("2000-01-01T00:00:00Z"),
+    process.env.SQUARE_LOCATION_ID
+      ? getSquareMoneyOwed(process.env.SQUARE_LOCATION_ID)
+      : Promise.resolve({ totalCents: 0, count: 0 }),
+  ]);
+  const cards = [
+    {
+      label: "Revenue Collected (Square)",
+      value: formatPrice(squareRevenue.totalCents / 100),
+      sub: `${squareRevenue.count} payments`,
+    },
+    {
+      label: "Money Owed (Square)",
+      value: formatPrice(squareMoneyOwed.totalCents / 100),
+      sub: `${squareMoneyOwed.count} unpaid invoices`,
+    },
+  ];
+  return (
+    <>
+      {cards.map((stat) => (
+        <div key={stat.label} className={statCardClass}>
+          <div className="text-xs font-semibold uppercase tracking-wide text-g500">{stat.label}</div>
+          <div className="mt-1 font-display text-2xl font-extrabold">{stat.value}</div>
+          <div className={itemSubClass}>{stat.sub}</div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function SquareStatsFallback() {
+  return (
+    <>
+      {["Revenue Collected (Square)", "Money Owed (Square)"].map((label) => (
+        <div key={label} className={statCardClass}>
+          <div className="text-xs font-semibold uppercase tracking-wide text-g500">{label}</div>
+          <div className="mt-1 font-display text-2xl font-extrabold text-g500">Loading…</div>
+        </div>
+      ))}
+    </>
+  );
+}
 
 export default async function DashboardPage() {
   // Revenue, money owed and invoice totals are owner/office only. Techs get a
@@ -45,7 +96,11 @@ export default async function DashboardPage() {
   const in30Days = new Date();
   in30Days.setDate(in30Days.getDate() + 30);
 
+  const todayRange = etDayRange(etDateKey());
+
   const [
+    { data: todaysJobs },
+    { count: estimatesToReview },
     { count: totalCustomers },
     { count: activeJobs },
     { data: outstandingInvoices },
@@ -53,9 +108,20 @@ export default async function DashboardPage() {
     { count: contractsRenewing },
     { data: upcomingJobs },
     { data: recentDocuments },
-    squareRevenue,
-    squareMoneyOwed,
   ] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select("id, status, scheduled_at, customers(name), properties(address)")
+      .gte("scheduled_at", todayRange.start.toISOString())
+      .lt("scheduled_at", todayRange.end.toISOString())
+      .neq("status", "cancelled")
+      .order("scheduled_at", { ascending: true }),
+    supabase
+      .from("documents")
+      .select("*", { count: "exact", head: true })
+      .eq("type", "estimate")
+      .eq("status", "draft")
+      .is("routed_to", null),
     supabase.from("customers").select("*", { count: "exact", head: true }),
     supabase
       .from("jobs")
@@ -81,14 +147,6 @@ export default async function DashboardPage() {
       .select("*, customers(name)")
       .order("created_at", { ascending: false })
       .limit(5),
-    // Real revenue mostly flows through Square (POS, Square Invoices), not
-    // the CRM's own documents -- see lib/square.ts. Shown as its own card
-    // rather than merged into "Revenue Collected" to avoid double-counting
-    // a job that's tracked in both places.
-    getSquareRevenue("2000-01-01T00:00:00Z"),
-    process.env.SQUARE_LOCATION_ID
-      ? getSquareMoneyOwed(process.env.SQUARE_LOCATION_ID)
-      : Promise.resolve({ totalCents: 0, count: 0 }),
   ]);
 
   const outstandingTotal = (outstandingInvoices ?? []).reduce((sum, doc) => sum + (doc.total ?? 0), 0);
@@ -103,16 +161,6 @@ export default async function DashboardPage() {
       sub: `${outstandingInvoices?.length ?? 0} unpaid`,
     },
     { label: "Revenue Collected", value: formatPrice(revenueTotal) },
-    {
-      label: "Revenue Collected (Square)",
-      value: formatPrice(squareRevenue.totalCents / 100),
-      sub: `${squareRevenue.count} payments`,
-    },
-    {
-      label: "Money Owed (Square)",
-      value: formatPrice(squareMoneyOwed.totalCents / 100),
-      sub: `${squareMoneyOwed.count} unpaid invoices`,
-    },
     { label: "Contracts Renewing", value: contractsRenewing ?? 0, sub: "next 30 days" },
   ];
 
@@ -136,6 +184,48 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold">Today</h2>
+          <Link href="/jobs" className="text-xs font-semibold text-accent">
+            All jobs
+          </Link>
+        </div>
+        <div className="flex flex-col divide-y divide-white/8 rounded-xl border border-white/8 bg-white/3">
+          {(todaysJobs?.length ?? 0) === 0 && <p className={`${subTextClass} p-4`}>No jobs scheduled today.</p>}
+          {todaysJobs?.map((job) => {
+            const customer = (Array.isArray(job.customers) ? job.customers[0] : job.customers) as { name: string | null } | null;
+            const property = (Array.isArray(job.properties) ? job.properties[0] : job.properties) as { address: string | null } | null;
+            return (
+              <div key={job.id} className="flex items-center justify-between gap-3 p-4">
+                <div>
+                  <div className={itemTitleClass}>
+                    {customer?.name ?? "Unknown customer"}
+                    {property?.address ? ` — ${property.address}` : ""}
+                  </div>
+                  <div className={itemSubClass}>{job.scheduled_at ? formatEtTime(job.scheduled_at) : "No time"}</div>
+                </div>
+                <span
+                  className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    jobStatusClass[job.status] ?? "bg-white/8 text-g300"
+                  }`}
+                >
+                  {job.status.replace("_", " ")}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        {(estimatesToReview ?? 0) > 0 && (
+          <Link
+            href="/documents/inbox"
+            className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm font-semibold text-white hover:bg-accent/20"
+          >
+            {estimatesToReview} estimate{estimatesToReview === 1 ? "" : "s"} waiting for you to review
+          </Link>
+        )}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.label} className="rounded-xl border border-white/8 bg-white/3 p-4">
@@ -146,6 +236,9 @@ export default async function DashboardPage() {
             {stat.sub && <div className={itemSubClass}>{stat.sub}</div>}
           </div>
         ))}
+        <Suspense fallback={<SquareStatsFallback />}>
+          <SquareStats />
+        </Suspense>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
