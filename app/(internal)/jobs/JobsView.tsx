@@ -432,7 +432,7 @@ export default function JobsView({
                       }`
                     : ""}
                 </div>
-                <BillingLine status={job.status} invoices={job.invoices ?? []} />
+                {job.invoices && <BillingLine status={job.status} invoices={job.invoices} />}
               </div>
               <div className="flex items-center gap-2">
                 {job.diagnostics && job.diagnostics.length > 0 ? (
