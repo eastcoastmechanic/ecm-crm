@@ -45,6 +45,7 @@ export const navEntries: NavEntry[] = [
       { href: "/pm", label: "Maintenance" },
       { href: "/diagnostics", label: "Diagnostics" },
       { href: "/tasks", label: "Tasks" },
+      { href: "/hours", label: "Weekly hours" },
       { href: "/inventory", label: "Inventory" },
       { href: "/procurement", label: "Procurement" },
     ],
