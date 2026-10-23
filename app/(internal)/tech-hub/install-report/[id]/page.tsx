@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -26,6 +27,7 @@ export default async function InstallReportDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const isTech = (await headers()).get("x-staff-role") === "tech";
 
   const { data: report, error } = await supabase
     .from("install_reports")
@@ -65,7 +67,7 @@ export default async function InstallReportDetailPage({
         {report.jobs && (
           <p className={subTextClass}>
             From job:{" "}
-            <Link href="/jobs" className="underline">
+            <Link href={isTech ? "/field-board" : "/jobs"} className="underline">
               {new Date(report.jobs.scheduled_at).toLocaleDateString()} ({report.jobs.status})
             </Link>
           </p>
@@ -169,8 +171,8 @@ export default async function InstallReportDetailPage({
         {report.signed_at && <div className={itemSubClass}>Signed {new Date(report.signed_at).toLocaleString()}</div>}
       </section>
 
-      <Link href="/tech-hub/install-report" className={subTextClass}>
-        &larr; Back to install reports
+      <Link href={isTech ? "/field-board" : "/tech-hub/install-report"} className={subTextClass}>
+        &larr; {isTech ? "Back to field board" : "Back to install reports"}
       </Link>
     </div>
   );
