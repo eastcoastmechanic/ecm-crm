@@ -40,9 +40,12 @@ const TECH_BLOCKED_PATHS = ["/field-board/print"];
 // list, the PDF, or anything else under /diagnostics (those carry customer history and prices).
 const TECH_DIAGNOSTIC_PATH = /^\/diagnostics\/(new|[0-9a-f-]{36})\/?$/i;
 
+// Same for the install checklist: start one, open one, never the list of all reports.
+const TECH_INSTALL_PATH = /^\/tech-hub\/install-report\/(new|[0-9a-f-]{36})\/?$/i;
+
 function techMayAccess(pathname: string) {
   if (TECH_BLOCKED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return false;
-  if (TECH_DIAGNOSTIC_PATH.test(pathname)) return true;
+  if (TECH_DIAGNOSTIC_PATH.test(pathname) || TECH_INSTALL_PATH.test(pathname)) return true;
   return TECH_ALLOWED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 

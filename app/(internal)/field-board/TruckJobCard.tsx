@@ -33,6 +33,7 @@ export type TruckJob = {
   arrived_at?: string | null;
   completed_at?: string | null;
   reportId?: string | null;
+  installReportId?: string | null;
   accessNotes?: string | null;
   customerNotes?: string | null;
   equipment?: { type: string | null; brand: string | null; model: string | null; serial: string | null; installDate: string | null }[];
@@ -197,6 +198,18 @@ export default function TruckJobCard({ job, primary = false }: { job: TruckJob; 
           >
             {job.reportId ? "Service report" : "Start service report"}
           </a>
+          {(job.job_type === "install" || job.installReportId) && (
+            <a
+              href={
+                job.installReportId
+                  ? `/tech-hub/install-report/${job.installReportId}`
+                  : `/tech-hub/install-report/new?job_id=${job.id}`
+              }
+              className={linkButton}
+            >
+              {job.installReportId ? "Install checklist" : "Start install checklist"}
+            </a>
+          )}
         </div>
       )}
 
