@@ -109,11 +109,14 @@ export async function recordPartsUsed(formData: FormData) {
 
   // What this report already took out of inventory, so saving again only moves
   // the difference instead of deducting the whole list a second time.
-  const { data: before } = await supabase
+  const { data: before, error: beforeError } = await supabase
     .from("diagnostics")
     .select("actual_parts_used")
     .eq("id", diagnosticId)
     .maybeSingle();
+  // Without the saved list we cannot tell what was already deducted, so stop
+  // rather than take the whole list out of inventory again.
+  if (beforeError) throw new Error(beforeError.message);
   const previousQty = new Map<string, number>();
   for (const p of (before?.actual_parts_used ?? []) as { price_book_item_name?: string; qty?: number }[]) {
     if (!p?.price_book_item_name) continue;
