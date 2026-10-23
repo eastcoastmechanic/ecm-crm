@@ -216,11 +216,13 @@ create table tasks (
 create index tasks_due_at_idx on tasks(due_at);
 
 -- Storage: public bucket used for diagnostic/condition-assessment photos
--- (0008). Server-side anon key trust model, same as every table here — no
--- per-file signed URLs.
+-- (0008). Public bucket, no per-file signed URLs. (The anon storage policies
+-- were removed in 0042; the service-role key does uploads.)
 -- insert into storage.buckets (id, name, public) values ('diagnostic-photos', 'diagnostic-photos', true);
 
--- RLS: every table above has "internal full access" (all ops, role anon).
+-- RLS: tables were created with "internal full access" (all ops, role anon);
+-- 0045_lock_down_anon_access.sql REMOVED all anon policies/grants. Internal
+-- code uses the service-role key; only `authenticated` policies remain.
 -- 0003 additionally scopes read-only policies to the `authenticated` role
 -- for the customer portal (own-customer-only, via auth_customer_id()):
 --   customers (claim + read own), properties, equipment, service_contracts,

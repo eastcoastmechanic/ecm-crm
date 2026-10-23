@@ -1,3 +1,5 @@
+-- NOTE: HISTORICAL. The anon policies below were removed by
+-- migrations/0045_lock_down_anon_access.sql; do not re-apply this file.
 -- Phase 1 RLS policies: solo/internal use only, no auth yet.
 -- Every table gets full access for the anon + authenticated roles so the
 -- internal app (using the anon key) can read/write freely.

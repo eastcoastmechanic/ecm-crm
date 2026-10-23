@@ -17,7 +17,7 @@ function loadEnv() {
 }
 
 const env = loadEnv();
-const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
 async function main() {
   // 1. Rename "Boiler Annual Service" to clarify it's a recurring maintenance
