@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { flagReferralRewardIfEligible } from "@/lib/referral";
 import { movePlannerTaskForJob } from "@/lib/planner-connector";
 import { syncDocumentToGraph } from "@/lib/graph-connector";
+import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 
 export type PaymentSource = "stripe" | "square" | "manual" | "cash_check";
 
@@ -52,6 +53,7 @@ export async function markDocumentPaid(
     if (doc.customer_id) await flagReferralRewardIfEligible(doc.customer_id, doc.type);
     if (doc.type === "invoice" && doc.job_id) await movePlannerTaskForJob(doc.job_id, "billed");
     await syncDocumentToGraph(documentId);
+    if (doc.type === "invoice") await notifyOwnerOfEvent("invoice_paid", documentId);
   } catch (err) {
     console.error(`[document-paid] post-paid steps failed for ${documentId}:`, err);
   }

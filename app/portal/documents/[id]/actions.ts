@@ -7,6 +7,7 @@ import { stripe } from "@/lib/stripe";
 import { supabase as adminDb } from "@/lib/supabase";
 import type { ContractLineItems } from "@/lib/contract-terms";
 import { etDateKey } from "@/lib/tz";
+import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 
 export async function createCheckoutSession(formData: FormData) {
   const documentId = formData.get("document_id") as string;
@@ -84,16 +85,21 @@ export async function approveEstimate(formData: FormData) {
   if (doc.type !== "estimate") throw new Error("Only estimates can be approved");
   if (doc.status !== "sent") throw new Error("This estimate can't be approved right now");
 
-  const { error: updateError } = await supabase
+  const { data: approved, error: updateError } = await supabase
     .from("documents")
     .update({
       status: "approved",
       signed_at: new Date().toISOString(),
       signature_data: signatureData,
     })
-    .eq("id", documentId);
+    .eq("id", documentId)
+    .eq("status", "sent")
+    .select("id");
 
   if (updateError) throw new Error(updateError.message);
+  if (!approved || approved.length === 0) throw new Error("This estimate can't be approved right now");
+
+  await notifyOwnerOfEvent("estimate_approved", documentId);
 
   redirect(`/portal/documents/${documentId}?approved=1`);
 }
@@ -148,6 +154,8 @@ export async function signContract(formData: FormData) {
 
   if (updateError) throw new Error(updateError.message);
   if (!signed || signed.length === 0) throw new Error("This contract can't be signed right now");
+
+  await notifyOwnerOfEvent("contract_signed", documentId);
 
   // A contract that offers yearly renewal is a maintenance plan: make sure the customer has an active plan
   // record for this property, and record renewal consent on it. Never fails the signing: the authorization
