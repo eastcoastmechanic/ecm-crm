@@ -8,9 +8,11 @@ import { NEW_CUSTOMER_VALUE } from "../intake-constants";
 import { requireOffice } from "@/lib/require-role";
 
 export async function addProperty(formData: FormData) {
+  await requireOffice();
   let customer_id = formData.get("customer_id") as string;
   const address = (formData.get("address") as string)?.trim();
   const property_type = formData.get("property_type") as string;
+  const access_notes = (formData.get("access_notes") as string)?.trim();
 
   if (!customer_id) {
     throw new Error("Customer is required");
@@ -35,6 +37,7 @@ export async function addProperty(formData: FormData) {
     customer_id,
     address,
     property_type: property_type || null,
+    access_notes: access_notes || null,
   });
 
   if (error) {
@@ -46,10 +49,12 @@ export async function addProperty(formData: FormData) {
 }
 
 export async function updateProperty(formData: FormData) {
+  await requireOffice();
   const id = formData.get("id") as string;
   const customer_id = formData.get("customer_id") as string;
   const address = (formData.get("address") as string)?.trim();
   const property_type = formData.get("property_type") as string;
+  const access_notes = (formData.get("access_notes") as string)?.trim();
 
   if (!id) throw new Error("Missing property id");
   if (!customer_id) throw new Error("Customer is required");
@@ -61,6 +66,7 @@ export async function updateProperty(formData: FormData) {
       customer_id,
       address,
       property_type: property_type || null,
+      access_notes: access_notes || null,
     })
     .eq("id", id);
 

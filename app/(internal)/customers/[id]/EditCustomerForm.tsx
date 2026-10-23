@@ -13,6 +13,8 @@ type Customer = {
   billing_address: string | null;
   notes: string | null;
   sms_consent: boolean | null;
+  company_name?: string | null;
+  alt_phone?: string | null;
 };
 
 export default function EditCustomerForm({ customer }: { customer: Customer }) {
@@ -46,6 +48,14 @@ export default function EditCustomerForm({ customer }: { customer: Customer }) {
       <label className="flex flex-col gap-1 text-xs text-g300">
         Phone
         <input name="phone" defaultValue={customer.phone ?? ""} className={inputClass} />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-g300">
+        Company (if a business)
+        <input name="company_name" defaultValue={customer.company_name ?? ""} className={inputClass} />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-g300">
+        Second phone
+        <input name="alt_phone" defaultValue={customer.alt_phone ?? ""} className={inputClass} />
       </label>
       <label className="flex flex-col gap-1 text-xs text-g300">
         Email

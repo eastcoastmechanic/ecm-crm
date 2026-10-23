@@ -26,6 +26,10 @@ export default function AddPropertyForm({ customers }: { customers: Customer[] }
         Address
         <input name="address" placeholder="Address" required className={inputClass} />
       </label>
+      <label className="flex flex-col gap-1 text-xs text-g300 sm:col-span-2">
+        Access notes (gate code, pets, parking, lockbox)
+        <textarea name="access_notes" className={inputClass} />
+      </label>
       <SubmitButton className={`${buttonClass} sm:col-span-2 sm:w-fit`}>Add Property</SubmitButton>
     </form>
   );

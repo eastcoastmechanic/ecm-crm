@@ -15,6 +15,13 @@ export async function addCustomer(formData: FormData) {
   const notes = (formData.get("notes") as string)?.trim();
   const sms_consent = formData.get("sms_consent") === "on";
   const referred_by_customer_id = (formData.get("referred_by_customer_id") as string)?.trim();
+  const company_name = (formData.get("company_name") as string)?.trim();
+  const alt_phone = (formData.get("alt_phone") as string)?.trim();
+  // Optional first property, entered with the customer.
+  const propertyAddress = (formData.get("property_address") as string)?.trim();
+  const propertyType = (formData.get("property_type") as string)?.trim();
+  const accessNotes = (formData.get("access_notes") as string)?.trim();
+  const billingSame = formData.get("billing_same") === "on";
 
   if (!name) {
     throw new Error("Name is required");
@@ -26,7 +33,9 @@ export async function addCustomer(formData: FormData) {
       name,
       email: email || null,
       phone: phone || null,
-      billing_address: billing_address || null,
+      billing_address: billing_address || (billingSame && propertyAddress ? propertyAddress : null),
+      company_name: company_name || null,
+      alt_phone: alt_phone || null,
       notes: notes || null,
       sms_consent,
       sms_consent_at: sms_consent ? new Date().toISOString() : null,
@@ -39,9 +48,20 @@ export async function addCustomer(formData: FormData) {
     throw new Error(error.message);
   }
 
+  if (customer && propertyAddress) {
+    const { error: propertyError } = await supabase.from("properties").insert({
+      customer_id: customer.id,
+      address: propertyAddress,
+      property_type: propertyType || null,
+      access_notes: accessNotes || null,
+    });
+    if (propertyError) throw new Error(`Customer saved, but the property was not: ${propertyError.message}`);
+  }
+
   if (customer) await syncCustomerToGraph(customer.id);
 
   revalidatePath("/customers");
+  revalidatePath("/properties");
 }
 
 export async function updateCustomer(formData: FormData) {
@@ -53,6 +73,8 @@ export async function updateCustomer(formData: FormData) {
   const billing_address = (formData.get("billing_address") as string)?.trim();
   const notes = (formData.get("notes") as string)?.trim();
   const sms_consent = formData.get("sms_consent") === "on";
+  const company_name = (formData.get("company_name") as string)?.trim();
+  const alt_phone = (formData.get("alt_phone") as string)?.trim();
 
   if (!id) throw new Error("Missing customer id");
   if (!name) throw new Error("Name is required");
@@ -64,6 +86,8 @@ export async function updateCustomer(formData: FormData) {
       email: email || null,
       phone: phone || null,
       billing_address: billing_address || null,
+      company_name: company_name || null,
+      alt_phone: alt_phone || null,
       notes: notes || null,
       sms_consent,
     })
