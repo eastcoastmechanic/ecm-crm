@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { getSquareRevenue, getSquareMoneyOwed } from "@/lib/square";
+import { getSyncedSquareRevenue, getSyncedSquareMoneyOwed } from "@/lib/square-synced";
 import { getStaffRole } from "@/lib/require-role";
-import { etDateKey, etDayRange, formatEtTime } from "@/lib/tz";
+import { etDateKey, etDayRange, formatEtDateTime, formatEtTime } from "@/lib/tz";
 import {
   buttonClass,
   buttonSecondaryClass,
@@ -30,22 +30,19 @@ const statCardClass = "rounded-xl border border-white/8 bg-white/3 p-4";
 // The Square numbers come from live Square API calls, which are slow. They render
 // in their own boundary so the rest of the dashboard shows up immediately.
 async function SquareStats() {
-  const [squareRevenue, squareMoneyOwed] = await Promise.all([
-    getSquareRevenue("2000-01-01T00:00:00Z"),
-    process.env.SQUARE_LOCATION_ID
-      ? getSquareMoneyOwed(process.env.SQUARE_LOCATION_ID)
-      : Promise.resolve({ totalCents: 0, count: 0 }),
-  ]);
+  const [squareRevenue, squareMoneyOwed] = await Promise.all([getSyncedSquareRevenue(), getSyncedSquareMoneyOwed()]);
+  const latestSync = [squareRevenue.syncedAt, squareMoneyOwed.syncedAt].filter(Boolean).sort().pop() ?? null;
+  const syncNote = latestSync ? `as of ${formatEtDateTime(latestSync, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "not synced yet";
   const cards = [
     {
-      label: "Revenue Collected (Square)",
+      label: "Revenue Collected (Square, last 12 mo)",
       value: formatPrice(squareRevenue.totalCents / 100),
-      sub: `${squareRevenue.count} payments`,
+      sub: `${squareRevenue.count} payments · ${syncNote}`,
     },
     {
       label: "Money Owed (Square)",
       value: formatPrice(squareMoneyOwed.totalCents / 100),
-      sub: `${squareMoneyOwed.count} unpaid invoices`,
+      sub: `${squareMoneyOwed.count} unpaid invoices · ${syncNote}`,
     },
   ];
   return (
@@ -64,7 +61,7 @@ async function SquareStats() {
 function SquareStatsFallback() {
   return (
     <>
-      {["Revenue Collected (Square)", "Money Owed (Square)"].map((label) => (
+      {["Revenue Collected (Square, last 12 mo)", "Money Owed (Square)"].map((label) => (
         <div key={label} className={statCardClass}>
           <div className="text-xs font-semibold uppercase tracking-wide text-g500">{label}</div>
           <div className="mt-1 font-display text-2xl font-extrabold text-g500">Loading…</div>
