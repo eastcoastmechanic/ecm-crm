@@ -149,6 +149,19 @@ export async function listOpenPlannerTasks(): Promise<OpenPlannerTask[]> {
     }));
 }
 
+/**
+ * Same as listOpenPlannerTasks, but a Planner/Graph outage returns an error
+ * message instead of throwing, so pages that show tasks (Tasks, Jobs) keep working.
+ */
+export async function listOpenPlannerTasksSafe(): Promise<{ tasks: OpenPlannerTask[]; error: string | null }> {
+  try {
+    return { tasks: await listOpenPlannerTasks(), error: null };
+  } catch (err) {
+    console.error("Planner task list failed:", err);
+    return { tasks: [], error: "Couldn't load tasks from Planner right now. Try again in a minute." };
+  }
+}
+
 export async function completePlannerTask(taskId: string): Promise<boolean> {
   if (!plannerConfigured()) return false;
   const etag = await getTaskEtag(taskId);

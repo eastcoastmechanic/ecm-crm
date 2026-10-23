@@ -1,4 +1,4 @@
-import { listOpenPlannerTasks, plannerConfigured } from "@/lib/planner-connector";
+import { listOpenPlannerTasksSafe, plannerConfigured } from "@/lib/planner-connector";
 import { addTask } from "./actions";
 import TaskList from "./TaskList";
 import SubmitButton from "../SubmitButton";
@@ -6,7 +6,7 @@ import { buttonClass, cardClass, errorClass, headingClass, inputClass, subTextCl
 
 export default async function TasksPage() {
   const configured = plannerConfigured();
-  const tasks = configured ? await listOpenPlannerTasks() : [];
+  const { tasks, error: loadError } = configured ? await listOpenPlannerTasksSafe() : { tasks: [], error: null };
 
   return (
     <div className="flex flex-col gap-8">
@@ -34,6 +34,8 @@ export default async function TasksPage() {
       {!configured && (
         <p className={errorClass}>Planner isn&apos;t configured yet — tasks can&apos;t be loaded or added until setup finishes.</p>
       )}
+
+      {loadError && <p className={errorClass}>{loadError}</p>}
 
       <TaskList tasks={tasks} />
     </div>
