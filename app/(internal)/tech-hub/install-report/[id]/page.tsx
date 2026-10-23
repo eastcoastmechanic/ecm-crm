@@ -36,6 +36,17 @@ export default async function InstallReportDetailPage({
   if (error || !report) notFound();
 
   const checks = (report.startup_checks ?? []) as CheckItem[];
+  type ReportUnit = {
+    label?: string | null;
+    type?: string | null;
+    brand?: string | null;
+    model?: string | null;
+    serial?: string | null;
+    refrigerant_type?: string | null;
+    lineset_size?: string | null;
+    lineset_ft?: number | null;
+  };
+  const units = (Array.isArray(report.units) ? report.units : []) as ReportUnit[];
 
   return (
     <div className="flex flex-col gap-8">
@@ -66,16 +77,37 @@ export default async function InstallReportDetailPage({
         <div className="mt-2 grid gap-x-6 gap-y-1 text-sm text-white sm:grid-cols-2">
           <div>Tech: {report.tech_name ?? "—"}</div>
           <div>Zone config: {report.zone_config ?? "—"}</div>
-          <div>Serial: {report.serial ?? "—"}</div>
-          <div>Refrigerant: {report.refrigerant_type ?? "—"}</div>
+          {units.length === 0 && <div>Serial: {report.serial ?? "—"}</div>}
+          {units.length === 0 && <div>Refrigerant: {report.refrigerant_type ?? "—"}</div>}
         </div>
+        {units.length > 0 && (
+          <div className="mt-3 grid gap-3">
+            {units.map((u, i) => (
+              <div key={i} className="rounded-lg border border-white/8 bg-white/3 p-3 text-sm text-white">
+                <div className="font-semibold">
+                  Unit {i + 1}
+                  {u.label ? ` — ${u.label}` : ""}
+                  {u.type ? ` (${u.type})` : ""}
+                </div>
+                <div className="mt-1 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+                  <div>Brand: {u.brand ?? "—"}</div>
+                  <div>Model: {u.model ?? "—"}</div>
+                  <div>Serial: {u.serial ?? "—"}</div>
+                  <div>Refrigerant: {u.refrigerant_type ?? "—"}</div>
+                  <div>Lineset size: {u.lineset_size ?? "—"}</div>
+                  <div>Lineset length: {fmt(u.lineset_ft ?? null, " ft")}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="rounded-xl border border-white/8 p-4">
         <div className="text-xs font-bold uppercase tracking-wide text-g300">Lineset Charge</div>
         <div className="mt-2 grid gap-x-6 gap-y-1 text-sm text-white sm:grid-cols-2">
-          <div>Lineset size: {report.lineset_size ?? "—"}</div>
-          <div>Lineset length: {fmt(report.lineset_total_ft, " ft")}</div>
+          {units.length === 0 && <div>Lineset size: {report.lineset_size ?? "—"}</div>}
+          <div>Total lineset length: {fmt(report.lineset_total_ft, " ft")}</div>
           <div>Factory charge: {fmt(report.factory_charge_oz, " oz")}</div>
           <div>Charge rate: {fmt(report.charge_rate_oz_per_ft, " oz/ft")}</div>
           <div>Actual charge added: {fmt(report.actual_charge_added_oz, " oz")}</div>

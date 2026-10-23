@@ -24,6 +24,37 @@ function ts(formData: FormData, name: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+type Unit = {
+  label: string | null;
+  type: string | null;
+  brand: string | null;
+  model: string | null;
+  serial: string | null;
+  refrigerant_type: string | null;
+  lineset_size: string | null;
+  lineset_ft: number | null;
+};
+
+function readUnits(formData: FormData): Unit[] {
+  const count = Math.min(Math.max(Number(formData.get("unit_count")) || 0, 0), 20);
+  const units: Unit[] = [];
+  for (let i = 0; i < count; i++) {
+    const unit: Unit = {
+      label: str(formData, `unit_${i}_label`),
+      type: str(formData, `unit_${i}_type`),
+      brand: str(formData, `unit_${i}_brand`),
+      model: str(formData, `unit_${i}_model`),
+      serial: str(formData, `unit_${i}_serial`),
+      refrigerant_type: str(formData, `unit_${i}_refrigerant_type`),
+      lineset_size: str(formData, `unit_${i}_lineset_size`),
+      lineset_ft: num(formData, `unit_${i}_lineset_ft`),
+    };
+    // Skip a unit left completely empty.
+    if (Object.values(unit).some((v) => v !== null)) units.push(unit);
+  }
+  return units;
+}
+
 export async function createInstallReport(formData: FormData) {
   const job_id = str(formData, "job_id");
   const equipment_id = str(formData, "equipment_id");
@@ -47,6 +78,9 @@ export async function createInstallReport(formData: FormData) {
   }));
 
   const customer_sign_name = str(formData, "customer_sign_name");
+  const units = readUnits(formData);
+  const first = units[0];
+  const unitFtSum = units.reduce((sum, u) => sum + (u.lineset_ft ?? 0), 0);
 
   const { data: report, error } = await supabase
     .from("install_reports")
@@ -56,14 +90,16 @@ export async function createInstallReport(formData: FormData) {
       property_id,
       equipment_id,
       tech_name: str(formData, "tech_name"),
-      system_type: str(formData, "system_type"),
+      units,
+      // The single-unit columns hold the first unit so lists and the assistant keep working.
+      system_type: first?.type ?? null,
       zone_config: str(formData, "zone_config"),
-      brand: str(formData, "brand"),
-      model: str(formData, "model"),
-      serial: str(formData, "serial"),
-      refrigerant_type: str(formData, "refrigerant_type"),
-      lineset_size: str(formData, "lineset_size"),
-      lineset_total_ft: num(formData, "lineset_total_ft"),
+      brand: first?.brand ?? null,
+      model: first?.model ?? null,
+      serial: first?.serial ?? null,
+      refrigerant_type: first?.refrigerant_type ?? null,
+      lineset_size: first?.lineset_size ?? null,
+      lineset_total_ft: num(formData, "lineset_total_ft") ?? (unitFtSum > 0 ? unitFtSum : null),
       factory_charge_oz: num(formData, "factory_charge_oz"),
       charge_rate_oz_per_ft: num(formData, "charge_rate_oz_per_ft"),
       actual_charge_added_oz: num(formData, "actual_charge_added_oz"),
