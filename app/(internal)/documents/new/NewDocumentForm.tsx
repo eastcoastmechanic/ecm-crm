@@ -44,11 +44,13 @@ function subscribeNoop() {
 export default function NewDocumentForm({
   customers,
   properties,
+  defaultCustomerId = "",
 }: {
   customers: Customer[];
   properties: Property[];
+  defaultCustomerId?: string;
 }) {
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(defaultCustomerId);
   const [description, setDescription] = useState("");
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);

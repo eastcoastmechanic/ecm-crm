@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { headingClass, subTextClass, itemSubClass, itemTitleClass, errorClass } from "../../ui";
+import { buttonClass, buttonSecondaryClass, headingClass, subTextClass, itemSubClass, itemTitleClass, errorClass } from "../../ui";
 import EditCustomerForm from "./EditCustomerForm";
 import PropertiesEquipmentSection from "./PropertiesEquipmentSection";
 import DeleteRecordButton from "../../DeleteRecordButton";
@@ -103,6 +103,14 @@ export default async function CustomerProfilePage({
           <p className={subTextClass}>
             {[customer.email, customer.phone].filter(Boolean).join(" · ")}
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href={`/documents/new?customer_id=${customer.id}`} className={buttonClass}>
+              New Estimate
+            </Link>
+            <Link href={`/documents/contract/new?customer_id=${customer.id}`} className={buttonSecondaryClass}>
+              New Contract
+            </Link>
+          </div>
           {customer.notes && <p className={`${subTextClass} mt-1`}>{customer.notes}</p>}
           {referredBy && (
             <p className={`${subTextClass} mt-1`}>
