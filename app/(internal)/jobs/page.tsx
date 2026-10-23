@@ -10,7 +10,7 @@ export default async function JobsPage() {
   const [{ data: jobs, error }, plannerTasks, { data: staffRows }] = await Promise.all([
     supabase
       .from("jobs")
-      .select("*, customers(name), properties(address), diagnostics(id), install_reports(id)")
+      .select("*, customers(id, name), properties(address), diagnostics(id), install_reports(id)")
       .order("scheduled_at", { ascending: false }),
     listOpenPlannerTasks(),
     supabase.from("staff").select("id, name, email, role").order("name"),

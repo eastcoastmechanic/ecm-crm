@@ -10,6 +10,14 @@ import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass
 
 const statusOptions = ["requested", "scheduled", "in_progress", "complete", "cancelled"];
 
+const statusLabel: Record<string, string> = {
+  requested: "Requested",
+  scheduled: "Scheduled",
+  in_progress: "In progress",
+  complete: "Complete",
+  cancelled: "Cancelled",
+};
+
 const statusDotClass: Record<string, string> = {
   requested: "bg-g500",
   scheduled: "bg-blue",
@@ -35,7 +43,7 @@ type Job = {
   tracked_hours: number | null;
   created_via: string | null;
   assigned_staff_id?: string | null;
-  customers: { name: string | null } | null;
+  customers: { id?: string | null; name: string | null } | null;
   properties: { address: string | null } | null;
   diagnostics: { id: string }[] | null;
   install_reports: { id: string }[] | null;
@@ -366,7 +374,13 @@ export default function JobsView({
               <input type="hidden" name="id" value={job.id} />
               <div>
                 <div className={itemTitleClass}>
-                  {job.customers?.name ?? "Unknown customer"}
+                  {job.customers?.id ? (
+                    <Link href={`/customers/${job.customers.id}`} className="underline decoration-white/20 hover:decoration-white">
+                      {job.customers.name ?? "Unknown customer"}
+                    </Link>
+                  ) : (
+                    (job.customers?.name ?? "Unknown customer")
+                  )}
                   {job.properties?.address ? ` — ${job.properties.address}` : ""}
                   {job.created_via === "ai_sms" && (
                     <span className="ml-2 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
@@ -440,7 +454,7 @@ export default function JobsView({
                 <select name="status" defaultValue={job.status} className={inputClass} aria-label="Job status">
                   {statusOptions.map((s) => (
                     <option key={s} value={s}>
-                      {s.replace("_", " ")}
+                      {statusLabel[s] ?? s}
                     </option>
                   ))}
                 </select>
