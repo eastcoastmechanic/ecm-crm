@@ -5,6 +5,7 @@ import { generateJobICS } from "@/lib/ics";
 import { syncJobToGraph } from "@/lib/graph-connector";
 import { syncJobToPlanner } from "@/lib/planner-connector";
 import { formatEtDateTime } from "@/lib/tz";
+import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 
 // Shared job lifecycle. The Jobs page, the truck screen, the Field Board and the
 // field bot all change status through applyJobStatus so arrived_at, completed_at,
@@ -123,6 +124,10 @@ export async function applyJobStatus(id: string, status: string) {
 
   if (status === "scheduled" && existing.status !== "scheduled") {
     await sendScheduleNotifications(id);
+  }
+
+  if (status === "complete" && existing.status !== "complete") {
+    await notifyOwnerOfEvent("job_completed", id);
   }
 
   await syncJobToGraph(id);
