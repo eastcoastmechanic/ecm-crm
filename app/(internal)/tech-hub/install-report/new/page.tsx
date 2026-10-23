@@ -23,7 +23,10 @@ export default async function NewInstallReportPage({
     .select("id, type, brand, model, serial_number, refrigerant_type, properties(address, customers(name))")
     .order("created_at", { ascending: false });
   if (propertyId) equipmentQuery = equipmentQuery.eq("property_id", propertyId);
-  const { data: equipment } = await equipmentQuery;
+  // A tech with no job (or one with no property) gets no equipment list: it would
+  // expose every customer's name and address.
+  const { data: equipmentRows } = isTech && !propertyId ? { data: [] } : await equipmentQuery;
+  const equipment = equipmentRows ?? [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -35,7 +38,7 @@ export default async function NewInstallReportPage({
         </p>
       </div>
 
-      <InstallReportForm equipment={equipment ?? []} jobId={job_id} />
+      <InstallReportForm equipment={equipment} jobId={job_id} />
     </div>
   );
 }
