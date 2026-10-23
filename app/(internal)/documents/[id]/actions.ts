@@ -381,3 +381,17 @@ export async function sendDocumentEmail(formData: FormData) {
   revalidatePath(`/documents/${id}`);
   revalidatePath("/documents");
 }
+
+/** Office-only: builds a Stripe checkout link for an unpaid invoice so it can be texted or emailed. */
+export async function getInvoicePaymentLink(
+  documentId: string
+): Promise<{ ok: true; url: string; total: number } | { ok: false; error: string }> {
+  await requireOffice();
+  try {
+    const { createInvoicePaymentLink } = await import("@/lib/payment-links");
+    const { url, total } = await createInvoicePaymentLink(documentId);
+    return { ok: true, url, total };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Could not create the payment link" };
+  }
+}
