@@ -28,14 +28,17 @@ async function sumPaged<Row extends { synced_at: string }>(
   return { totalCents, count, syncedAt };
 }
 
-/** Completed Square payments the sync holds (it imports the last 366 days). */
+/** Completed Square payments the sync holds (it imports the last 366 days), filtered to the last 365. */
 export function getSyncedSquareRevenue(): Promise<Totals> {
+  // Rolling 12 months, so rows the sync already holds do not outlive the label.
+  const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
   return sumPaged<{ total_cents: number; synced_at: string }>(
     (from, to) =>
       supabase
         .from("square_payments")
         .select("total_cents, synced_at")
         .eq("status", "COMPLETED")
+        .gte("square_created_at", since)
         .order("id")
         .range(from, to),
     (row) => row.total_cents ?? 0
