@@ -36,8 +36,13 @@ const INTERNAL_PATH_PREFIXES = [
 const TECH_ALLOWED_PATHS = ["/field-board", "/pm"];
 const TECH_BLOCKED_PATHS = ["/field-board/print"];
 
+// A tech may start a service report and open one report page, but not the report
+// list, the PDF, or anything else under /diagnostics (those carry customer history and prices).
+const TECH_DIAGNOSTIC_PATH = /^\/diagnostics\/(new|[0-9a-f-]{36})\/?$/i;
+
 function techMayAccess(pathname: string) {
   if (TECH_BLOCKED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return false;
+  if (TECH_DIAGNOSTIC_PATH.test(pathname)) return true;
   return TECH_ALLOWED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 

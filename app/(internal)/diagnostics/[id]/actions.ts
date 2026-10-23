@@ -90,6 +90,21 @@ export async function recordPartsUsed(formData: FormData) {
     });
   }
 
+  // Prices come from the price book on the server, never from the browser: techs
+  // submit this form without seeing prices, and a part saved with no price would
+  // drop off the invoice the office creates later.
+  for (const part of parts) {
+    if (part.unit_price !== null) continue;
+    const { data: priced } = await supabase
+      .from("price_book_items")
+      .select("unit_price")
+      .eq("name", part.price_book_item_name)
+      .not("unit_price", "is", null)
+      .limit(1)
+      .maybeSingle();
+    if (priced?.unit_price != null) part.unit_price = Number(priced.unit_price);
+  }
+
   const { error } = await supabase
     .from("diagnostics")
     .update({ actual_parts_used: parts })

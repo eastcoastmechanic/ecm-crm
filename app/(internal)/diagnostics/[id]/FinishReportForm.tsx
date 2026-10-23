@@ -5,7 +5,7 @@ import { finishServiceReport } from "./actions";
 import SubmitButton from "../../SubmitButton";
 import { buttonClass, inputClass, itemSubClass } from "../../ui";
 
-export default function FinishReportForm({ diagnosticId }: { diagnosticId: string }) {
+export default function FinishReportForm({ diagnosticId, canInvoice = true }: { diagnosticId: string; canInvoice?: boolean }) {
   const [startedAt, setStartedAt] = useState("");
   const [endedAt, setEndedAt] = useState("");
 
@@ -44,6 +44,7 @@ export default function FinishReportForm({ diagnosticId }: { diagnosticId: strin
       </div>
       {hours !== null && <p className={itemSubClass}>Time tracked: {hours} hrs</p>}
 
+      {canInvoice && (
       <label className="flex items-start gap-2 text-xs text-g300">
         <input type="checkbox" name="create_invoice" defaultChecked className="mt-0.5" />
         <span>
@@ -51,6 +52,7 @@ export default function FinishReportForm({ diagnosticId }: { diagnosticId: strin
           finish this report.
         </span>
       </label>
+      )}
 
       <SubmitButton className={`${buttonClass} w-fit`} pendingText="Finishing…">
         Finish Service Call

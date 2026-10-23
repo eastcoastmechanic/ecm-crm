@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -49,6 +50,8 @@ export default async function DiagnosticPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  // Techs work the report but never see money: no prices, invoice, PDF or customer email.
+  const isTech = (await headers()).get("x-staff-role") === "tech";
 
   const { data: diagnostic, error } = await supabase
     .from("diagnostics")
@@ -89,16 +92,18 @@ export default async function DiagnosticPage({
       priceBookByName.set(row.name, { id: row.id, name: row.name, category: row.category, unit_price: row.unit_price });
     }
   }
-  const priceBookOptions = Array.from(priceBookByName.values()).sort((a, b) => a.name.localeCompare(b.name));
+  const priceBookOptions = Array.from(priceBookByName.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((o) => (isTech ? { ...o, unit_price: null } : o));
 
   const partsInitialRows = actualPartsUsed.length
-    ? actualPartsUsed.map((p) => ({ name: p.price_book_item_name, qty: p.qty, unitPrice: p.unit_price }))
+    ? actualPartsUsed.map((p) => ({ name: p.price_book_item_name, qty: p.qty, unitPrice: isTech ? null : p.unit_price }))
     : lineItems
         .filter((li) => li.price_book_item_name && priceBookByName.has(li.price_book_item_name))
         .map((li) => ({
           name: li.price_book_item_name as string,
           qty: li.qty || 1,
-          unitPrice: priceBookByName.get(li.price_book_item_name as string)?.unit_price ?? null,
+          unitPrice: isTech ? null : (priceBookByName.get(li.price_book_item_name as string)?.unit_price ?? null),
         }));
 
   const displayCustomerName = diagnostic.equipment?.properties?.customers?.name ?? diagnostic.jobs?.customers?.name;
@@ -113,7 +118,7 @@ export default async function DiagnosticPage({
     equipment: { id: string; type: string; brand: string | null; model: string | null; property_id: string | null }[];
   } | null = null;
 
-  if (!hasCustomer) {
+  if (!hasCustomer && !isTech) {
     const [{ data: customers }, { data: properties }, { data: equipmentRows }] = await Promise.all([
       supabase.from("customers").select("id, name").order("name"),
       supabase.from("properties").select("id, address, customer_id"),
@@ -152,6 +157,8 @@ export default async function DiagnosticPage({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {!isTech && (
+            <>
           <a
             href={`/diagnostics/${id}/pdf`}
             target="_blank"
@@ -171,6 +178,8 @@ export default async function DiagnosticPage({
                 Email to Customer
               </SubmitButton>
             </form>
+          )}
+            </>
           )}
         </div>
       </div>
@@ -273,7 +282,7 @@ export default async function DiagnosticPage({
           Confirm the real parts used, resolved against the price book — pre-filled from the suggested line
           items above where a match was found. Saving deducts matching truck inventory on hand.
         </p>
-        <PartsUsedForm diagnosticId={id} priceBookOptions={priceBookOptions} initialRows={partsInitialRows} />
+        <PartsUsedForm diagnosticId={id} priceBookOptions={priceBookOptions} initialRows={partsInitialRows} showPrices={!isTech} />
       </section>
 
       <section className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/3 p-4">
@@ -284,7 +293,7 @@ export default async function DiagnosticPage({
               Finished {new Date(diagnostic.completed_at).toLocaleString()}
               {diagnostic.tracked_hours !== null ? ` · ${diagnostic.tracked_hours} hrs tracked` : ""}
             </p>
-            {diagnostic.invoice ? (
+            {isTech ? null : diagnostic.invoice ? (
               <Link href={`/documents/${diagnostic.invoice_document_id}`} className="text-sm underline">
                 View {diagnostic.invoice.doc_number} — ${diagnostic.invoice.total} ({diagnostic.invoice.status})
               </Link>
@@ -293,7 +302,7 @@ export default async function DiagnosticPage({
             )}
           </div>
         ) : (
-          <FinishReportForm diagnosticId={id} />
+          <FinishReportForm diagnosticId={id} canInvoice={!isTech} />
         )}
       </section>
 
@@ -319,8 +328,8 @@ export default async function DiagnosticPage({
         </div>
       </details>
 
-      <Link href="/diagnostics" className={subTextClass}>
-        &larr; Back to diagnostics
+      <Link href={isTech ? "/field-board" : "/diagnostics"} className={subTextClass}>
+        &larr; {isTech ? "Back to field board" : "Back to diagnostics"}
       </Link>
     </div>
   );

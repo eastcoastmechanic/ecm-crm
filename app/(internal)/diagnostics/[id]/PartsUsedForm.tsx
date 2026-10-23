@@ -14,9 +14,12 @@ export default function PartsUsedForm({
   diagnosticId,
   priceBookOptions,
   initialRows,
+  showPrices = true,
 }: {
   diagnosticId: string;
   priceBookOptions: PriceBookOption[];
+  /** False for techs: unit prices are neither shown nor sent to the browser. */
+  showPrices?: boolean;
   initialRows: Row[];
 }) {
   const [rows, setRows] = useState(() =>
@@ -76,9 +79,11 @@ export default function PartsUsedForm({
               className={`${inputClass} w-20 text-right`}
             />
             <input type="hidden" name={`unit_price_${i}`} value={row.unitPrice ?? ""} />
-            <span className="w-20 text-right text-xs text-g300">
-              {row.unitPrice !== null ? `$${row.unitPrice.toFixed(2)}` : "—"}
-            </span>
+            {showPrices && (
+              <span className="w-20 text-right text-xs text-g300">
+                {row.unitPrice !== null ? `$${row.unitPrice.toFixed(2)}` : "—"}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => removeRow(row.rowId)}
