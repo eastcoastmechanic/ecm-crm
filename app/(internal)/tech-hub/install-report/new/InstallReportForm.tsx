@@ -17,6 +17,24 @@ type Equipment = {
   properties: { address: string | null; customers: { name: string | null }[] | null }[] | null;
 };
 
+type UnitDraft = {
+  key: string;
+  label: string;
+  type: string;
+  brand: string;
+  model: string;
+  serial: string;
+  refrigerant_type: string;
+  lineset_size: string;
+  lineset_ft: string;
+};
+
+let unitCounter = 0;
+function blankUnit(): UnitDraft {
+  unitCounter += 1;
+  return { key: `u${unitCounter}`, label: "", type: "", brand: "", model: "", serial: "", refrigerant_type: "", lineset_size: "", lineset_ft: "" };
+}
+
 function minutesBetween(startStr: string, endStr: string): number | null {
   if (!startStr || !endStr) return null;
   const start = new Date(startStr).getTime();
@@ -33,13 +51,28 @@ export default function InstallReportForm({
   jobId?: string;
 }) {
   const [equipmentId, setEquipmentId] = useState("");
-  const selectedEquipment = useMemo(
-    () => equipment.find((e) => e.id === equipmentId) ?? null,
-    [equipment, equipmentId]
+
+  // One entry per unit installed. Unit 1 starts from the equipment on file, if one is picked.
+  const [units, setUnits] = useState<UnitDraft[]>(() => [blankUnit()]);
+  const [prefillFor, setPrefillFor] = useState("");
+  if (prefillFor !== equipmentId) {
+    setPrefillFor(equipmentId);
+    const eq = equipment.find((e) => e.id === equipmentId);
+    if (eq) {
+      setUnits((list) => [
+        { ...blankUnit(), type: eq.type ?? "", brand: eq.brand ?? "", model: eq.model ?? "", serial: eq.serial_number ?? "", refrigerant_type: eq.refrigerant_type ?? "" },
+        ...list.slice(1),
+      ]);
+    }
+  }
+  const unitFtSum = useMemo(
+    () => units.reduce((sum, u) => sum + (Number(u.lineset_ft) || 0), 0),
+    [units]
   );
 
-  // Lineset charge calculator inputs
-  const [linesetTotalFt, setLinesetTotalFt] = useState("");
+  // Lineset charge calculator inputs (total defaults to the sum of the units' lineset lengths)
+  const [linesetTotalFtInput, setLinesetTotalFt] = useState("");
+  const linesetTotalFt = linesetTotalFtInput || (unitFtSum > 0 ? String(unitFtSum) : "");
   const [chargeRate, setChargeRate] = useState("");
   const [factoryCharge, setFactoryCharge] = useState("");
   const [actualCharge, setActualCharge] = useState("");
@@ -106,63 +139,113 @@ export default function InstallReportForm({
           Tech name
           <input name="tech_name" placeholder="Tech name" className={inputClass} />
         </label>
+        <label className="flex flex-col gap-1 text-xs text-g300">
+          Zone config
+          <input name="zone_config" placeholder="e.g. single zone, 3-zone" className={inputClass} />
+        </label>
       </section>
 
-      <section
-        key={equipmentId}
-        className="flex flex-col gap-3 rounded-xl border border-white/8 p-4"
-      >
-        <h2 className="text-xs font-bold uppercase tracking-wide text-g300">System Info</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-xs text-g300">
-            System type
-            <input
-              name="system_type"
-              placeholder="e.g. ducted split, mini-split, boiler"
-              defaultValue={selectedEquipment?.type ?? ""}
-              className={inputClass}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-g300">
-            Zone config
-            <input name="zone_config" placeholder="e.g. single zone, 3-zone" className={inputClass} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-g300">
-            Brand
-            <input name="brand" defaultValue={selectedEquipment?.brand ?? ""} className={inputClass} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-g300">
-            Model
-            <input name="model" defaultValue={selectedEquipment?.model ?? ""} className={inputClass} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-g300">
-            Serial
-            <input name="serial" defaultValue={selectedEquipment?.serial_number ?? ""} className={inputClass} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-g300">
-            Refrigerant
-            <input
-              name="refrigerant_type"
-              list="refrigerant-types"
-              defaultValue={selectedEquipment?.refrigerant_type ?? ""}
-              className={inputClass}
-            />
-            <datalist id="refrigerant-types">
-              {REFRIGERANT_TYPES.map((r) => (
-                <option key={r} value={r} />
-              ))}
-            </datalist>
-          </label>
-        </div>
+      <section className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-g300">
+          Equipment installed ({units.length})
+        </h2>
+        <input type="hidden" name="unit_count" value={units.length} />
+        {units.map((unit, i) => (
+          <div key={unit.key} className="flex flex-col gap-3 rounded-lg border border-white/8 bg-white/3 p-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold uppercase tracking-wide text-white">Unit {i + 1}</div>
+              {units.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setUnits((list) => list.filter((u) => u.key !== unit.key))}
+                  className="text-xs font-semibold text-accent hover:underline"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs text-g300">
+                Location / zone
+                <input
+                  name={`unit_${i}_label`}
+                  placeholder="e.g. Living room, Outdoor condenser"
+                  defaultValue={unit.label}
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-g300">
+                System type
+                <input
+                  name={`unit_${i}_type`}
+                  placeholder="e.g. wall mount head, condenser, boiler"
+                  defaultValue={unit.type}
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-g300">
+                Brand
+                <input name={`unit_${i}_brand`} defaultValue={unit.brand} className={inputClass} />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-g300">
+                Model
+                <input name={`unit_${i}_model`} defaultValue={unit.model} className={inputClass} />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-g300">
+                Serial
+                <input name={`unit_${i}_serial`} defaultValue={unit.serial} className={inputClass} />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-g300">
+                Refrigerant
+                <input
+                  name={`unit_${i}_refrigerant_type`}
+                  list="refrigerant-types"
+                  defaultValue={unit.refrigerant_type}
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-g300">
+                Lineset size
+                <input
+                  name={`unit_${i}_lineset_size`}
+                  placeholder={'e.g. 1/4" liquid x 1/2" suction'}
+                  defaultValue={unit.lineset_size}
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-g300">
+                Lineset length (ft)
+                <input
+                  type="number"
+                  step="any"
+                  name={`unit_${i}_lineset_ft`}
+                  defaultValue={unit.lineset_ft}
+                  onChange={(e) =>
+                    setUnits((list) => list.map((u) => (u.key === unit.key ? { ...u, lineset_ft: e.target.value } : u)))
+                  }
+                  className={inputClass}
+                />
+              </label>
+            </div>
+          </div>
+        ))}
+        <datalist id="refrigerant-types">
+          {REFRIGERANT_TYPES.map((r) => (
+            <option key={r} value={r} />
+          ))}
+        </datalist>
+        <button
+          type="button"
+          onClick={() => setUnits((list) => [...list, blankUnit()])}
+          className="rounded-lg border border-white/8 bg-white/6 px-3 py-2 text-sm font-semibold text-white hover:bg-white/10"
+        >
+          + Add another unit
+        </button>
       </section>
 
       <section className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
         <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Lineset Charge Calculator</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-xs text-g300">
-            Lineset size
-            <input name="lineset_size" placeholder={'e.g. 3/8" liquid x 3/4" suction'} className={inputClass} />
-          </label>
           <label className="flex flex-col gap-1 text-xs text-g300">
             Total lineset length (ft)
             <input
