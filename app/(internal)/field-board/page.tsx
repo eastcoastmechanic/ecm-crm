@@ -74,7 +74,7 @@ async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
   const { data } = await supabase
     .from("jobs")
     .select(
-      "id, status, scheduled_at, notes, job_type, on_way_at, arrived_at, completed_at, photos, assigned_staff_id, property_id, customers(name, phone, notes), properties(address, access_notes)"
+      "id, status, scheduled_at, notes, job_type, on_way_at, arrived_at, completed_at, photos, assigned_staff_id, property_id, diagnostics(id), customers(name, phone, notes), properties(address, access_notes)"
     )
     // Every job that isn't finished or cancelled (so the tech can pick any of them),
     // plus anything scheduled in the recent/upcoming window.
@@ -136,6 +136,7 @@ async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
       arrived_at: (row.arrived_at as string | null) ?? null,
       completed_at: (row.completed_at as string | null) ?? null,
       assignedToMe: myStaffId !== null && row.assigned_staff_id === myStaffId,
+      reportId: ((row.diagnostics as { id: string }[] | null) ?? [])[0]?.id ?? null,
       accessNotes: property?.access_notes ?? null,
       customerNotes: customer?.notes ?? null,
       equipment: row.property_id ? (equipmentByProperty.get(row.property_id as string) ?? []) : [],

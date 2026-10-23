@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import DiagnosticForm from "./DiagnosticForm";
 import { headingClass, subTextClass } from "../../ui";
@@ -9,10 +10,20 @@ export default async function NewDiagnosticPage({
 }) {
   const { job_id } = await searchParams;
 
-  const { data: equipment } = await supabase
+  // A tech opening this from a job sees that property's equipment, not every unit on file.
+  const isTech = (await headers()).get("x-staff-role") === "tech";
+  let propertyId: string | null = null;
+  if (isTech && job_id) {
+    const { data: job } = await supabase.from("jobs").select("property_id").eq("id", job_id).maybeSingle();
+    propertyId = (job?.property_id as string | null) ?? null;
+  }
+
+  let equipmentQuery = supabase
     .from("equipment")
     .select("id, type, brand, model, refrigerant_type, properties(address, customers(name))")
     .order("created_at", { ascending: false });
+  if (propertyId) equipmentQuery = equipmentQuery.eq("property_id", propertyId);
+  const { data: equipment } = await equipmentQuery;
 
   return (
     <div className="flex flex-col gap-8">
