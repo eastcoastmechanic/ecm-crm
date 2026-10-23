@@ -7,7 +7,7 @@ import { renderServiceReportPdf } from "@/lib/service-report-pdf";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createInvoiceDirect, type DirectLineItem } from "@/lib/document-generation";
-import { requireOffice } from "@/lib/require-role";
+import { getStaffRole, requireOffice } from "@/lib/require-role";
 
 export async function assignCustomer(formData: FormData) {
   const diagnosticId = formData.get("diagnostic_id") as string;
@@ -90,18 +90,20 @@ export async function recordPartsUsed(formData: FormData) {
     });
   }
 
-  // Prices come from the price book on the server, never from the browser: techs
-  // submit this form without seeing prices, and a part saved with no price would
-  // drop off the invoice the office creates later.
+  // Prices come from the price book on the server. A tech's submitted prices are
+  // ignored entirely (they never see prices, and must not be able to set them);
+  // for office, a price already on the form is kept. Where a part has several tier
+  // rows, the "better" tier wins, matching what the office form shows.
+  const isTech = (await getStaffRole()) === "tech";
   for (const part of parts) {
+    if (isTech) part.unit_price = null;
     if (part.unit_price !== null) continue;
-    const { data: priced } = await supabase
+    const { data: rows } = await supabase
       .from("price_book_items")
-      .select("unit_price")
+      .select("tier, unit_price")
       .eq("name", part.price_book_item_name)
-      .not("unit_price", "is", null)
-      .limit(1)
-      .maybeSingle();
+      .not("unit_price", "is", null);
+    const priced = (rows ?? []).find((r) => r.tier === "better") ?? (rows ?? [])[0];
     if (priced?.unit_price != null) part.unit_price = Number(priced.unit_price);
   }
 
@@ -149,6 +151,93 @@ function parseLocalDateTime(value: FormDataEntryValue | null): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+type ReportForInvoice = {
+  actual_parts_used?: unknown;
+  job_id?: string | null;
+};
+
+/** Builds the invoice for a service report from its saved parts and tracked time. */
+async function createReportInvoice(
+  diagnostic: ReportForInvoice,
+  customerId: string,
+  propertyId: string | null,
+  trackedHours: number | null
+) {
+  const actualPartsUsed = (diagnostic.actual_parts_used ?? []) as {
+    price_book_item_name: string;
+    qty: number;
+    unit_price: number | null;
+  }[];
+
+  const items: DirectLineItem[] = actualPartsUsed
+    .filter((p) => p.unit_price !== null)
+    .map((p) => ({
+      category: "Parts",
+      description: p.price_book_item_name,
+      price_book_item_name: p.price_book_item_name,
+      qty: p.qty,
+      unit: "EA",
+      unit_price: p.unit_price as number,
+      notes: null,
+    }));
+
+  const hourlyRate = Number(process.env.HOURLY_LABOR_RATE) || null;
+  if (trackedHours && hourlyRate) {
+    items.push({
+      category: "Labor",
+      description: "Labor",
+      price_book_item_name: null,
+      qty: trackedHours,
+      unit: "HR",
+      unit_price: hourlyRate,
+      notes: "Auto-added from service report time tracking",
+    });
+  }
+
+  if (items.length === 0) {
+    throw new Error(
+      "Nothing to invoice yet — save parts used and/or track time (with an hourly rate configured) first"
+    );
+  }
+
+  const result = await createInvoiceDirect({ customerId, propertyId, items, jobId: diagnostic.job_id ?? undefined });
+  return result;
+}
+
+/** Office-only: invoice a report a tech already finished without one (techs can't create invoices). */
+export async function createInvoiceForFinishedReport(formData: FormData) {
+  await requireOffice();
+  const diagnosticId = formData.get("diagnostic_id") as string;
+
+  const { data: diagnostic, error } = await supabase
+    .from("diagnostics")
+    .select("*, equipment(properties(id, customer_id)), jobs(customer_id, property_id, document_id)")
+    .eq("id", diagnosticId)
+    .single();
+  if (error || !diagnostic) throw new Error(error?.message ?? "Service report not found");
+  if (!diagnostic.completed_at) throw new Error("Finish the service report first");
+  if (diagnostic.invoice_document_id) throw new Error("This report already has an invoice");
+
+  const customerId = diagnostic.equipment?.properties?.customer_id ?? diagnostic.jobs?.customer_id ?? null;
+  const propertyId = diagnostic.equipment?.properties?.id ?? diagnostic.jobs?.property_id ?? null;
+  if (!customerId) throw new Error("Assign a customer before creating an invoice");
+
+  const result = await createReportInvoice(diagnostic, customerId, propertyId, diagnostic.tracked_hours ?? null);
+
+  if (diagnostic.job_id && !diagnostic.jobs?.document_id) {
+    await supabase.from("jobs").update({ document_id: result.documentId }).eq("id", diagnostic.job_id);
+  }
+  const { error: updateError } = await supabase
+    .from("diagnostics")
+    .update({ invoice_document_id: result.documentId })
+    .eq("id", diagnosticId);
+  if (updateError) throw new Error(updateError.message);
+
+  revalidatePath(`/diagnostics/${diagnosticId}`);
+  revalidatePath("/documents");
+  revalidatePath("/jobs");
+}
+
 export async function finishServiceReport(formData: FormData) {
   const diagnosticId = formData.get("diagnostic_id") as string;
   const timeStartedAt = parseLocalDateTime(formData.get("time_started_at"));
@@ -176,44 +265,7 @@ export async function finishServiceReport(formData: FormData) {
     await requireOffice();
     if (!customerId) throw new Error("Assign a customer before creating an invoice");
 
-    const actualPartsUsed = (diagnostic.actual_parts_used ?? []) as {
-      price_book_item_name: string;
-      qty: number;
-      unit_price: number | null;
-    }[];
-
-    const items: DirectLineItem[] = actualPartsUsed
-      .filter((p) => p.unit_price !== null)
-      .map((p) => ({
-        category: "Parts",
-        description: p.price_book_item_name,
-        price_book_item_name: p.price_book_item_name,
-        qty: p.qty,
-        unit: "EA",
-        unit_price: p.unit_price as number,
-        notes: null,
-      }));
-
-    const hourlyRate = Number(process.env.HOURLY_LABOR_RATE) || null;
-    if (trackedHours && hourlyRate) {
-      items.push({
-        category: "Labor",
-        description: "Labor",
-        price_book_item_name: null,
-        qty: trackedHours,
-        unit: "HR",
-        unit_price: hourlyRate,
-        notes: "Auto-added from service report time tracking",
-      });
-    }
-
-    if (items.length === 0) {
-      throw new Error(
-        "Nothing to invoice yet — save parts used and/or track time (with an hourly rate configured) first"
-      );
-    }
-
-    const result = await createInvoiceDirect({ customerId, propertyId, items, jobId: diagnostic.job_id ?? undefined });
+    const result = await createReportInvoice(diagnostic, customerId, propertyId, trackedHours);
     invoiceDocumentId = result.documentId;
 
     if (diagnostic.job_id && !diagnostic.jobs?.document_id) {

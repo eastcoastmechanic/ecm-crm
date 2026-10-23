@@ -4,7 +4,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { signStoredPhotos } from "@/lib/photo-urls";
 import { fetchAllPriceBookItems } from "@/lib/price-book";
-import { sendServiceReportEmail } from "./actions";
+import { createInvoiceForFinishedReport, sendServiceReportEmail } from "./actions";
 import AssignCustomerForm from "./AssignCustomerForm";
 import PartsUsedForm from "./PartsUsedForm";
 import FinishReportForm from "./FinishReportForm";
@@ -298,7 +298,15 @@ export default async function DiagnosticPage({
                 View {diagnostic.invoice.doc_number} — ${diagnostic.invoice.total} ({diagnostic.invoice.status})
               </Link>
             ) : (
-              <p className={itemSubClass}>No invoice was created for this report.</p>
+              <div className="flex flex-col gap-2">
+                <p className={itemSubClass}>No invoice was created for this report.</p>
+                <form action={createInvoiceForFinishedReport}>
+                  <input type="hidden" name="diagnostic_id" value={id} />
+                  <SubmitButton className={buttonSecondaryClass} pendingText="Creating…">
+                    Create invoice from this report
+                  </SubmitButton>
+                </form>
+              </div>
             )}
           </div>
         ) : (
