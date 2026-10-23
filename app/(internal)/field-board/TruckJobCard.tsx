@@ -32,6 +32,7 @@ export type TruckJob = {
   assignedToMe?: boolean;
   arrived_at?: string | null;
   completed_at?: string | null;
+  reportId?: string | null;
   accessNotes?: string | null;
   customerNotes?: string | null;
   equipment?: { type: string | null; brand: string | null; model: string | null; serial: string | null; installDate: string | null }[];
@@ -185,6 +186,17 @@ export default function TruckJobCard({ job, primary = false }: { job: TruckJob; 
               Call
             </a>
           )}
+        </div>
+      )}
+
+      {(primary || job.status === "in_progress") && (
+        <div className="mt-3 flex gap-2">
+          <a
+            href={job.reportId ? `/diagnostics/${job.reportId}` : `/diagnostics/new?job_id=${job.id}`}
+            className={linkButton}
+          >
+            {job.reportId ? "Service report" : "Start service report"}
+          </a>
         </div>
       )}
 
