@@ -4,6 +4,7 @@ import SubmitButton from "../../SubmitButton";
 import { scheduleJobFromContract } from "../../jobs/actions";
 import { buttonClass, buttonSecondaryClass, inputClass, subTextClass } from "../../ui";
 import DocumentDeleteButton from "../DocumentDeleteButton";
+import DepositPanel from "./DepositPanel";
 import { BrandedFormShell } from "@/lib/branded-form-shell";
 import { COMPANY_NAME, COMPANY_ADDRESS, COMPANY_PHONE, HIC_REGISTRATION_NUMBER } from "@/lib/brand";
 import type { ContractLineItems } from "@/lib/contract-terms";
@@ -42,6 +43,9 @@ export default function ContractDetail({
     signed_at: string | null;
     signature_data: string | null;
     total: number | null;
+    deposit_received_cents?: number | null;
+    deposit_received_at?: string | null;
+    deposit_method?: string | null;
     customers: { id: string; name: string | null } | null;
     properties: { address: string | null } | null;
     line_items: ContractLineItems;
@@ -89,6 +93,14 @@ export default function ContractDetail({
         {statusLabel[doc.status] ?? doc.status}
         {doc.status === "signed" && doc.signed_at && ` on ${new Date(doc.signed_at).toLocaleString()}`}
       </div>
+
+      <DepositPanel
+        id={doc.id}
+        total={doc.total}
+        depositCents={doc.deposit_received_cents ?? null}
+        receivedAt={doc.deposit_received_at ?? null}
+        method={doc.deposit_method ?? null}
+      />
 
       {doc.status === "signed" && (
         <div className="rounded-xl border border-white/8 bg-white/3 p-4">

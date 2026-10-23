@@ -395,3 +395,40 @@ export async function getInvoicePaymentLink(
     return { ok: false, error: err instanceof Error ? err.message : "Could not create the payment link" };
   }
 }
+
+const DEPOSIT_METHODS = ["card", "square", "check", "cash", "other"];
+
+/** Office-only: record (or clear, with an empty amount) the deposit received on a contract. */
+export async function recordContractDeposit(formData: FormData) {
+  await requireOffice();
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Missing contract id");
+
+  const { data: doc } = await supabase.from("documents").select("id, type, total").eq("id", id).single();
+  if (!doc || doc.type !== "contract") throw new Error("Deposits can only be recorded on contracts");
+
+  const raw = String(formData.get("amount") ?? "").trim();
+  if (!raw) {
+    const { error: clearError } = await supabase
+      .from("documents")
+      .update({ deposit_received_cents: null, deposit_received_at: null, deposit_method: null })
+      .eq("id", id);
+    if (clearError) throw new Error(clearError.message);
+  } else {
+    const amount = Number(raw.replace(/[$,]/g, ""));
+    if (!Number.isFinite(amount) || amount < 0) throw new Error("Enter a valid deposit amount");
+    if (doc.total != null && amount > Number(doc.total)) throw new Error("Deposit can't be more than the contract total");
+    const method = String(formData.get("method") ?? "other");
+    const date = String(formData.get("received_at") ?? "").trim();
+    const { error } = await supabase
+      .from("documents")
+      .update({
+        deposit_received_cents: Math.round(amount * 100),
+        deposit_received_at: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null,
+        deposit_method: DEPOSIT_METHODS.includes(method) ? method : "other",
+      })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath(`/documents/${id}`);
+}
