@@ -1,6 +1,7 @@
 import SubmitButton from "../SubmitButton";
 import PhotoButtons, { type PhotoCounts } from "./PhotoButtons";
 import { truckOnMyWay, truckSetStatus } from "./actions";
+import { formatEtTime } from "@/lib/tz";
 
 export type TruckJob = {
   id: string;
@@ -14,6 +15,8 @@ export type TruckJob = {
   address: string | null;
   photoCounts: PhotoCounts;
   assignedToMe?: boolean;
+  arrived_at?: string | null;
+  completed_at?: string | null;
 };
 
 const bigButton =
@@ -65,6 +68,20 @@ function StepButton({ job }: { job: TruckJob }) {
   );
 }
 
+/** "On site since 2:14 PM (1h 20m)" while working; "On site 1.5 h" once the job is complete. */
+function onSiteLine(job: TruckJob): string | null {
+  if (!job.arrived_at) return null;
+  const start = new Date(job.arrived_at).getTime();
+  const end = job.status === "complete" && job.completed_at ? new Date(job.completed_at).getTime() : Date.now();
+  const minutes = Math.max(0, Math.round((end - start) / 60000));
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const spent = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  if (job.status === "complete") return `On site ${spent}`;
+  if (job.status === "in_progress") return `On site since ${formatEtTime(job.arrived_at)} (${spent})`;
+  return null;
+}
+
 function stateLabel(job: TruckJob) {
   if (job.status === "in_progress") return "On site";
   if (job.on_way_at) return "On the way";
@@ -99,6 +116,7 @@ export default function TruckJobCard({ job, primary = false }: { job: TruckJob; 
         )}
       </div>
       <p className="text-sm text-g300">{job.address ?? "No address on this job"}</p>
+      {onSiteLine(job) && <p className="mt-1 text-sm font-semibold text-white">{onSiteLine(job)}</p>}
       {primary && job.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-g300">{job.notes}</p>}
 
       {(maps || tel) && (
