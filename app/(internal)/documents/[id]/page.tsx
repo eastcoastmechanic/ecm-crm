@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { signStoredPhotos } from "@/lib/photo-urls";
 import type { AssessmentItem } from "@/lib/assessment-report-pdf";
 import { sendDocumentEmail } from "./actions";
+import PaymentLinkButton from "./PaymentLinkButton";
 import AssessmentDetail from "./AssessmentDetail";
 import WarrantyDetail from "./WarrantyDetail";
 import MassSaveRebateDetail from "./MassSaveRebateDetail";
@@ -224,6 +225,7 @@ export default async function DocumentPage({
           >
             Download PDF
           </a>
+          {doc.type === "invoice" && doc.status !== "paid" && <PaymentLinkButton id={doc.id} />}
           <DocumentDeleteButton id={doc.id} label={typeLabel[doc.type] ?? "Document"} />
           {doc.customers?.email ? (
             <form action={sendDocumentEmail}>
