@@ -409,10 +409,11 @@ export async function recordContractDeposit(formData: FormData) {
 
   const raw = String(formData.get("amount") ?? "").trim();
   if (!raw) {
-    await supabase
+    const { error: clearError } = await supabase
       .from("documents")
       .update({ deposit_received_cents: null, deposit_received_at: null, deposit_method: null })
       .eq("id", id);
+    if (clearError) throw new Error(clearError.message);
   } else {
     const amount = Number(raw.replace(/[$,]/g, ""));
     if (!Number.isFinite(amount) || amount < 0) throw new Error("Enter a valid deposit amount");
