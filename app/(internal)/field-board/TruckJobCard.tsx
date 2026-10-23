@@ -32,7 +32,52 @@ export type TruckJob = {
   assignedToMe?: boolean;
   arrived_at?: string | null;
   completed_at?: string | null;
+  accessNotes?: string | null;
+  customerNotes?: string | null;
+  equipment?: { type: string | null; brand: string | null; model: string | null; serial: string | null; installDate: string | null }[];
+  lastVisit?: string | null;
 };
+
+function SiteInfo({ job }: { job: TruckJob }) {
+  const equipment = job.equipment ?? [];
+  if (!job.accessNotes && !job.customerNotes && equipment.length === 0 && !job.lastVisit) return null;
+  return (
+    <div className="mt-3 flex flex-col gap-2 rounded-xl border border-white/8 bg-white/3 p-3 text-sm">
+      {job.accessNotes && (
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-accent">Access</div>
+          <p className="whitespace-pre-wrap text-white">{job.accessNotes}</p>
+        </div>
+      )}
+      {job.customerNotes && (
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-g300">Customer notes</div>
+          <p className="whitespace-pre-wrap text-g300">{job.customerNotes}</p>
+        </div>
+      )}
+      {equipment.length > 0 && (
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-g300">Equipment on file</div>
+          <ul className="mt-1 flex flex-col gap-1 text-g300">
+            {equipment.map((e, i) => (
+              <li key={i}>
+                {[e.type, e.brand, e.model].filter(Boolean).join(" · ") || "Unit"}
+                {e.serial ? ` · S/N ${e.serial}` : ""}
+                {e.installDate ? ` · installed ${e.installDate}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {job.lastVisit && (
+        <div className="text-g300">
+          Last visit:{" "}
+          {new Date(job.lastVisit).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const bigButton =
   "w-full rounded-xl bg-gradient-to-br from-accent to-accent-2 px-4 py-4 text-base font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90";
@@ -119,6 +164,14 @@ export default function TruckJobCard({ job, primary = false }: { job: TruckJob; 
       <p className="text-sm text-g300">{job.address ?? "No address on this job"}</p>
       <OnSite job={job} />
       {primary && job.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-g300">{job.notes}</p>}
+      {primary ? (
+        <SiteInfo job={job} />
+      ) : (
+        <details className="mt-2 text-sm">
+          <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-g300">Site info</summary>
+          <SiteInfo job={job} />
+        </details>
+      )}
 
       {(maps || tel) && (
         <div className="mt-3 flex gap-2">

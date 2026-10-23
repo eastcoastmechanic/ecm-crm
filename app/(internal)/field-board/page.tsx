@@ -31,8 +31,10 @@ function stamp(value: string | null) {
   });
 }
 
-type RelatedName = { name: string | null; phone?: string | null } | { name: string | null; phone?: string | null }[] | null;
-type RelatedAddress = { address: string | null } | { address: string | null }[] | null;
+type CustomerRel = { name: string | null; phone?: string | null; notes?: string | null };
+type RelatedName = CustomerRel | CustomerRel[] | null;
+type PropertyRel = { address: string | null; access_notes?: string | null };
+type RelatedAddress = PropertyRel | PropertyRel[] | null;
 
 function countPhotos(photos: unknown): TruckJob["photoCounts"] {
   const counts = { arrival: 0, during: 0, completion: 0 };
@@ -72,7 +74,7 @@ async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
   const { data } = await supabase
     .from("jobs")
     .select(
-      "id, status, scheduled_at, notes, job_type, on_way_at, arrived_at, completed_at, photos, assigned_staff_id, customers(name, phone), properties(address)"
+      "id, status, scheduled_at, notes, job_type, on_way_at, arrived_at, completed_at, photos, assigned_staff_id, property_id, customers(name, phone, notes), properties(address, access_notes)"
     )
     // Every job that isn't finished or cancelled (so the tech can pick any of them),
     // plus anything scheduled in the recent/upcoming window.
@@ -80,6 +82,42 @@ async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
     .neq("status", "cancelled")
     .order("scheduled_at", { ascending: true, nullsFirst: false })
     .limit(150);
+
+  // Equipment on file and the last finished visit, per property. No prices:
+  // this feeds the tech's phone screen.
+  const propertyIds = [...new Set((data ?? []).map((r) => r.property_id as string | null).filter((v): v is string => !!v))];
+  const equipmentByProperty = new Map<string, TruckJob["equipment"]>();
+  const lastVisitByProperty = new Map<string, string>();
+  if (propertyIds.length) {
+    const [{ data: equipmentRows }, { data: visitRows }] = await Promise.all([
+      supabase
+        .from("equipment")
+        .select("property_id, type, brand, model, serial_number, install_date")
+        .in("property_id", propertyIds),
+      supabase
+        .from("jobs")
+        .select("property_id, completed_at")
+        .in("property_id", propertyIds)
+        .eq("status", "complete")
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false }),
+    ]);
+    for (const e of equipmentRows ?? []) {
+      const list = equipmentByProperty.get(e.property_id as string) ?? [];
+      list.push({
+        type: (e.type as string | null) ?? null,
+        brand: (e.brand as string | null) ?? null,
+        model: (e.model as string | null) ?? null,
+        serial: (e.serial_number as string | null) ?? null,
+        installDate: (e.install_date as string | null) ?? null,
+      });
+      equipmentByProperty.set(e.property_id as string, list);
+    }
+    for (const v of visitRows ?? []) {
+      const key = v.property_id as string;
+      if (!lastVisitByProperty.has(key)) lastVisitByProperty.set(key, v.completed_at as string);
+    }
+  }
 
   return (data ?? []).map((row) => {
     const customer = one(row.customers as RelatedName);
@@ -98,6 +136,14 @@ async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
       arrived_at: (row.arrived_at as string | null) ?? null,
       completed_at: (row.completed_at as string | null) ?? null,
       assignedToMe: myStaffId !== null && row.assigned_staff_id === myStaffId,
+      accessNotes: property?.access_notes ?? null,
+      customerNotes: customer?.notes ?? null,
+      equipment: row.property_id ? (equipmentByProperty.get(row.property_id as string) ?? []) : [],
+      // Only for jobs still open, so a finished job never reports itself as the last visit.
+      lastVisit:
+        row.property_id && row.status !== "complete"
+          ? (lastVisitByProperty.get(row.property_id as string) ?? null)
+          : null,
     };
   });
 }
