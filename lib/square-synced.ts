@@ -28,7 +28,7 @@ async function sumPaged<Row extends { synced_at: string }>(
   return { totalCents, count, syncedAt };
 }
 
-/** Completed Square payments, all time. Same rule as the live Square call it replaces. */
+/** Completed Square payments the sync holds (it imports the last 366 days). */
 export function getSyncedSquareRevenue(): Promise<Totals> {
   return sumPaged<{ total_cents: number; synced_at: string }>(
     (from, to) =>

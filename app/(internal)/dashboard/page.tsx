@@ -35,7 +35,7 @@ async function SquareStats() {
   const syncNote = latestSync ? `as of ${formatEtDateTime(latestSync, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "not synced yet";
   const cards = [
     {
-      label: "Revenue Collected (Square)",
+      label: "Revenue Collected (Square, last 12 mo)",
       value: formatPrice(squareRevenue.totalCents / 100),
       sub: `${squareRevenue.count} payments · ${syncNote}`,
     },
@@ -61,7 +61,7 @@ async function SquareStats() {
 function SquareStatsFallback() {
   return (
     <>
-      {["Revenue Collected (Square)", "Money Owed (Square)"].map((label) => (
+      {["Revenue Collected (Square, last 12 mo)", "Money Owed (Square)"].map((label) => (
         <div key={label} className={statCardClass}>
           <div className="text-xs font-semibold uppercase tracking-wide text-g500">{label}</div>
           <div className="mt-1 font-display text-2xl font-extrabold text-g500">Loading…</div>
