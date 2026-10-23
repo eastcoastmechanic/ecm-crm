@@ -1,6 +1,22 @@
 import SubmitButton from "../SubmitButton";
 import PhotoButtons, { type PhotoCounts } from "./PhotoButtons";
 import { truckOnMyWay, truckSetStatus } from "./actions";
+import { formatEtTime } from "@/lib/tz";
+import OnSiteLine from "./OnSiteLine";
+
+export function OnSite({ job }: { job: TruckJob }) {
+  if (!job.arrived_at || (job.status !== "in_progress" && job.status !== "complete")) return null;
+  return (
+    <p className="mt-1 text-sm font-semibold text-white">
+      <OnSiteLine
+        arrivedAt={job.arrived_at}
+        completedAt={job.completed_at ?? null}
+        status={job.status}
+        sinceLabel={formatEtTime(job.arrived_at)}
+      />
+    </p>
+  );
+}
 
 export type TruckJob = {
   id: string;
@@ -14,6 +30,8 @@ export type TruckJob = {
   address: string | null;
   photoCounts: PhotoCounts;
   assignedToMe?: boolean;
+  arrived_at?: string | null;
+  completed_at?: string | null;
 };
 
 const bigButton =
@@ -99,6 +117,7 @@ export default function TruckJobCard({ job, primary = false }: { job: TruckJob; 
         )}
       </div>
       <p className="text-sm text-g300">{job.address ?? "No address on this job"}</p>
+      <OnSite job={job} />
       {primary && job.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-g300">{job.notes}</p>}
 
       {(maps || tel) && (

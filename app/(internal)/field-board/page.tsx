@@ -5,7 +5,7 @@ import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } from "@/lib/field-board";
 import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import FieldNoteForm from "./FieldNoteForm";
-import TruckJobCard, { type TruckJob } from "./TruckJobCard";
+import TruckJobCard, { OnSite, type TruckJob } from "./TruckJobCard";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +72,7 @@ async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
   const { data } = await supabase
     .from("jobs")
     .select(
-      "id, status, scheduled_at, notes, job_type, on_way_at, photos, assigned_staff_id, customers(name, phone), properties(address)"
+      "id, status, scheduled_at, notes, job_type, on_way_at, arrived_at, completed_at, photos, assigned_staff_id, customers(name, phone), properties(address)"
     )
     // Every job that isn't finished or cancelled (so the tech can pick any of them),
     // plus anything scheduled in the recent/upcoming window.
@@ -95,6 +95,8 @@ async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
       phone: customer?.phone ?? null,
       address: property?.address ?? null,
       photoCounts: countPhotos(row.photos),
+      arrived_at: (row.arrived_at as string | null) ?? null,
+      completed_at: (row.completed_at as string | null) ?? null,
       assignedToMe: myStaffId !== null && row.assigned_staff_id === myStaffId,
     };
   });
@@ -253,6 +255,7 @@ export default async function FieldBoardPage() {
               <div key={job.id}>
                 <div className={itemTitleClass}>{job.customer ?? "Job"}</div>
                 <p className={itemSubClass}>{job.address ?? "No address"}</p>
+                <OnSite job={job} />
               </div>
             ))}
           </div>
