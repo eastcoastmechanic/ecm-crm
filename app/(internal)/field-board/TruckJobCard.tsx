@@ -2,6 +2,21 @@ import SubmitButton from "../SubmitButton";
 import PhotoButtons, { type PhotoCounts } from "./PhotoButtons";
 import { truckOnMyWay, truckSetStatus } from "./actions";
 import { formatEtTime } from "@/lib/tz";
+import OnSiteLine from "./OnSiteLine";
+
+export function OnSite({ job }: { job: TruckJob }) {
+  if (!job.arrived_at || (job.status !== "in_progress" && job.status !== "complete")) return null;
+  return (
+    <p className="mt-1 text-sm font-semibold text-white">
+      <OnSiteLine
+        arrivedAt={job.arrived_at}
+        completedAt={job.completed_at ?? null}
+        status={job.status}
+        sinceLabel={formatEtTime(job.arrived_at)}
+      />
+    </p>
+  );
+}
 
 export type TruckJob = {
   id: string;
@@ -68,20 +83,6 @@ function StepButton({ job }: { job: TruckJob }) {
   );
 }
 
-/** "On site since 2:14 PM (1h 20m)" while working; "On site 1.5 h" once the job is complete. */
-function onSiteLine(job: TruckJob): string | null {
-  if (!job.arrived_at) return null;
-  const start = new Date(job.arrived_at).getTime();
-  const end = job.status === "complete" && job.completed_at ? new Date(job.completed_at).getTime() : Date.now();
-  const minutes = Math.max(0, Math.round((end - start) / 60000));
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  const spent = h > 0 ? `${h}h ${m}m` : `${m}m`;
-  if (job.status === "complete") return `On site ${spent}`;
-  if (job.status === "in_progress") return `On site since ${formatEtTime(job.arrived_at)} (${spent})`;
-  return null;
-}
-
 function stateLabel(job: TruckJob) {
   if (job.status === "in_progress") return "On site";
   if (job.on_way_at) return "On the way";
@@ -116,7 +117,7 @@ export default function TruckJobCard({ job, primary = false }: { job: TruckJob; 
         )}
       </div>
       <p className="text-sm text-g300">{job.address ?? "No address on this job"}</p>
-      {onSiteLine(job) && <p className="mt-1 text-sm font-semibold text-white">{onSiteLine(job)}</p>}
+      <OnSite job={job} />
       {primary && job.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-g300">{job.notes}</p>}
 
       {(maps || tel) && (

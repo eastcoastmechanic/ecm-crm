@@ -5,7 +5,7 @@ import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } from "@/lib/field-board";
 import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import FieldNoteForm from "./FieldNoteForm";
-import TruckJobCard, { type TruckJob } from "./TruckJobCard";
+import TruckJobCard, { OnSite, type TruckJob } from "./TruckJobCard";
 
 export const dynamic = "force-dynamic";
 
@@ -255,6 +255,7 @@ export default async function FieldBoardPage() {
               <div key={job.id}>
                 <div className={itemTitleClass}>{job.customer ?? "Job"}</div>
                 <p className={itemSubClass}>{job.address ?? "No address"}</p>
+                <OnSite job={job} />
               </div>
             ))}
           </div>
