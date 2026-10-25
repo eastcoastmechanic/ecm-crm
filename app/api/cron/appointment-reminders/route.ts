@@ -2,9 +2,8 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
-import { addDaysToDateKey, etDateKey, etDayRange, formatEtDateTime } from "@/lib/tz";
-
-type CustomerContact = { name: string | null; phone: string | null; sms_consent: boolean } | null;
+import { addDaysToDateKey, etDateKey, etDayRange } from "@/lib/tz";
+import { appointmentReminder, type ReminderJobRow } from "@/lib/appointment-reminder";
 
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) {
@@ -25,31 +24,19 @@ export async function GET(request: Request) {
   if (error) return NextResponse.json({ sent: 0, errors: [error.message] });
 
   const errors: string[] = [];
+  const skipped: Record<string, number> = {};
   let sent = 0;
-  let skipped = 0;
 
   for (const job of jobs ?? []) {
-    const customer = (job.customers as unknown as CustomerContact[] | null)?.[0];
-    const property = (job.properties as unknown as { address: string | null }[] | null)?.[0];
+    const decision = appointmentReminder(job as unknown as ReminderJobRow);
 
-    if (!customer?.phone || !customer.sms_consent) {
-      skipped++;
+    if (!decision.send) {
+      skipped[decision.reason] = (skipped[decision.reason] ?? 0) + 1;
       continue;
     }
 
-    const when = formatEtDateTime(job.scheduled_at, {
-      weekday: "short",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-
     try {
-      const result = await sendSMS(
-        customer.phone,
-        `East Coast Mechanical: reminder — you're scheduled for ${when}${
-          property?.address ? ` at ${property.address}` : ""
-        }. Reply STOP to opt out.`
-      );
+      const result = await sendSMS(decision.phone, decision.body);
       if (!result.ok) {
         errors.push(`job ${job.id}: ${result.error ?? "send failed"}`);
         continue;
@@ -64,5 +51,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ sent, skipped, errors });
+  return NextResponse.json({ jobs: jobs?.length ?? 0, sent, skipped, errors });
 }
