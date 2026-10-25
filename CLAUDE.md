@@ -55,10 +55,11 @@ Order, one PR each:
 Decided by Josh (2026-10-25):
 - Visits per plan: 2 a year, AC tune-up in April, heating tune-up in October. Default for new contracts; editable per contract.
 - Booking reminders: text and email. Text still only with `sms_consent`; without consent, email only.
+- Tech reminders: one morning digest of the day's jobs (each tech their own jobs, Josh all jobs), not a text before each job.
 
 Open decisions for Josh:
-- Tech reminders: morning digest or one text before each job.
 - Vercel plan cron frequency (Claude checks in step 1).
+- Digest send time (plan says 7:00 ET) and channel for staff (email, text, or both).
 
 ## After Phase 3
 - Phase 4: lead pipeline board, good/better/best estimates, text review requests (plus one reminder), seasonal/lapsed-customer campaigns once consent is confirmed.
