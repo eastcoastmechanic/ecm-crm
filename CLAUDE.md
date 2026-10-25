@@ -37,7 +37,8 @@ Internal app: `app/(internal)`. Customer portal: `app/(portal)`.
 ## Where things stand (as of 2026-10-25, verify with `gh pr list`)
 - Phase 1 (owner alerts, job billing line, payment link, deposit tracking) merged: #44 to #47.
 - Phase 2 (truck app for techs: job card details, tech account page, service report access, install report access, inventory deduction, tech hours) merged: #48 to #52.
-- #53 (inventory double-deduction fix) open.
+- #53 (inventory double-deduction fix) merged.
+- #54 (CLAUDE.md and docs/ecm reference docs) merged.
 - Earlier merged: #41 (signed maintenance contract creates plan), #42 (multi-unit install report, migration 0050), #43 (customer/property fields, access notes, migration 0051), #33 (Schedule job button).
 - Anon DB/storage policies were locked down. Photo buckets were still public after that lockdown (Phase 5 item).
 
