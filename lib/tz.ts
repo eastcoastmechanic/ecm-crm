@@ -15,6 +15,12 @@ export function etDateKey(date: Date = new Date()): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+/** Hour of the day (0-23) in New York at the given instant. */
+export function etHour(date: Date = new Date()): number {
+  const hour = new Intl.DateTimeFormat("en-US", { timeZone: BUSINESS_TZ, hourCycle: "h23", hour: "numeric" }).format(date);
+  return Number(hour);
+}
+
 /** Add whole calendar days to a YYYY-MM-DD key (no timezone involved). */
 export function addDaysToDateKey(dateKey: string, days: number): string {
   const [y, m, d] = dateKey.split("-").map(Number);
