@@ -107,6 +107,24 @@ export async function recordPartsUsed(formData: FormData) {
     if (priced?.unit_price != null) part.unit_price = Number(priced.unit_price);
   }
 
+  // What this report already took out of inventory, so saving again only moves
+  // the difference instead of deducting the whole list a second time.
+  const { data: before, error: beforeError } = await supabase
+    .from("diagnostics")
+    .select("actual_parts_used")
+    .eq("id", diagnosticId)
+    .maybeSingle();
+  // Without the saved list we cannot tell what was already deducted, so stop
+  // rather than take the whole list out of inventory again.
+  if (beforeError) throw new Error(beforeError.message);
+  const previousQty = new Map<string, number>();
+  for (const p of (before?.actual_parts_used ?? []) as { price_book_item_name?: string; qty?: number }[]) {
+    if (!p?.price_book_item_name) continue;
+    previousQty.set(p.price_book_item_name, (previousQty.get(p.price_book_item_name) ?? 0) + Number(p.qty || 0));
+  }
+  const newQty = new Map<string, number>();
+  for (const p of parts) newQty.set(p.price_book_item_name, (newQty.get(p.price_book_item_name) ?? 0) + p.qty);
+
   const { error } = await supabase
     .from("diagnostics")
     .update({ actual_parts_used: parts })
@@ -117,11 +135,15 @@ export async function recordPartsUsed(formData: FormData) {
   // tiers (good/better/best) are separate rows for the same physical part,
   // and inventory only tracks one row per part regardless of which tier id
   // it was originally added under.
-  for (const part of parts) {
+  // Positive delta takes stock out; a part removed or reduced puts it back.
+  for (const name of new Set([...previousQty.keys(), ...newQty.keys()])) {
+    const delta = (newQty.get(name) ?? 0) - (previousQty.get(name) ?? 0);
+    if (delta === 0) continue;
+
     const { data: matchingItems } = await supabase
       .from("price_book_items")
       .select("id")
-      .eq("name", part.price_book_item_name);
+      .eq("name", name);
     const ids = (matchingItems ?? []).map((r) => r.id);
     if (ids.length === 0) continue;
 
@@ -133,10 +155,9 @@ export async function recordPartsUsed(formData: FormData) {
       .maybeSingle();
 
     if (invRow) {
-      const newQty = Math.max(0, invRow.qty_on_hand - part.qty);
       await supabase
         .from("inventory_items")
-        .update({ qty_on_hand: newQty, updated_at: new Date().toISOString() })
+        .update({ qty_on_hand: Math.max(0, invRow.qty_on_hand - delta), updated_at: new Date().toISOString() })
         .eq("id", invRow.id);
     }
   }
