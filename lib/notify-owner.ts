@@ -1,6 +1,7 @@
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
+import { postToTeams } from "@/lib/teams";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
@@ -144,6 +145,15 @@ export async function notifyOwnerOfEvent(kind: OwnerEvent, id: string) {
       job_completed: `Job finished: ${who}`,
     }[kind];
     const line = what ? `${headline} (${what})` : headline;
+
+    // Teams first: it never throws, so a failed email or text can't skip it.
+    // Teams. Money events carry amounts, so they go only to the private Money
+    // Alerts channel. A finished job has no prices, so it goes to Dispatch where
+    // the techs see it.
+    await postToTeams(kind === "job_completed" ? "dispatch" : "money", {
+      title: line,
+      url: link,
+    });
 
     if (OWNER_EMAIL) {
       await resend.emails.send({
