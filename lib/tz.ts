@@ -59,8 +59,12 @@ function etMidnight(dateKey: string): Date {
 export function parseEtLocal(value: string): Date | null {
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value ?? "");
   if (!m) return null;
-  const midnight = etMidnight(m[1]);
-  const when = new Date(midnight.getTime() + (Number(m[2]) * 60 + Number(m[3])) * 60000);
+  const [y, mo, d] = m[1].split("-").map(Number);
+  // Resolve the offset at the wall time itself (not at midnight), so the 23/25-hour
+  // DST days come out right. Two passes converge on the correct offset.
+  const wallAsUtc = Date.UTC(y, mo - 1, d, Number(m[2]), Number(m[3]), 0);
+  let when = new Date(wallAsUtc - etOffsetMs(new Date(wallAsUtc)));
+  when = new Date(wallAsUtc - etOffsetMs(when));
   return Number.isNaN(when.getTime()) ? null : when;
 }
 

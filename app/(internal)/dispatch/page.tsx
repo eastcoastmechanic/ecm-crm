@@ -103,7 +103,7 @@ export default async function DispatchPage({
   const rangeStart = etDayRange(first).start;
   const rangeEnd = etDayRange(addDaysToDateKey(first, step - 1)).end;
 
-  const [{ data: jobRows, error }, { data: unscheduledRows }, { data: staffRows }] = await Promise.all([
+  const [{ data: jobRows, error }, { data: unscheduledRows, error: unscheduledError }, { data: staffRows, error: staffError }] = await Promise.all([
     supabase
       .from("jobs")
       .select("id, scheduled_at, status, job_type, assigned_staff_id, customers(name), properties(address)")
@@ -163,6 +163,11 @@ export default async function DispatchPage({
       </div>
 
       {error && <p className="text-sm text-accent">Couldn&apos;t load jobs: {error.message}</p>}
+      {staffError && (
+        <p className="text-sm text-accent">
+          Couldn&apos;t load staff: {staffError.message}. Techs may show as Unassigned until this loads.
+        </p>
+      )}
 
       <div className="overflow-x-auto">
         <div
@@ -195,7 +200,9 @@ export default async function DispatchPage({
 
       <section className="flex flex-col gap-2">
         <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Not scheduled yet</h2>
-        {unscheduled.length === 0 ? (
+        {unscheduledError ? (
+          <p className="text-sm text-accent">Couldn&apos;t load unscheduled jobs: {unscheduledError.message}</p>
+        ) : unscheduled.length === 0 ? (
           <p className={subTextClass}>Every open job has a date.</p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
