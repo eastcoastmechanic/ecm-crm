@@ -16,7 +16,8 @@ type VisitJobInput = {
 // Make the unscheduled maintenance job for a visit and link it. Returns an error text, or null on success.
 // Safe to repeat: if an earlier run made the job but could not link it, that job is reused, not duplicated.
 async function createJobForVisit(v: VisitJobInput): Promise<string | null> {
-  const notes = `Maintenance plan visit: ${v.label} (${monthName(v.month)} ${v.year}).`;
+  // The short visit id keeps two plans for the same customer and property from sharing one job.
+  const notes = `Maintenance plan visit: ${v.label} (${monthName(v.month)} ${v.year}). Ref ${v.visitId.slice(0, 8)}`;
 
   let existingQuery = supabase
     .from("jobs")
