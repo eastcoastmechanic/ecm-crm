@@ -14,29 +14,44 @@ type VisitJobInput = {
 };
 
 // Make the unscheduled maintenance job for a visit and link it. Returns an error text, or null on success.
+// Safe to repeat: if an earlier run made the job but could not link it, that job is reused, not duplicated.
 async function createJobForVisit(v: VisitJobInput): Promise<string | null> {
-  const { data: job, error: jobError } = await supabase
-    .from("jobs")
-    .insert({
-      customer_id: v.customerId,
-      property_id: v.propertyId,
-      job_type: "maintenance",
-      status: "requested",
-      scheduled_at: null,
-      notes: `Maintenance plan visit: ${v.label} (${monthName(v.month)} ${v.year}).`,
-      created_via: "maintenance_plan",
-    })
-    .select("id")
-    .single();
-  // The visit stays without a job; the sweep below finds it on the next run.
-  if (jobError || !job) return jobError?.message ?? "job not created";
+  const notes = `Maintenance plan visit: ${v.label} (${monthName(v.month)} ${v.year}).`;
 
-  const { error: linkError } = await supabase.from("maintenance_visits").update({ job_id: job.id }).eq("id", v.visitId);
-  if (linkError) {
-    // Remove the job we just made so the retry does not leave a second one behind.
-    const { error: undoError } = await supabase.from("jobs").delete().eq("id", job.id);
-    return `visit not linked to job: ${linkError.message}${undoError ? `; job ${job.id} not removed: ${undoError.message}` : ""}`;
+  let existingQuery = supabase
+    .from("jobs")
+    .select("id")
+    .eq("created_via", "maintenance_plan")
+    .eq("notes", notes)
+    .neq("status", "cancelled")
+    .limit(1);
+  existingQuery = v.customerId ? existingQuery.eq("customer_id", v.customerId) : existingQuery.is("customer_id", null);
+  existingQuery = v.propertyId ? existingQuery.eq("property_id", v.propertyId) : existingQuery.is("property_id", null);
+  const { data: found, error: findError } = await existingQuery;
+  if (findError) return findError.message;
+
+  let jobId = found?.[0]?.id as string | undefined;
+  if (!jobId) {
+    const { data: job, error: jobError } = await supabase
+      .from("jobs")
+      .insert({
+        customer_id: v.customerId,
+        property_id: v.propertyId,
+        job_type: "maintenance",
+        status: "requested",
+        scheduled_at: null,
+        notes,
+        created_via: "maintenance_plan",
+      })
+      .select("id")
+      .single();
+    // The visit stays without a job; the sweep finds it on the next run.
+    if (jobError || !job) return jobError?.message ?? "job not created";
+    jobId = job.id as string;
   }
+
+  const { error: linkError } = await supabase.from("maintenance_visits").update({ job_id: jobId }).eq("id", v.visitId);
+  if (linkError) return `visit not linked to job ${jobId}, will retry: ${linkError.message}`;
   return null;
 }
 
