@@ -42,6 +42,7 @@ export const navEntries: NavEntry[] = [
     label: "Operations",
     items: [
       { href: "/jobs", label: "Jobs" },
+      { href: "/dispatch", label: "Dispatch" },
       { href: "/pm", label: "Maintenance" },
       { href: "/diagnostics", label: "Diagnostics" },
       { href: "/tasks", label: "Tasks" },

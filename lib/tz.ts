@@ -86,3 +86,16 @@ export function formatEtDateTime(
 ): string {
   return new Date(date).toLocaleString("en-US", { timeZone: BUSINESS_TZ, ...options });
 }
+
+/** A datetime-local input value ("2026-10-22T09:30") for an instant, in New York time. */
+export function toEtLocalInput(date: Date | string): string {
+  const d = new Date(date);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: BUSINESS_TZ,
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return `${etDateKey(d)}T${get("hour")}:${get("minute")}`;
+}
