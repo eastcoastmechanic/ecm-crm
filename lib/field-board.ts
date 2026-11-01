@@ -3,6 +3,7 @@ import { bearerToken, tokenMatches } from "@/lib/bearer-auth";
 import { CRM_HUB_URL, FIELD_BOARD_URL } from "@/lib/field-board-links";
 import { applyJobStatus } from "@/lib/job-lifecycle";
 import { listOpenPlannerTasks } from "@/lib/planner-connector";
+import { postToTeams } from "@/lib/teams";
 
 export { CRM_HUB_URL, FIELD_BOARD_URL };
 
@@ -176,6 +177,38 @@ async function resolveJob(input: FieldBoardEventBody): Promise<ResolvedJob | nul
   return null;
 }
 
+// Mirrors a saved field note to the Job Notes channel in Teams so the office and
+// the other techs see it without opening the app. Never throws; a Teams problem
+// must not fail or retry the note that is already saved.
+async function mirrorNoteToTeams(note: {
+  jobId: string | null;
+  title: string;
+  body: string;
+  boardStatus: string | null;
+}) {
+  try {
+    let where = "";
+    if (note.jobId) {
+      const { data: job } = await supabase
+        .from("jobs")
+        .select("customers(name), properties(address)")
+        .eq("id", note.jobId)
+        .maybeSingle();
+      const customer = Array.isArray(job?.customers) ? job?.customers[0] : job?.customers;
+      const property = Array.isArray(job?.properties) ? job?.properties[0] : job?.properties;
+      where = [customer?.name, property?.address].filter(Boolean).join(" · ");
+    }
+    const detail = note.body && note.body !== note.title ? note.body : "";
+    await postToTeams("job_notes", {
+      title: where ? `${where}: ${note.title}` : note.title,
+      text: [note.boardStatus ? `Status: ${note.boardStatus}` : null, detail || null].filter(Boolean).join("\n\n"),
+      url: `${CRM_HUB_URL}/field-board`,
+    });
+  } catch (err) {
+    console.error("[field-board] Teams note mirror failed:", err instanceof Error ? err.name : "error");
+  }
+}
+
 export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
   const title = input.title?.trim();
   const body = input.body?.trim() ?? "";
@@ -267,6 +300,7 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
         // The note is already on the job. Keep the event (and its ref) so a retry
         // is seen as a duplicate instead of appending the note a second time.
         statusError = err instanceof Error ? err.message : "Status change failed";
+        await mirrorNoteToTeams({ jobId: job.id, title: title || body.slice(0, 120), body, boardStatus: input.board_status?.trim() || null });
         return { ...result(event, { status_applied: false }), status_error: statusError };
       }
       // Nothing was written: release the ref so the caller's retry can run it all again.
@@ -278,6 +312,13 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
       };
     }
   }
+
+  await mirrorNoteToTeams({
+    jobId: job?.id ?? null,
+    title: title || body.slice(0, 120),
+    body,
+    boardStatus: input.board_status?.trim() || null,
+  });
 
   return result(event, { status_applied: statusApplied });
 }
