@@ -4,9 +4,45 @@ import { supabase } from "@/lib/supabase";
 import { etDateKey } from "@/lib/tz";
 import { monthName, visitDueNow, visitLabel } from "@/lib/maintenance-visits";
 
+type VisitJobInput = {
+  visitId: string;
+  customerId: string | null;
+  propertyId: string | null;
+  label: string;
+  year: number;
+  month: number;
+};
+
+// Make the unscheduled maintenance job for a visit and link it. Returns an error text, or null on success.
+async function createJobForVisit(v: VisitJobInput): Promise<string | null> {
+  const { data: job, error: jobError } = await supabase
+    .from("jobs")
+    .insert({
+      customer_id: v.customerId,
+      property_id: v.propertyId,
+      job_type: "maintenance",
+      status: "requested",
+      scheduled_at: null,
+      notes: `Maintenance plan visit: ${v.label} (${monthName(v.month)} ${v.year}).`,
+      created_via: "maintenance_plan",
+    })
+    .select("id")
+    .single();
+  // The visit stays without a job; the sweep below finds it on the next run.
+  if (jobError || !job) return jobError?.message ?? "job not created";
+
+  const { error: linkError } = await supabase.from("maintenance_visits").update({ job_id: job.id }).eq("id", v.visitId);
+  if (linkError) {
+    // Remove the job we just made so the retry does not leave a second one behind.
+    const { error: undoError } = await supabase.from("jobs").delete().eq("id", job.id);
+    return `visit not linked to job: ${linkError.message}${undoError ? `; job ${job.id} not removed: ${undoError.message}` : ""}`;
+  }
+  return null;
+}
+
 // Daily: for each active plan with a visit schedule, make this month's visit once.
 // The visit row (unique per plan and month) is claimed first, then an unscheduled
-// maintenance job is created and linked. A visit left without a job is picked up on the next run.
+// maintenance job is created and linked. A visit left without a job (any month) is picked up by the sweep on the next run.
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -22,6 +58,26 @@ export async function GET(request: Request) {
 
   let created = 0;
   const errors: string[] = [];
+
+  // Sweep first: any open visit, from any month, that never got its job (an earlier run died part way).
+  const { data: orphans, error: orphanError } = await supabase
+    .from("maintenance_visits")
+    .select("id, customer_id, property_id, label, due_year, due_month")
+    .eq("status", "due")
+    .is("job_id", null);
+  if (orphanError) errors.push(`sweep: ${orphanError.message}`);
+  for (const o of orphans ?? []) {
+    const problem = await createJobForVisit({
+      visitId: o.id as string,
+      customerId: o.customer_id as string | null,
+      propertyId: o.property_id as string | null,
+      label: (o.label as string | null) ?? visitLabel(o.due_month as number),
+      year: o.due_year as number,
+      month: o.due_month as number,
+    });
+    if (problem) errors.push(`visit ${o.id}: ${problem}`);
+    else created++;
+  }
 
   for (const plan of plans ?? []) {
     const due = visitDueNow({
@@ -52,50 +108,19 @@ export async function GET(request: Request) {
       errors.push(`plan ${plan.id}: ${visitError.message}`);
       continue;
     }
-    // Already made on an earlier run: leave it, unless that run died before the job was linked.
-    let visitId = visit?.id as string | undefined;
-    if (!visitId) {
-      const { data: existing, error: existingError } = await supabase
-        .from("maintenance_visits")
-        .select("id, job_id, status")
-        .eq("service_contract_id", plan.id)
-        .eq("due_year", due.year)
-        .eq("due_month", due.month)
-        .maybeSingle();
-      if (existingError) {
-        errors.push(`plan ${plan.id}: ${existingError.message}`);
-        continue;
-      }
-      if (!existing || existing.job_id || existing.status !== "due") continue;
-      visitId = existing.id as string;
-    }
+    // Already made on an earlier run: leave it. A visit that lost its job is handled by the sweep above.
+    if (!visit) continue;
 
-    const { data: job, error: jobError } = await supabase
-      .from("jobs")
-      .insert({
-        customer_id: plan.customer_id,
-        property_id: plan.property_id,
-        job_type: "maintenance",
-        status: "requested",
-        scheduled_at: null,
-        notes: `Maintenance plan visit: ${label} (${monthName(due.month)} ${due.year}).`,
-        created_via: "maintenance_plan",
-      })
-      .select("id")
-      .single();
-    if (jobError || !job) {
-      // The visit stays without a job; tomorrow's run sees that and tries again.
-      errors.push(`plan ${plan.id}: ${jobError?.message ?? "job not created"}`);
-      continue;
-    }
-
-    const { error: linkError } = await supabase.from("maintenance_visits").update({ job_id: job.id }).eq("id", visitId);
-    if (linkError) {
-      // Remove the job we just made so the retry does not leave a second one behind.
-      const { error: undoError } = await supabase.from("jobs").delete().eq("id", job.id);
-      errors.push(
-        `plan ${plan.id}: visit not linked to job: ${linkError.message}${undoError ? `; job ${job.id} not removed: ${undoError.message}` : ""}`
-      );
+    const problem = await createJobForVisit({
+      visitId: visit.id as string,
+      customerId: plan.customer_id as string | null,
+      propertyId: plan.property_id as string | null,
+      label,
+      year: due.year,
+      month: due.month,
+    });
+    if (problem) {
+      errors.push(`plan ${plan.id}: ${problem}`);
       continue;
     }
     created++;
