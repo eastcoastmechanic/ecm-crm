@@ -113,6 +113,22 @@ export async function updateJobStatus(formData: FormData) {
   revalidatePath("/jobs");
 }
 
+/** Change a job's date and time (New York wall-clock, "2026-10-22T09:30"). Notifies the customer and syncs Graph. */
+export async function rescheduleJobAt(jobId: string, localDateTime: string) {
+  await requireOffice();
+  const next = parseEtLocal(localDateTime);
+  if (!next) throw new Error("Pick a valid date and time");
+
+  const { error } = await supabase.from("jobs").update({ scheduled_at: next.toISOString() }).eq("id", jobId);
+  if (error) throw new Error(error.message);
+
+  await sendScheduleNotifications(jobId);
+  await syncJobToGraph(jobId);
+
+  revalidatePath("/jobs");
+  revalidatePath("/dispatch");
+}
+
 export async function rescheduleJob(jobId: string, newDate: string) {
   await requireOffice();
   const { data: existing, error: fetchError } = await supabase
