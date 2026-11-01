@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { addDaysToDateKey, etDateKey, etDayRange, formatEtTime, toEtLocalInput } from "@/lib/tz";
+import { monthName, visitOverdue } from "@/lib/maintenance-visits";
 import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import JobEditor, { type StaffOption } from "./JobEditor";
 
@@ -56,7 +57,7 @@ function dayLabel(key: string) {
   });
 }
 
-function JobBlock({ job, staff }: { job: JobRow; staff: StaffOption[] }) {
+function JobBlock({ job, staff, planNote }: { job: JobRow; staff: StaffOption[]; planNote?: { text: string; overdue: boolean } }) {
   const customer = one(job.customers);
   const property = one(job.properties);
   return (
@@ -68,6 +69,11 @@ function JobBlock({ job, staff }: { job: JobRow; staff: StaffOption[] }) {
         <div className={itemSubClass}>
           {property?.address ?? "No address"}
         </div>
+        {planNote && (
+          <div className={`text-xs font-semibold ${planNote.overdue ? "text-accent" : "text-gold"}`}>
+            {planNote.overdue ? "Overdue plan visit" : "Plan visit"}: {planNote.text}
+          </div>
+        )}
         <div className="text-xs text-g300">
           {statusLabel[job.status] ?? job.status}
           {job.job_type ? ` · ${job.job_type}` : ""}
@@ -103,7 +109,7 @@ export default async function DispatchPage({
   const rangeStart = etDayRange(first).start;
   const rangeEnd = etDayRange(addDaysToDateKey(first, step - 1)).end;
 
-  const [{ data: jobRows, error }, { data: unscheduledRows, error: unscheduledError }, { data: staffRows, error: staffError }] = await Promise.all([
+  const [{ data: jobRows, error }, { data: unscheduledRows, error: unscheduledError }, { data: staffRows, error: staffError }, { data: visitRows }] = await Promise.all([
     supabase
       .from("jobs")
       .select("id, scheduled_at, status, job_type, assigned_staff_id, customers(name), properties(address)")
@@ -118,7 +124,21 @@ export default async function DispatchPage({
       .not("status", "in", "(complete,completed,cancelled)")
       .limit(50),
     supabase.from("staff").select("id, name, email").order("name"),
+    supabase
+      .from("maintenance_visits")
+      .select("job_id, label, due_year, due_month")
+      .eq("status", "due")
+      .not("job_id", "is", null),
   ]);
+
+  // Plan visits waiting on a date, so the list can say why a job is there and how late it is.
+  const planNotes = new Map<string, { text: string; overdue: boolean }>();
+  for (const v of visitRows ?? []) {
+    planNotes.set(v.job_id as string, {
+      text: `${v.label ?? "Maintenance visit"}, due ${monthName(v.due_month as number)} ${v.due_year}`,
+      overdue: visitOverdue(v.due_year as number, v.due_month as number, today),
+    });
+  }
 
   const staff: StaffOption[] = (staffRows ?? []).map((s) => ({
     id: s.id as string,
@@ -199,7 +219,7 @@ export default async function DispatchPage({
       </div>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Not scheduled yet</h2>
+        <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Needs scheduling</h2>
         {unscheduledError ? (
           <p className="text-sm text-accent">Couldn&apos;t load unscheduled jobs: {unscheduledError.message}</p>
         ) : unscheduled.length === 0 ? (
@@ -207,7 +227,7 @@ export default async function DispatchPage({
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {unscheduled.map((j) => (
-              <JobBlock key={j.id} job={j} staff={staff} />
+              <JobBlock key={j.id} job={j} staff={staff} planNote={planNotes.get(j.id)} />
             ))}
           </div>
         )}

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { DEFAULT_VISIT_MONTHS } from "@/lib/maintenance-visits";
 import { headers } from "next/headers";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { stripe } from "@/lib/stripe";
@@ -164,12 +165,14 @@ export async function signContract(formData: FormData) {
     try {
       const { data: plans, error: planError } = await adminDb
         .from("service_contracts")
-        .select("id")
+        .select("id, visit_months")
         .eq("customer_id", doc.customer_id)
         .eq("property_id", doc.property_id)
         .eq("status", "active");
       if (planError) throw new Error(planError.message);
 
+      // Months come from the contract; a contract that never set them gets Josh's default (April and October).
+      const visitMonths = lineItems.visitMonths && lineItems.visitMonths.length > 0 ? lineItems.visitMonths : DEFAULT_VISIT_MONTHS;
       const consent = authorizeRenewal ? { auto_renew_authorized_at: signedAt, renewal_price_cents: renewalCents } : {};
       if (!plans || plans.length === 0) {
         const start = etDateKey(new Date(signedAt));
@@ -179,6 +182,8 @@ export async function signContract(formData: FormData) {
           customer_id: doc.customer_id,
           property_id: doc.property_id,
           plan_name: "Annual Maintenance Plan",
+          visits_per_year: visitMonths.length,
+          visit_months: visitMonths,
           start_date: start,
           end_date: end.toISOString().slice(0, 10),
           status: "active",
@@ -188,8 +193,13 @@ export async function signContract(formData: FormData) {
         if (createError) throw new Error(createError.message);
       } else if (plans.length === 1) {
         // With several plans, one consent must not authorize them all, so only a single match is updated.
-        if (authorizeRenewal) {
-          const { error: setError } = await adminDb.from("service_contracts").update(consent).eq("id", plans[0].id);
+        // Give an existing plan a visit schedule only if it has none; never overwrite one that was set.
+        const schedule = plans[0].visit_months ? {} : { visits_per_year: visitMonths.length, visit_months: visitMonths };
+        if (authorizeRenewal || Object.keys(schedule).length > 0) {
+          const { error: setError } = await adminDb
+            .from("service_contracts")
+            .update({ ...consent, ...schedule })
+            .eq("id", plans[0].id);
           if (setError) throw new Error(setError.message);
         }
       } else {
