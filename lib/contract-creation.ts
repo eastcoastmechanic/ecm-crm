@@ -53,7 +53,8 @@ export async function createContract(input: CreateContractInput): Promise<Create
     fromDocumentId: input.fromDocumentId || null,
     autoRenewPriceCents:
       input.autoRenewPrice && input.autoRenewPrice > 0 ? Math.round(input.autoRenewPrice * 100) : null,
-    visitMonths: input.visitMonths && input.visitMonths.length > 0 ? input.visitMonths : null,
+    // undefined = not set (plan gets the default at signing); [] = no scheduled visits.
+    visitMonths: input.visitMonths ?? null,
   };
 
   const { data: document, error } = await supabase

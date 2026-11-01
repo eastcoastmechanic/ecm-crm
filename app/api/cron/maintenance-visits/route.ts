@@ -75,7 +75,13 @@ export async function GET(request: Request) {
     }
 
     const { error: linkError } = await supabase.from("maintenance_visits").update({ job_id: job.id }).eq("id", visit.id);
-    if (linkError) errors.push(`plan ${plan.id}: visit not linked to job: ${linkError.message}`);
+    if (linkError) {
+      // An unlinked visit would be skipped forever and never complete. Undo both so tomorrow's run starts clean.
+      await supabase.from("jobs").delete().eq("id", job.id);
+      await supabase.from("maintenance_visits").delete().eq("id", visit.id);
+      errors.push(`plan ${plan.id}: visit not linked to job, undone: ${linkError.message}`);
+      continue;
+    }
     created++;
   }
 

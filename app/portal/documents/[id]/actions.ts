@@ -171,8 +171,10 @@ export async function signContract(formData: FormData) {
         .eq("status", "active");
       if (planError) throw new Error(planError.message);
 
-      // Months come from the contract; a contract that never set them gets Josh's default (April and October).
-      const visitMonths = lineItems.visitMonths && lineItems.visitMonths.length > 0 ? lineItems.visitMonths : DEFAULT_VISIT_MONTHS;
+      // Months come from the contract. A contract that never set them gets Josh's default (April and October);
+      // one saved with the field cleared (empty list) means no scheduled visits.
+      const visitMonths = lineItems.visitMonths ?? DEFAULT_VISIT_MONTHS;
+      const hasSchedule = visitMonths.length > 0;
       const consent = authorizeRenewal ? { auto_renew_authorized_at: signedAt, renewal_price_cents: renewalCents } : {};
       if (!plans || plans.length === 0) {
         const start = etDateKey(new Date(signedAt));
@@ -182,8 +184,8 @@ export async function signContract(formData: FormData) {
           customer_id: doc.customer_id,
           property_id: doc.property_id,
           plan_name: "Annual Maintenance Plan",
-          visits_per_year: visitMonths.length,
-          visit_months: visitMonths,
+          visits_per_year: hasSchedule ? visitMonths.length : null,
+          visit_months: hasSchedule ? visitMonths : null,
           start_date: start,
           end_date: end.toISOString().slice(0, 10),
           status: "active",
@@ -194,7 +196,7 @@ export async function signContract(formData: FormData) {
       } else if (plans.length === 1) {
         // With several plans, one consent must not authorize them all, so only a single match is updated.
         // Give an existing plan a visit schedule only if it has none; never overwrite one that was set.
-        const schedule = plans[0].visit_months ? {} : { visits_per_year: visitMonths.length, visit_months: visitMonths };
+        const schedule = plans[0].visit_months || !hasSchedule ? {} : { visits_per_year: visitMonths.length, visit_months: visitMonths };
         if (authorizeRenewal || Object.keys(schedule).length > 0) {
           const { error: setError } = await adminDb
             .from("service_contracts")
