@@ -26,7 +26,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-type JobRel = { scheduled_at: string | null };
+type JobRel = { scheduled_at: string | null; status: string | null };
 
 export default async function VisitPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -34,7 +34,7 @@ export default async function VisitPage({ params }: { params: Promise<{ token: s
   const { data: visit } = UUID.test(token)
     ? await supabase
         .from("maintenance_visits")
-        .select("label, due_month, status, customer_request_at, jobs(scheduled_at)")
+        .select("label, due_month, status, customer_request_at, jobs(scheduled_at, status)")
         .eq("confirm_token", token)
         .maybeSingle()
     : { data: null };
@@ -54,7 +54,8 @@ export default async function VisitPage({ params }: { params: Promise<{ token: s
   let body: React.ReactNode;
   if (visit.status === "complete") {
     body = <p>This visit is done. Thank you!</p>;
-  } else if (job?.scheduled_at) {
+  } else if (job?.scheduled_at && job.status !== "cancelled") {
+    // A cancelled job keeps its old date; it is not a booking.
     body = <p>You&apos;re booked for {formatEtDateTime(job.scheduled_at)}. See you then.</p>;
   } else if (visit.customer_request_at) {
     body = (
