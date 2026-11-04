@@ -40,6 +40,7 @@ Internal app: `app/(internal)`. Customer portal: `app/(portal)`.
 - #53 (inventory double-deduction fix) merged.
 - #54 (CLAUDE.md and docs/ecm reference docs) merged.
 - #55 (status update) and #56 (PR template, Dependabot config) merged. Branch protection on `main` (PR + `check` + `Vercel` required), Dependabot security updates on.
+- Phase 3: #58 done (#80, 7:00 ET digest). Teams alerts merged (#83 money and finished jobs, #84 field notes to Job Notes). #59 `/dispatch` calendar merged (#85). #60 recurring maintenance visits in progress (needs SQL 0053).
 - Phase 3-5 items are GitHub Issues #57 to #71 (labels `phase-3`/`phase-4`/`phase-5`, `needs-decision`). Work from "do issue N".
 - Earlier merged: #41 (signed maintenance contract creates plan), #42 (multi-unit install report, migration 0050), #43 (customer/property fields, access notes, migration 0051), #33 (Schedule job button).
 - Anon DB/storage policies were locked down. Photo buckets were still public after that lockdown (Phase 5 item).

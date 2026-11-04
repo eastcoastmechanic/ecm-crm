@@ -21,6 +21,8 @@ export type ContractLineItems = {
   fromDocumentId?: string | null;
   /** Optional yearly renewal price (cents). When set, the customer may opt in to automatic annual renewal when signing. */
   autoRenewPriceCents?: number | null;
+  /** Calendar months (1-12) a maintenance plan visit is due. Copied onto the plan at signing; not set uses the default, an empty list means no scheduled visits. */
+  visitMonths?: number[] | null;
   /** Set at signing when the customer ticked the automatic-renewal box. */
   autoRenewAuthorizedAt?: string | null;
 };

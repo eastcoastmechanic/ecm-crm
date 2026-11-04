@@ -130,6 +130,16 @@ export async function applyJobStatus(id: string, status: string) {
     await notifyOwnerOfEvent("job_completed", id);
   }
 
+  if (status === "complete" && existing.status !== "complete") {
+    // A finished plan visit is done in the plan too. Best effort: never blocks the job.
+    const { error: visitError } = await supabase
+      .from("maintenance_visits")
+      .update({ status: "complete", completed_at: completed_at })
+      .eq("job_id", id)
+      .eq("status", "due");
+    if (visitError) console.error(`Could not mark plan visit complete for job ${id}: ${visitError.message}`);
+  }
+
   await syncJobToGraph(id);
   await syncJobToPlanner(id, status);
 }

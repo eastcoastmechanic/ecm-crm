@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { parseVisitMonths } from "@/lib/maintenance-visits";
 import { revalidatePath } from "next/cache";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createContract } from "@/lib/contract-creation";
@@ -19,6 +20,8 @@ export async function submitContract(formData: FormData) {
   const estimated_completion = (formData.get("estimated_completion") as string) || null;
   const notes = (formData.get("notes") as string)?.trim() || null;
   const auto_renew_price = Number(formData.get("auto_renew_price")) || null;
+  // Blank means this plan has no scheduled visits ([]), which is different from "not set" (the default).
+  const visit_months = parseVisitMonths(formData.get("visit_months") as string | null) ?? [];
   const from_document_id = (formData.get("from_document_id") as string) || null;
 
   if (!customer_id) throw new Error("Customer is required");
@@ -60,6 +63,7 @@ export async function submitContract(formData: FormData) {
     notes,
     fromDocumentId: from_document_id,
     autoRenewPrice: auto_renew_price,
+    visitMonths: visit_months,
   });
 
   revalidatePath("/documents");
