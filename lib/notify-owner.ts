@@ -173,3 +173,39 @@ export async function notifyOwnerOfEvent(kind: OwnerEvent, id: string) {
     console.error(`[notify-owner] ${kind} alert failed for ${id}:`, err);
   }
 }
+
+/**
+ * A customer tapped the link in their plan visit reminder and asked for a visit.
+ * Nothing is scheduled for them: this just puts the request in front of Josh with
+ * their note, so he can call or pick a day on the dispatch board.
+ * Never throws: the customer's request is already saved.
+ */
+export async function notifyOwnerOfVisitRequest(visitId: string) {
+  try {
+    const { data: visit } = await supabase
+      .from("maintenance_visits")
+      .select("label, due_month, customer_request_note, customers(name, phone)")
+      .eq("id", visitId)
+      .single();
+    const customer = Array.isArray(visit?.customers) ? visit?.customers[0] : visit?.customers;
+    const who = customer?.name ?? "A customer";
+    const label = (visit?.label ?? "maintenance visit").toLowerCase();
+    const line = `${who} asked to book their ${label}`;
+    const note = visit?.customer_request_note ? `Their note: "${visit.customer_request_note}"` : "No days given.";
+    const phone = customer?.phone ? `Phone: ${customer.phone}` : "No phone on file.";
+    const link = `${APP_URL}/dispatch`;
+
+    await postToTeams("dispatch", { title: line, text: `${note}\n${phone}`, url: link });
+
+    if (OWNER_EMAIL) {
+      await resend.emails.send({
+        from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+        to: OWNER_EMAIL,
+        subject: line,
+        text: `${line}.\n\n${note}\n${phone}\n\nNothing was scheduled. Pick a day on the dispatch board, under Needs scheduling:\n${link}`,
+      });
+    }
+  } catch (err) {
+    console.error(`[notify-owner] visit request alert failed for ${visitId}:`, err);
+  }
+}

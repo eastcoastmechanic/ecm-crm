@@ -57,7 +57,7 @@ function dayLabel(key: string) {
   });
 }
 
-function JobBlock({ job, staff, planNote }: { job: JobRow; staff: StaffOption[]; planNote?: { text: string; overdue: boolean } }) {
+function JobBlock({ job, staff, planNote }: { job: JobRow; staff: StaffOption[]; planNote?: { text: string; overdue: boolean; request?: string } }) {
   const customer = one(job.customers);
   const property = one(job.properties);
   return (
@@ -74,6 +74,7 @@ function JobBlock({ job, staff, planNote }: { job: JobRow; staff: StaffOption[];
             {planNote.overdue ? "Overdue plan visit" : "Plan visit"}: {planNote.text}
           </div>
         )}
+        {planNote?.request && <div className="text-xs font-semibold text-green">{planNote.request}</div>}
         <div className="text-xs text-g300">
           {statusLabel[job.status] ?? job.status}
           {job.job_type ? ` · ${job.job_type}` : ""}
@@ -126,17 +127,20 @@ export default async function DispatchPage({
     supabase.from("staff").select("id, name, email").order("name"),
     supabase
       .from("maintenance_visits")
-      .select("job_id, label, due_year, due_month")
+      .select("job_id, label, due_year, due_month, customer_request_at, customer_request_note")
       .eq("status", "due")
       .not("job_id", "is", null),
   ]);
 
   // Plan visits waiting on a date, so the list can say why a job is there and how late it is.
-  const planNotes = new Map<string, { text: string; overdue: boolean }>();
+  const planNotes = new Map<string, { text: string; overdue: boolean; request?: string }>();
   for (const v of visitRows ?? []) {
     planNotes.set(v.job_id as string, {
       text: `${v.label ?? "Maintenance visit"}, due ${monthName(v.due_month as number)} ${v.due_year}`,
       overdue: visitOverdue(v.due_year as number, v.due_month as number, today),
+      request: v.customer_request_at
+        ? `Customer asked to book${v.customer_request_note ? `: ${v.customer_request_note}` : ''}`
+        : undefined,
     });
   }
 

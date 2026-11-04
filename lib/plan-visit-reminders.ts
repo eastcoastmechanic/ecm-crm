@@ -23,11 +23,18 @@ export function nextReminder(opts: {
   return waitedMs >= FOLLOWUP_AFTER_DAYS * 24 * 60 * 60 * 1000 ? "followup" : null;
 }
 
-export function reminderCopy(opts: { kind: ReminderKind; customerName: string | null; label: string; month: number }) {
-  const { kind, customerName, label, month } = opts;
+export function reminderCopy(opts: {
+  kind: ReminderKind;
+  customerName: string | null;
+  label: string;
+  month: number;
+  /** Private link where the customer can ask for a visit. */
+  link: string;
+}) {
+  const { kind, customerName, label, month, link } = opts;
   const what = `${label.toLowerCase()} for ${monthName(month)}`;
   const hi = customerName ? `Hi ${customerName},` : "Hi,";
-  const ask = `Reply to this message or call ${COMPANY_PHONE_DISPLAY} and we'll find a day that works.`;
+  const ask = `Tap ${link} to ask for a day, reply to this message, or call ${COMPANY_PHONE_DISPLAY}, and we'll find a day that works.`;
   const lead =
     kind === "booking"
       ? `It's time to book your ${what}, part of your maintenance plan.`
@@ -35,6 +42,6 @@ export function reminderCopy(opts: { kind: ReminderKind; customerName: string | 
   return {
     subject: kind === "booking" ? `Time to book your ${label.toLowerCase()}` : `Reminder: book your ${label.toLowerCase()}`,
     email: `${hi}\n\n${lead} ${ask}\n\n${COMPANY_NAME}`,
-    text: `${COMPANY_NAME}: ${lead} Reply here or call ${COMPANY_PHONE} to pick a day. Reply STOP to opt out.`,
+    text: `${COMPANY_NAME}: ${lead} Ask for a day: ${link} or call ${COMPANY_PHONE}. Reply STOP to opt out.`,
   };
 }

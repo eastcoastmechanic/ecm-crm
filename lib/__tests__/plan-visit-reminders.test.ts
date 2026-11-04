@@ -18,13 +18,15 @@ describe("nextReminder", () => {
 
 describe("reminderCopy", () => {
   it("names the visit and the month, and gives a way to book", () => {
-    const c = reminderCopy({ kind: "booking", customerName: "Sam", label: "Heating tune-up", month: 10 });
+    const c = reminderCopy({ kind: "booking", customerName: "Sam", label: "Heating tune-up", month: 10, link: "https://x.test/visit/abc" });
     expect(c.email).toContain("heating tune-up for October");
     expect(c.text).toContain("Reply STOP to opt out");
     expect(c.text).toContain("774-343-6369");
+    expect(c.text).toContain("https://x.test/visit/abc");
+    expect(c.email).toContain("https://x.test/visit/abc");
   });
   it("marks the follow-up as a reminder", () => {
-    const c = reminderCopy({ kind: "followup", customerName: null, label: "AC tune-up", month: 4 });
+    const c = reminderCopy({ kind: "followup", customerName: null, label: "AC tune-up", month: 4, link: "https://x.test/visit/abc" });
     expect(c.subject.startsWith("Reminder")).toBe(true);
   });
 });

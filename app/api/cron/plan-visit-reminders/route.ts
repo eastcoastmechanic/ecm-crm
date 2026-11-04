@@ -7,6 +7,8 @@ import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { COMPANY_NAME } from "@/lib/brand";
 import { nextReminder, reminderCopy, type ReminderKind } from "@/lib/plan-visit-reminders";
 
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app").replace(/\/$/, "");
+
 type Customer = { name: string | null; email: string | null; phone: string | null; sms_consent: boolean | null };
 type JobRel = { status: string | null; scheduled_at: string | null };
 
@@ -26,7 +28,7 @@ export async function GET(request: Request) {
   const { data: visits, error } = await supabase
     .from("maintenance_visits")
     .select(
-      "id, label, due_month, booking_reminder_sent_at, followup_reminder_sent_at, customers(name, email, phone, sms_consent), jobs(status, scheduled_at)"
+      "id, label, due_month, confirm_token, customer_request_at, booking_reminder_sent_at, followup_reminder_sent_at, customers(name, email, phone, sms_consent), jobs(status, scheduled_at)"
     )
     .eq("status", "due")
     .not("job_id", "is", null);
@@ -43,6 +45,9 @@ export async function GET(request: Request) {
     if (!job || job.scheduled_at || job.status === "complete" || job.status === "completed" || job.status === "cancelled") {
       continue;
     }
+
+    // The customer already asked for a visit; Josh has the alert, so no more reminders.
+    if (v.customer_request_at) continue;
 
     const kind = nextReminder({
       bookingSentAt: v.booking_reminder_sent_at as string | null,
@@ -83,6 +88,7 @@ export async function GET(request: Request) {
       month: v.due_month as number,
       errors,
       visitId: v.id as string,
+      link: `${APP_URL}/visit/${v.confirm_token}`,
     });
 
     if (reached) {
@@ -106,9 +112,10 @@ async function deliver(opts: {
   month: number;
   errors: string[];
   visitId: string;
+  link: string;
 }): Promise<boolean> {
-  const { kind, customer, canText, canEmail, label, month, errors, visitId } = opts;
-  const copy = reminderCopy({ kind, customerName: customer.name, label, month });
+  const { kind, customer, canText, canEmail, label, month, errors, visitId, link } = opts;
+  const copy = reminderCopy({ kind, customerName: customer.name, label, month, link });
   let reached = false;
 
   if (canEmail) {
