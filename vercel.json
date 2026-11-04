@@ -21,6 +21,10 @@
       "schedule": "30 10 * * *"
     },
     {
+      "path": "/api/cron/plan-visit-reminders",
+      "schedule": "0 15 * * *"
+    },
+    {
       "path": "/api/cron/square-sync",
       "schedule": "20 */4 * * *"
     }
