@@ -40,7 +40,7 @@ Internal app: `app/(internal)`. Customer portal: `app/(portal)`.
 - #53 (inventory double-deduction fix) merged.
 - #54 (CLAUDE.md and docs/ecm reference docs) merged.
 - #55 (status update) and #56 (PR template, Dependabot config) merged. Branch protection on `main` (PR + `check` + `Vercel` required), Dependabot security updates on.
-- Phase 3: #58 done (#80, 7:00 ET digest). Teams alerts merged (#83 money and finished jobs, #84 field notes to Job Notes). #59 `/dispatch` calendar merged (#85). #60 part 1 merged (#86, SQL 0053 run): plans carry `visit_months` (default April and October), a daily cron makes each visit and an unscheduled maintenance job, dispatch lists them under Needs scheduling, dashboard counts overdue ones. #60 part 2 (customer booking reminder, daily 15:00 UTC) in progress: one reminder, one follow-up after 7 days (my choice, Josh has not set it), text only with `sms_consent`, email to anyone with an address.
+- Phase 3: #58 done (#80, 7:00 ET digest). Teams alerts merged (#83 money and finished jobs, #84 field notes to Job Notes). #59 `/dispatch` calendar merged (#85). #60 merged in two parts: part 1 (#86, SQL 0053 run) plans carry `visit_months` (default April and October), a daily cron makes each visit and an unscheduled maintenance job, dispatch lists them under Needs scheduling, dashboard counts overdue ones; part 2 (#88) daily 15:00 UTC booking reminder, one follow-up after 7 days (my choice, Josh has not set it), text only with `sms_consent`, email to anyone with an address. #61 (self-confirm link) is optional and not started. #82 (appointment reminder relation fix) is open.
 - Phase 3-5 items are GitHub Issues #57 to #71 (labels `phase-3`/`phase-4`/`phase-5`, `needs-decision`). Work from "do issue N".
 - Earlier merged: #41 (signed maintenance contract creates plan), #42 (multi-unit install report, migration 0050), #43 (customer/property fields, access notes, migration 0051), #33 (Schedule job button).
 - Anon DB/storage policies were locked down. Photo buckets were still public after that lockdown (Phase 5 item).
@@ -74,7 +74,7 @@ Some audit items were fixed after the audit. Re-check each one in code before wo
 - Fixed: renewal cron charges `renewal_price_cents` and rolls `end_date` forward one year.
 - `/api/internal-chat` has ungated destructive tools.
 - Square sync can un-pay a Stripe-paid invoice (`square-sync.ts`); Stripe webhook lacks amount/payment_status check and idempotency.
-- Customer appointment reminders may never send: relation read as an array (#81). 0 sent in the live DB.
+- Fixed in the #81 PR: customer appointment reminders read the customer relation as an array, so the first job with consent would have been skipped. 0 sent so far because no scheduled job has had a customer with phone + `sms_consent`. Use `one()` from `lib/appointment-reminder.ts` for Supabase relations.
 - SMS: STOP/START not handled, some sends skip consent, senders swallow HTTP errors.
 - No `loading.tsx`, most actions throw instead of returning inline errors.
 - `@ts-nocheck` still in `estimate-routing.test.ts`; 26 stale branches to clean.

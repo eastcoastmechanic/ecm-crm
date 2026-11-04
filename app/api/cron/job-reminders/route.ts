@@ -4,17 +4,13 @@ import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { etDateKey, etDayRange, etHour, formatEtDateTime } from "@/lib/tz";
 import { buildJobDigests, type DigestJob } from "@/lib/job-digest";
+import { one } from "@/lib/appointment-reminder";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL ?? null;
 const DIGEST_HOUR_ET = 7;
 
 type CustomerRel = { name: string | null; phone: string | null };
 type PropertyRel = { address: string | null; access_notes: string | null };
-
-function one<T>(value: T | T[] | null): T | null {
-  if (!value) return null;
-  return Array.isArray(value) ? value[0] ?? null : value;
-}
 
 // Morning digest: each tech gets today's jobs assigned to them, the owner gets
 // all of today's jobs. vercel.json runs this at 11:00 and 12:00 UTC so one of
