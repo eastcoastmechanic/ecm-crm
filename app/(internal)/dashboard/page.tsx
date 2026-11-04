@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { getSyncedSquareRevenue, getSyncedSquareMoneyOwed } from "@/lib/square-synced";
 import { getStaffRole } from "@/lib/require-role";
 import { etDateKey, etDayRange, formatEtDateTime, formatEtTime } from "@/lib/tz";
+import { visitOverdue } from "@/lib/maintenance-visits";
 import {
   buttonClass,
   buttonSecondaryClass,
@@ -105,6 +106,7 @@ export default async function DashboardPage() {
     { count: contractsRenewing },
     { data: upcomingJobs },
     { data: recentDocuments },
+    { data: openPlanVisits },
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -144,10 +146,15 @@ export default async function DashboardPage() {
       .select("*, customers(name)")
       .order("created_at", { ascending: false })
       .limit(5),
+    supabase.from("maintenance_visits").select("due_year, due_month").eq("status", "due"),
   ]);
 
   const outstandingTotal = (outstandingInvoices ?? []).reduce((sum, doc) => sum + (doc.total ?? 0), 0);
   const revenueTotal = (paidDocuments ?? []).reduce((sum, doc) => sum + (doc.total ?? 0), 0);
+
+  const overduePlanVisits = (openPlanVisits ?? []).filter((v) =>
+    visitOverdue(v.due_year as number, v.due_month as number, etDateKey())
+  ).length;
 
   const stats = [
     { label: "Customers", value: totalCustomers ?? 0 },
@@ -159,6 +166,7 @@ export default async function DashboardPage() {
     },
     { label: "Revenue Collected", value: formatPrice(revenueTotal) },
     { label: "Contracts Renewing", value: contractsRenewing ?? 0, sub: "next 30 days" },
+    { label: "Plan Visits Overdue", value: overduePlanVisits, sub: "see Dispatch" },
   ];
 
   return (

@@ -59,8 +59,12 @@ function etMidnight(dateKey: string): Date {
 export function parseEtLocal(value: string): Date | null {
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(value ?? "");
   if (!m) return null;
-  const midnight = etMidnight(m[1]);
-  const when = new Date(midnight.getTime() + (Number(m[2]) * 60 + Number(m[3])) * 60000);
+  const [y, mo, d] = m[1].split("-").map(Number);
+  // Resolve the offset at the wall time itself (not at midnight), so the 23/25-hour
+  // DST days come out right. Two passes converge on the correct offset.
+  const wallAsUtc = Date.UTC(y, mo - 1, d, Number(m[2]), Number(m[3]), 0);
+  let when = new Date(wallAsUtc - etOffsetMs(new Date(wallAsUtc)));
+  when = new Date(wallAsUtc - etOffsetMs(when));
   return Number.isNaN(when.getTime()) ? null : when;
 }
 
@@ -85,4 +89,17 @@ export function formatEtDateTime(
   options: Intl.DateTimeFormatOptions = { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" }
 ): string {
   return new Date(date).toLocaleString("en-US", { timeZone: BUSINESS_TZ, ...options });
+}
+
+/** A datetime-local input value ("2026-10-22T09:30") for an instant, in New York time. */
+export function toEtLocalInput(date: Date | string): string {
+  const d = new Date(date);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: BUSINESS_TZ,
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return `${etDateKey(d)}T${get("hour")}:${get("minute")}`;
 }

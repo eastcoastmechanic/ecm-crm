@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
+import { headers } from "next/headers";
 import ChangePasswordForm from "./ChangePasswordForm";
+import TeamsTestButton from "./TeamsTestButton";
 import { headingClass, subTextClass, buttonClass } from "../ui";
 
 export default async function AccountPage() {
@@ -8,6 +10,8 @@ export default async function AccountPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const isOwner = (await headers()).get("x-staff-role") === "owner";
 
   return (
     <div className="flex flex-col gap-8">
@@ -40,6 +44,17 @@ export default async function AccountPage() {
             </h2>
             <ChangePasswordForm />
           </div>
+        </div>
+      )}
+
+      {isOwner && (
+        <div className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Microsoft Teams</h2>
+          <p className={subTextClass}>
+            Posts one test card to each connected Teams channel, naming the channel it should
+            appear in.
+          </p>
+          <TeamsTestButton />
         </div>
       )}
     </div>

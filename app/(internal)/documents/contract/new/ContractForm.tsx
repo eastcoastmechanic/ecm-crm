@@ -103,6 +103,15 @@ export default function ContractForm({
       </label>
 
       <label className="flex flex-col gap-1 text-xs text-g300">
+        Plan visit months (maintenance plans only)
+        <input type="text" name="visit_months" defaultValue="4, 10" placeholder="4, 10" className={inputClass} />
+        <span className="text-g300">
+          Month numbers a visit is due. 4, 10 is the AC tune-up in April and heating tune-up in October. Clear it for a
+          plan with no scheduled visits.
+        </span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-xs text-g300">
         Warranty terms
         <textarea name="warranty_terms" rows={3} defaultValue={defaultWarrantyTerms} className={inputClass} />
       </label>
