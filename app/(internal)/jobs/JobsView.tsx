@@ -6,6 +6,7 @@ import Link from "next/link";
 import { addJobPhotos, assignJob, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
 import { addTask, completeTask } from "../tasks/actions";
 import SubmitButton from "../SubmitButton";
+import CreateInvoiceForm from "./CreateInvoiceForm";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 
 const statusOptions = ["requested", "scheduled", "in_progress", "complete", "cancelled"];
@@ -36,6 +37,8 @@ type Task = {
 type Job = {
   id: string;
   invoices?: { id: string; doc_number: string | null; status: string; total: number | null }[];
+  /** For the Create invoice form: contract total less deposit received, when the job has a contract. */
+  invoiceHint?: { suggested: string; note: string | null };
   job_type?: string | null;
   scheduled_at: string | null;
   status: string;
@@ -78,10 +81,25 @@ function monthGrid(cursor: Date) {
   });
 }
 
-function BillingLine({ status, invoices }: { status: string; invoices: NonNullable<Job["invoices"]> }) {
+function BillingLine({
+  jobId,
+  status,
+  invoices,
+  hint,
+}: {
+  jobId: string;
+  status: string;
+  invoices: NonNullable<Job["invoices"]>;
+  hint?: Job["invoiceHint"];
+}) {
   if (invoices.length === 0) {
     if (status !== "complete") return null;
-    return <div className="mt-1 text-xs font-semibold text-amber-400">Finished — no invoice linked yet</div>;
+    return (
+      <div className="mt-1">
+        <div className="text-xs font-semibold text-amber-400">Finished — no invoice linked yet</div>
+        <CreateInvoiceForm jobId={jobId} suggested={hint?.suggested ?? ""} hint={hint?.note ?? null} />
+      </div>
+    );
   }
   const owed = invoices.filter((i) => i.status !== "paid" && i.status !== "void");
   const owedTotal = owed.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
@@ -432,7 +450,7 @@ export default function JobsView({
                       }`
                     : ""}
                 </div>
-                {job.invoices && <BillingLine status={job.status} invoices={job.invoices} />}
+                {job.invoices && <BillingLine jobId={job.id} status={job.status} invoices={job.invoices} hint={job.invoiceHint} />}
               </div>
               <div className="flex items-center gap-2">
                 {job.diagnostics && job.diagnostics.length > 0 ? (

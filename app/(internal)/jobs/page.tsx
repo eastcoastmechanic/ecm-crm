@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveJobPhotos } from "@/lib/job-photos";
 import { listOpenPlannerTasksSafe } from "@/lib/planner-connector";
 import { createServiceCall } from "./actions";
+import { balanceDueCents, formatMoney } from "@/lib/job-invoice-rules";
 import JobsView from "./JobsView";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, errorClass, headingClass, subTextClass } from "../ui";
@@ -47,11 +48,41 @@ export default async function JobsPage() {
     billingByJob.set(d.job_id as string, list);
   }
 
+  // Finished jobs with a contract and no invoice yet: suggest the balance (total less deposit received).
+  // Only what the contract actually says is used. An unknown deposit is left out of the note, not guessed.
+  const needInvoice = (jobs ?? []).filter(
+    (j) => j.status === "complete" && j.document_id && !(billingByJob.get(j.id as string) ?? []).length
+  );
+  const contractIds = [...new Set(needInvoice.map((j) => j.document_id as string))];
+  const { data: contractRows } = contractIds.length
+    ? await supabase
+        .from("documents")
+        .select("id, doc_number, type, total, deposit_received_cents")
+        .eq("type", "contract")
+        .in("id", contractIds)
+    : { data: [] };
+  const contractById = new Map((contractRows ?? []).map((c) => [c.id as string, c]));
+  function invoiceHintFor(job: { id: unknown; document_id?: unknown }) {
+    const c = job.document_id ? contractById.get(job.document_id as string) : undefined;
+    if (!c || c.total == null) return undefined;
+    const totalCents = Math.round(Number(c.total) * 100);
+    const dep = (c.deposit_received_cents as number | null) ?? null;
+    const balance = balanceDueCents(totalCents, dep);
+    return {
+      suggested: (balance / 100).toFixed(2),
+      note:
+        dep == null
+          ? `Contract ${c.doc_number ?? ""} total ${formatMoney(totalCents)}. No deposit is recorded, so the full amount is filled in. Fix it if a deposit came in.`
+          : `Contract ${c.doc_number ?? ""} total ${formatMoney(totalCents)} less deposit received ${formatMoney(dep)}.`,
+    };
+  }
+
   const jobsWithPhotos = await Promise.all(
     (jobs ?? []).map(async (job) => ({
       ...job,
       photos: await resolveJobPhotos(job.photos),
       invoices: invoiceError ? undefined : (billingByJob.get(job.id as string) ?? []),
+      invoiceHint: invoiceHintFor(job),
     }))
   );
 
