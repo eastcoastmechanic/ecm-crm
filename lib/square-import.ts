@@ -43,13 +43,22 @@ export async function importSquareCustomers(dryRun: boolean): Promise<SquareImpo
   }
   out.squareTotal = square.length;
 
-  const { data: crm, error } = await supabase.from("customers").select("id, email, phone, square_customer_id");
-  if (error) return { ...out, error: error.message };
+  // PostgREST returns at most 1000 rows a call, so read every CRM customer in pages. A short read
+  // would make existing customers look new and import them twice.
+  type CrmRow = { id: string; email: string | null; phone: string | null; square_customer_id: string | null };
+  const crm: CrmRow[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: page, error } = await supabase
+      .from("customers")
+      .select("id, email, phone, square_customer_id")
+      .order("id")
+      .range(from, from + 999);
+    if (error) return { ...out, error: error.message };
+    crm.push(...((page ?? []) as CrmRow[]));
+    if (!page || page.length < 1000) break;
+  }
 
-  const plan: ImportPlan = planCustomerImport(
-    square,
-    (crm ?? []) as { id: string; email: string | null; phone: string | null; square_customer_id: string | null }[]
-  );
+  const plan: ImportPlan = planCustomerImport(square, crm);
   out.willCreate = plan.toCreate.length;
   out.willLink = plan.toLink.length;
   out.alreadyLinked = plan.alreadyLinked;
@@ -78,8 +87,16 @@ export async function importSquareCustomers(dryRun: boolean): Promise<SquareImpo
   for (let i = 0; i < rows.length; i += 100) {
     const batch = rows.slice(i, i + 100);
     const { error: insertError } = await supabase.from("customers").insert(batch);
-    if (insertError) out.failed += batch.length;
-    else out.created += batch.length;
+    if (!insertError) {
+      out.created += batch.length;
+      continue;
+    }
+    // One bad row (for example a Square id that was linked a moment ago) must not sink the other 99.
+    for (const row of batch) {
+      const { error: rowError } = await supabase.from("customers").insert(row);
+      if (rowError) out.failed += 1;
+      else out.created += 1;
+    }
   }
   return out;
 }
