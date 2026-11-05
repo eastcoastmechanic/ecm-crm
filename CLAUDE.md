@@ -56,6 +56,8 @@ Order, one PR each:
 3. (#60) Recurring maintenance visits from plans: add `visits_per_year` and `visit_months` (contract, copied to plan on signing), `maintenance_visits` table (SQL for Josh), daily cron creates the next due visit as an unscheduled maintenance job, "Needs scheduling" list, customer reminder to book plus follow-up, PM checklist starts from the right template, overdue plan visits show on dashboard.
 4. (#61) Optional: customer self-confirm link, lands as an owner alert.
 
+Decided by Josh (2026-11-05): Wisetack financing is a yes. Offer "Pay monthly" on estimates and contracts (Phase 4, after Stage 1 security fixes). Fees and terms not checked yet.
+
 Decided by Josh (2026-10-25):
 - Visits per plan: 2 a year, AC tune-up in April, heating tune-up in October. Default for new contracts; editable per contract.
 - Booking reminders: text and email. Text still only with `sms_consent`; without consent, email only.
@@ -65,8 +67,7 @@ Checked by Claude: the Vercel plan allows sub-daily crons (`square-sync` already
 
 Open decisions for Josh:
 - Text the tech digest too? Needs a `staff.phone` column.
-- Wisetack/financing: yes or no.
-- Does any bot or script hit the field board with the cron or MCP key? (#96 blocks it.)
+- Field board key: Josh was unsure whether any bot uses the cron or MCP key there. Checked 2026-11-05: `quo` and `billing` events were still arriving after #96, so nothing seen depends on the old keys. Older sources (`grok`, `crm-field`, `field-sheet`, `office`) last posted before #96. If a bot goes quiet, it needs the field-board token.
 - Still to do on his side: save the Stripe webhook signing secret as `STRIPE_WEBHOOK_SECRET` on Vercel, check the Gusto import column names against the hours file, ask Gusto about API access.
 
 ## After Phase 3
