@@ -83,6 +83,23 @@ export async function createBalanceInvoice(_prev: CreateInvoiceState, formData: 
     return { error: err instanceof Error ? err.message : "Could not create the invoice." };
   }
 
+  // Two taps (or two office users) can both pass the check above before either row exists.
+  // Settle it after the insert: the earliest invoice for the job stays, any later one is voided,
+  // so the customer is never left holding two payable invoices for the same job.
+  const { data: mine } = await supabase
+    .from("documents")
+    .select("id, created_at")
+    .eq("type", "invoice")
+    .eq("job_id", jobId)
+    .neq("status", "void")
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+  if (mine && mine.length > 1 && mine[0].id !== documentId) {
+    await supabase.from("documents").update({ status: "void" }).eq("id", documentId);
+    revalidatePath("/jobs");
+    return { error: "This job already has an invoice." };
+  }
+
   revalidatePath("/jobs");
   revalidatePath("/documents");
   redirect(`/documents/${documentId}`);
