@@ -77,39 +77,18 @@ export async function createBalanceInvoice(_prev: CreateInvoiceState, formData: 
     ],
   };
 
-  // balance_for_job_id (SQL 0058) lets the database refuse a second live balance invoice for the job.
-  // If that SQL has not been run yet, fall back to the check after the insert below.
+  // balance_for_job_id (SQL 0058) has a unique index, so the database itself refuses a second live
+  // balance invoice for the job, even when two taps race. Without that SQL there is no such guard,
+  // so refuse rather than risk billing twice.
   let documentId: string;
   try {
-    let result;
-    try {
-      result = await createInvoiceDirect({ ...input, extra: { balance_for_job_id: jobId } });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-      if (/documents_one_balance_invoice_per_job_idx/.test(message)) return { error: "This job already has an invoice." };
-      if (/balance_for_job_id/.test(message)) result = await createInvoiceDirect(input);
-      else throw err;
-    }
+    const result = await createInvoiceDirect({ ...input, extra: { balance_for_job_id: jobId } });
     documentId = result.documentId;
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not create the invoice." };
-  }
-
-  // Two taps (or two office users) can both pass the check above before either row exists.
-  // Settle it after the insert: the earliest invoice for the job stays, any later one is voided,
-  // so the customer is never left holding two payable invoices for the same job.
-  const { data: mine } = await supabase
-    .from("documents")
-    .select("id, created_at")
-    .eq("type", "invoice")
-    .eq("job_id", jobId)
-    .neq("status", "void")
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true });
-  if (mine && mine.length > 1 && mine[0].id !== documentId) {
-    await supabase.from("documents").update({ status: "void" }).eq("id", documentId);
-    revalidatePath("/jobs");
-    return { error: "This job already has an invoice." };
+    const message = err instanceof Error ? err.message : "";
+    if (/documents_one_balance_invoice_per_job_idx/.test(message)) return { error: "This job already has an invoice." };
+    if (/balance_for_job_id/.test(message)) return { error: "Run SQL 0058 first (it stops a job being invoiced twice), then try again." };
+    return { error: message || "Could not create the invoice." };
   }
 
   revalidatePath("/jobs");
