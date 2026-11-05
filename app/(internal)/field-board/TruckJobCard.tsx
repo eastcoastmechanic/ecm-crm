@@ -6,6 +6,7 @@ import ChecklistPanel, { type TruckChecklistItem } from "./ChecklistPanel";
 import FinishForm from "./FinishForm";
 import { formatEtTime } from "@/lib/tz";
 import OnSiteLine from "./OnSiteLine";
+import { jobFilesUrl } from "@/lib/job-files";
 
 export function OnSite({ job }: { job: TruckJob }) {
   if (!job.arrived_at || (job.status !== "in_progress" && job.status !== "complete")) return null;
@@ -172,6 +173,7 @@ export default function TruckJobCard({
   const maps = job.address
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`
     : null;
+  const filesUrl = jobFilesUrl();
 
   return (
     <div
@@ -206,8 +208,8 @@ export default function TruckJobCard({
         </details>
       )}
 
-      {(maps || tel) && (
-        <div className="mt-3 flex gap-2">
+      {(maps || tel || filesUrl) && (
+        <div className="mt-3 flex flex-wrap gap-2">
           {maps && (
             <a href={maps} target="_blank" rel="noreferrer" className={linkButton}>
               Maps
@@ -218,7 +220,15 @@ export default function TruckJobCard({
               Call
             </a>
           )}
+          {filesUrl && (
+            <a href={filesUrl} target="_blank" rel="noreferrer" className={linkButton}>
+              Job files
+            </a>
+          )}
         </div>
+      )}
+      {filesUrl && job.address && (
+        <p className="mt-1 text-xs text-g300">Job files opens Teams. Folder is named {job.address}.</p>
       )}
 
       {(primary || job.status === "in_progress") && (
