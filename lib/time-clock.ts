@@ -52,10 +52,10 @@ async function ensureShift(staffId: string): Promise<string | null> {
   return data.id as string;
 }
 
-async function closeOpenEntry(staffId: string, endedAt: Date, flagReason?: string, note?: string) {
+async function closeOpenEntry(staffId: string, endedAt: Date, flagReason?: string, note?: string, pauseIfWork = false) {
   const { data: open } = await supabase
     .from("job_time_entries")
-    .select("id")
+    .select("id, kind")
     .eq("staff_id", staffId)
     .is("ended_at", null)
     .maybeSingle();
@@ -66,6 +66,8 @@ async function closeOpenEntry(staffId: string, endedAt: Date, flagReason?: strin
       ended_at: endedAt.toISOString(),
       ...(flagReason ? { flagged: true, flag_reason: flagReason } : {}),
       ...(note ? { note } : {}),
+      // Clocking out mid-job: the job shows Resume next day instead of losing its timer controls.
+      ...(pauseIfWork && open.kind === "work" ? { note: "paused" } : {}),
     })
     .eq("id", open.id);
 }
@@ -84,7 +86,7 @@ export async function clockOut(staffId: string, breakMinutes: number | null): Pr
   }
 
   // A job still running when the day ends is closed with the shift and flagged for the office.
-  await closeOpenEntry(staffId, now, "Still running when the tech clocked out.");
+  await closeOpenEntry(staffId, now, "Still running when the tech clocked out.", undefined, true);
 
   const shortBreak = needsBreak && (breakMinutes ?? 0) < MEAL_BREAK_MINUTES;
   const { error } = await supabase
@@ -163,6 +165,16 @@ export async function finalizeJobTime(jobId: string, completedAt: string): Promi
   const entries = (data ?? []) as { kind: string; started_at: string; ended_at: string | null }[];
   if (!entries.some((e) => e.kind === "work")) return null;
   return sumWorkHours(entries);
+}
+
+/** A cancelled job stops any timer still running on it. Nothing is counted after the cancel. */
+export async function closeJobEntries(jobId: string, at: string): Promise<void> {
+  const { error } = await supabase
+    .from("job_time_entries")
+    .update({ ended_at: at })
+    .eq("job_id", jobId)
+    .is("ended_at", null);
+  if (error) console.error(`[time-clock] could not close entries for cancelled job ${jobId}: ${error.message}`);
 }
 
 export type ClockState = {

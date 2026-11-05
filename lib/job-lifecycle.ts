@@ -7,7 +7,7 @@ import { syncJobToPlanner } from "@/lib/planner-connector";
 import { formatEtDateTime } from "@/lib/tz";
 import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 import { notifyTech } from "@/lib/tech-notice-send";
-import { finalizeJobTime } from "@/lib/time-clock";
+import { closeJobEntries, finalizeJobTime } from "@/lib/time-clock";
 
 // Shared job lifecycle. The Jobs page, the truck screen, the Field Board and the
 // field bot all change status through applyJobStatus so arrived_at, completed_at,
@@ -151,6 +151,7 @@ export async function applyJobStatus(id: string, status: string) {
 
   // A cancelled job tells the tech it was assigned to. Best effort.
   if ((status === "cancelled" || status === "canceled") && existing.status !== status) {
+    await closeJobEntries(id, new Date().toISOString());
     await notifyTech({ jobId: id, staffId: existing.assigned_staff_id as string | null, kind: "cancelled" });
   }
 
