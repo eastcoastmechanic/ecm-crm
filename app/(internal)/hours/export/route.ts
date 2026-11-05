@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const to = parseEtLocal(`${addDaysToDateKey(start, 7)}T00:00`);
   if (!from || !to) return new Response("Bad week", { status: 400 });
 
-  const [{ data: staff }, { data: shifts }, { data: entries }] = await Promise.all([
+  const [staffRes, shiftsRes, entriesRes] = await Promise.all([
     supabase.from("staff").select("id, name, email"),
     supabase
       .from("time_shifts")
@@ -36,6 +36,16 @@ export async function GET(request: Request) {
       .gte("started_at", from.toISOString())
       .lt("started_at", to.toISOString()),
   ]);
+
+  // A failed read must never download as a clean file with missing people or hours.
+  const failed = staffRes.error ?? shiftsRes.error ?? entriesRes.error;
+  if (failed) {
+    console.error(`[hours export] query failed: ${failed.message}`);
+    return new Response("Could not load the hours. Nothing was exported. Try again.", { status: 500 });
+  }
+  const staff = staffRes.data;
+  const shifts = shiftsRes.data;
+  const entries = entriesRes.data;
 
   const csv = weekCsv(
     start,
