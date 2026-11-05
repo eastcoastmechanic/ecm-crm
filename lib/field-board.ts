@@ -27,20 +27,15 @@ export function fieldBoardSecretStatus() {
   return {
     field_board_secret: Boolean(process.env.FIELD_BOARD_SECRET),
     field_board_app_key: Boolean(process.env.FIELD_BOARD_APP_KEY),
-    cron_secret: Boolean(process.env.CRON_SECRET),
-    mcp_key: Boolean(process.env.MCP_API_KEY),
   };
 }
 
 export function fieldBoardAuthorized(request: Request) {
   const token = bearerToken(request);
   if (!token) return false;
-  const secrets = [
-    process.env.FIELD_BOARD_SECRET,
-    process.env.FIELD_BOARD_APP_KEY,
-    process.env.CRON_SECRET,
-    process.env.MCP_API_KEY,
-  ];
+  // Only the Field Board's own keys. CRON_SECRET and MCP_API_KEY used to work here
+  // too, so a leak of either opened the field API. One secret per surface.
+  const secrets = [process.env.FIELD_BOARD_SECRET, process.env.FIELD_BOARD_APP_KEY];
   // Check every secret (no early exit) so timing does not reveal which matched.
   // tokenMatches fails closed on unset/empty values.
   return secrets.reduce((ok, secret) => tokenMatches(token, secret) || ok, false);

@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
  * Read hook for the Truck CRM at ecm-field.grok.me.
  *
  * The truck is not called from this route. A later integration can GET this
- * with the same bearer the field board already uses (FIELD_BOARD_SECRET,
- * FIELD_BOARD_APP_KEY, CRON_SECRET, or MCP_API_KEY) and render the payload.
+ * with the same bearer the field board already uses (FIELD_BOARD_SECRET or
+ * FIELD_BOARD_APP_KEY) and render the payload.
  *
  *   GET /api/integrations/truck-crm/pm?job_id=<uuid>
  *   Authorization: Bearer <field board secret>
