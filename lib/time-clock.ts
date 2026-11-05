@@ -204,12 +204,15 @@ export async function getClockState(staffId: string): Promise<ClockState> {
       .limit(20),
   ]);
 
-  // A job counts as paused when my latest work entry on it was closed by Pause and nothing is running.
+  // A job counts as paused when my latest work entry on it was closed by Pause (or by clock-out / a job switch) and it is not the one running.
   const latestByJob = new Map<string, string | null>();
   for (const row of (recent ?? []) as { job_id: string; note: string | null }[]) {
     if (!latestByJob.has(row.job_id)) latestByJob.set(row.job_id, row.note);
   }
-  const pausedJobIds = open ? [] : [...latestByJob].filter(([, note]) => note === "paused").map(([id]) => id);
+  // Other jobs stay resumable while a timer runs on one of them (switching back is allowed).
+  const pausedJobIds = [...latestByJob]
+    .filter(([id, note]) => note === "paused" && id !== (open?.job_id as string | undefined))
+    .map(([id]) => id);
 
   return {
     shiftStartedAt: shift?.started_at ?? null,
