@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPushPayload, isGoneStatus, parseSubscription } from "../push-rules";
+import { buildPushPayload, isAllowedPushEndpoint, isGoneStatus, parseSubscription } from "../push-rules";
 
 describe("buildPushPayload", () => {
   it("trims, collapses whitespace and caps length", () => {
@@ -31,8 +31,27 @@ describe("parseSubscription", () => {
   });
   it("rejects non-https endpoints, missing keys and junk", () => {
     expect(parseSubscription({ ...good, endpoint: "http://x" })).toBeNull();
+    expect(parseSubscription({ ...good, endpoint: "https://attacker.example/x" })).toBeNull();
     expect(parseSubscription({ endpoint: good.endpoint, keys: { p256dh: "k" } })).toBeNull();
     expect(parseSubscription(null)).toBeNull();
     expect(parseSubscription("x")).toBeNull();
+  });
+});
+
+describe("isAllowedPushEndpoint", () => {
+  it("accepts the real browser push services", () => {
+    expect(isAllowedPushEndpoint("https://fcm.googleapis.com/fcm/send/abc")).toBe(true);
+    expect(isAllowedPushEndpoint("https://updates.push.services.mozilla.com/wpush/v2/abc")).toBe(true);
+    expect(isAllowedPushEndpoint("https://web.push.apple.com/abc")).toBe(true);
+    expect(isAllowedPushEndpoint("https://wns2-par02p.notify.windows.com/?token=abc")).toBe(true);
+  });
+  it("rejects other hosts, look-alikes, ports and credentials", () => {
+    expect(isAllowedPushEndpoint("https://attacker.example/x")).toBe(false);
+    expect(isAllowedPushEndpoint("https://fcm.googleapis.com.evil.example/x")).toBe(false);
+    expect(isAllowedPushEndpoint("https://evilnotify.windows.com.example/x")).toBe(false);
+    expect(isAllowedPushEndpoint("https://fcm.googleapis.com:8443/x")).toBe(false);
+    expect(isAllowedPushEndpoint("https://u:p@fcm.googleapis.com/x")).toBe(false);
+    expect(isAllowedPushEndpoint("http://fcm.googleapis.com/x")).toBe(false);
+    expect(isAllowedPushEndpoint("not a url")).toBe(false);
   });
 });

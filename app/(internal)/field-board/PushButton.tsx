@@ -47,6 +47,7 @@ export default function PushButton() {
   async function turnOn() {
     setBusy(true);
     setError(null);
+    let created: PushSubscription | null = null;
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
@@ -55,6 +56,7 @@ export default function PushButton() {
       }
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(VAPID_PUBLIC) });
+      created = sub;
       const res = await savePushSubscription(sub.toJSON(), navigator.userAgent);
       if (!res.ok) {
         await sub.unsubscribe();
@@ -63,6 +65,13 @@ export default function PushButton() {
       }
       setStatus("on");
     } catch {
+      // The phone may hold a subscription the server never saved. Drop it so the button
+      // does not claim alerts are on when the server has nothing to send to.
+      try {
+        await created?.unsubscribe();
+      } catch {
+        // nothing more to do
+      }
       setError("Could not turn alerts on. Try again.");
     } finally {
       setBusy(false);

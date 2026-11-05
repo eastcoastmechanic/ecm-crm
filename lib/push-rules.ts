@@ -20,13 +20,36 @@ export function isGoneStatus(statusCode: number | undefined): boolean {
 
 export type PushSubscriptionInput = { endpoint: string; p256dh: string; auth: string };
 
-/** Validate what the browser sends. Only https push endpoints are accepted. */
+// Browsers hand out endpoints on their own push service. Because the server will POST to whatever
+// endpoint is saved, only those services are accepted, so a signed-in user cannot point it elsewhere.
+const PUSH_HOSTS = [
+  "fcm.googleapis.com",
+  "android.googleapis.com",
+  "web.push.apple.com",
+  "push.services.mozilla.com",
+  "notify.windows.com",
+];
+const PUSH_SUFFIXES = [".push.apple.com", ".push.services.mozilla.com", ".notify.windows.com"];
+
+export function isAllowedPushEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.port || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  return PUSH_HOSTS.includes(host) || PUSH_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
+/** Validate what the browser sends. Only https endpoints on a known push service are accepted. */
 export function parseSubscription(raw: unknown): PushSubscriptionInput | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
   const endpoint = typeof r.endpoint === "string" ? r.endpoint : "";
   const p256dh = typeof r.keys?.p256dh === "string" ? r.keys.p256dh : "";
   const auth = typeof r.keys?.auth === "string" ? r.keys.auth : "";
-  if (!endpoint.startsWith("https://") || endpoint.length > 1000 || !p256dh || !auth) return null;
+  if (!isAllowedPushEndpoint(endpoint) || endpoint.length > 1000 || !p256dh || !auth) return null;
   return { endpoint, p256dh, auth };
 }

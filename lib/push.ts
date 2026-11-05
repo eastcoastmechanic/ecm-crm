@@ -39,7 +39,7 @@ export async function sendPushToStaff(staffId: string, input: PushPayload): Prom
           await webpush.sendNotification(
             { endpoint: s.endpoint as string, keys: { p256dh: s.p256dh as string, auth: s.auth as string } },
             payload,
-            { TTL: 60 * 60 * 12 }
+            { TTL: 60 * 60 * 12, timeout: 8000 }
           );
           await supabase.from("push_subscriptions").update({ last_used_at: new Date().toISOString() }).eq("id", s.id);
         } catch (err) {
