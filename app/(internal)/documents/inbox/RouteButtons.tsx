@@ -5,7 +5,7 @@ import SubmitButton from "../../SubmitButton";
 import { buttonClass, buttonSecondaryClass, errorClass } from "../../ui";
 import { routeToCrm, routeToSquare, type RouteResult } from "./actions";
 
-export default function RouteButtons({ documentId }: { documentId: string }) {
+export default function RouteButtons({ documentId, squareEnabled = false }: { documentId: string; squareEnabled?: boolean }) {
   const [crmState, crmAction] = useActionState(
     async (): Promise<RouteResult | null> => routeToCrm(documentId),
     null
@@ -20,15 +20,17 @@ export default function RouteButtons({ documentId }: { documentId: string }) {
     <div className="flex flex-col items-start gap-2 sm:items-end">
       <div className="flex flex-wrap gap-2">
         <form action={crmAction}>
-          <SubmitButton className={buttonSecondaryClass} pendingText="Saving…">
+          <SubmitButton className={squareEnabled ? buttonSecondaryClass : buttonClass} pendingText="Saving…">
             Create in CRM
           </SubmitButton>
         </form>
-        <form action={squareAction}>
-          <SubmitButton className={buttonClass} pendingText="Sending to Square…">
-            Create in Square
-          </SubmitButton>
-        </form>
+        {squareEnabled && (
+          <form action={squareAction}>
+            <SubmitButton className={buttonClass} pendingText="Sending to Square…">
+              Create in Square
+            </SubmitButton>
+          </form>
+        )}
       </div>
       {error && <p className={`${errorClass} max-w-sm sm:text-right`}>{error}</p>}
     </div>

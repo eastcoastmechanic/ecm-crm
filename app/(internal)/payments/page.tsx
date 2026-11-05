@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { isSquareConfigured, getSquareLocationId } from "@/lib/square";
 import PaymentsList, { type SquareInvoiceRow, type SquarePaymentRow } from "./PaymentsList";
 import SyncSquareButton from "./SyncSquareButton";
+import ImportCustomersPanel from "./ImportCustomersPanel";
+import { getStaffRole } from "@/lib/require-role";
 import { errorClass, headingClass, subTextClass } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +16,7 @@ function relatedName(value: RelatedCustomer) {
 }
 
 export default async function PaymentsPage() {
+  const isOwner = (await getStaffRole()) === "owner";
   const configured = isSquareConfigured();
   const hasLocation = Boolean(getSquareLocationId());
 
@@ -72,6 +75,8 @@ export default async function PaymentsPage() {
         </div>
         <SyncSquareButton />
       </div>
+
+      {isOwner && isSquareConfigured() && <ImportCustomersPanel />}
 
       {!configured && (
         <p className={errorClass}>SQUARE_ACCESS_TOKEN is missing on Vercel — nothing to sync yet.</p>
