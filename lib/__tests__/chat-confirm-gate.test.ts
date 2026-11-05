@@ -36,4 +36,17 @@ describe("createTurnGate", () => {
     expect(gate.blocksConfirm("one")).toBe(true);
     expect(gate.blocksConfirm("two")).toBe(true);
   });
+
+  it("blocks the same uuid written without hyphens, in braces or in capitals", () => {
+    const gate = createTurnGate();
+    gate.noteProposal(reply("3f2b8c1e-9a47-4d10-8e5b-0c6a7d2f1b34"));
+    expect(gate.blocksConfirm("3f2b8c1e9a474d108e5b0c6a7d2f1b34")).toBe(true);
+    expect(gate.blocksConfirm("{3F2B8C1E-9A47-4D10-8E5B-0C6A7D2F1B34}")).toBe(true);
+  });
+
+  it("still lets a different uuid through", () => {
+    const gate = createTurnGate();
+    gate.noteProposal(reply("3f2b8c1e-9a47-4d10-8e5b-0c6a7d2f1b34"));
+    expect(gate.blocksConfirm("3f2b8c1e-9a47-4d10-8e5b-0c6a7d2f1b35")).toBe(false);
+  });
 });

@@ -15,16 +15,25 @@ export const SAME_TURN_MESSAGE =
 
 const TOKEN_IN_TEXT = /token "([^"]+)"/g;
 
+/**
+ * Tokens are database uuids, and Postgres reads the same uuid written with
+ * braces, without hyphens or in capitals. Compare on the bare hex digits so a
+ * differently written token can't slip past the guard.
+ */
+function canonical(token: string) {
+  return token.toLowerCase().replace(/[^0-9a-f]/g, "");
+}
+
 export function createTurnGate() {
   const minted = new Set<string>();
   return {
     /** Record any confirmation tokens found in a propose_* tool's reply. */
     noteProposal(reply: string) {
-      for (const match of reply.matchAll(TOKEN_IN_TEXT)) minted.add(match[1].trim().toLowerCase());
+      for (const match of reply.matchAll(TOKEN_IN_TEXT)) minted.add(canonical(match[1]));
     },
     /** True when this token was minted earlier in the same request. */
     blocksConfirm(token: string) {
-      return minted.has(token.trim().toLowerCase());
+      return minted.has(canonical(token));
     },
   };
 }
