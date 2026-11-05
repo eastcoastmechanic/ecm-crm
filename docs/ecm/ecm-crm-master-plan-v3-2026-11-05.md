@@ -122,3 +122,12 @@ Read: ECM already matches recurring plans, dispatch and customer reminders. Behi
 5. Turn off Square draft/customer creation from the CRM now?
 6. Quo as the business phone? Wisetack financing?
 7. Also open: head office address in Stripe tax settings; DOR withholding account name; accountant on sales tax.
+
+## 10. Decided by Josh (2026-11-05, later that morning)
+1. **Order:** the tech's day first (Phase 1), Stripe invoices after.
+2. **Gusto:** Route B leaning. Gusto's own clock for the full day (needs Plus or higher, confirm price and run a trial); per-job billable time stays in the CRM (`job_time_entries`). The CRM does not build a second payroll clock.
+3. **Checklist gate:** hard gate on Finish, with an owner-only unlock that records who and why.
+4. **Teams folders:** live in SharePoint site `ecmjobs`, Shared Documents / Job Notes / one folder per job address (for example "<street> <town>"), with subfolders such as Equipment and Scope. Teams Job Notes channel Files tab shows the same folders. Read from the Microsoft 365 connector 2026-11-05; the Teams list call needs a scope not granted, so channel layout is unchecked.
+5. **Square:** stop the CRM creating Square customers, orders and draft invoices (`routeToSquare`). Square becomes a read-only archive.
+6. **Quo:** already signed in and in use. Not a purchase. CRM work is to connect it (calls, texts, missed-call text-back into the inbox).
+7. Still open: Wisetack financing, Teams phone use by techs, `staff.phone`.
