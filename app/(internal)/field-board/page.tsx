@@ -3,6 +3,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import ClockBar from "./ClockBar";
+import PushButton from "./PushButton";
 import { finishBlockers } from "@/lib/checklist-rules";
 import { ensureChecklists, loadChecklists, unlockedJobIds } from "@/lib/job-checklist";
 import { formatEtTime } from "@/lib/tz";
@@ -243,6 +244,7 @@ export default async function FieldBoardPage() {
           sinceLabel={clock?.shiftStartedAt ? formatEtTime(clock.shiftStartedAt) : null}
         />
       )}
+      {myId && <PushButton />}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className={headingClass}>Today</h1>

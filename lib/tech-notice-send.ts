@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { postToTeams } from "@/lib/teams";
+import { sendPushToStaff } from "@/lib/push";
 import { buildTechNotice, type TechNoticeKind } from "@/lib/tech-notice";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app";
@@ -65,6 +66,14 @@ export async function notifyTech(opts: {
         console.error(`[tech-notice] email failed for job ${jobId}:`, err instanceof Error ? err.message : err);
       }
     }
+
+    // Phone alert for anyone who turned alerts on. Quiet no-op until the push keys are set.
+    await sendPushToStaff(staffId, {
+      title: notice.teamsTitle,
+      body: notice.teamsText,
+      url: "/field-board",
+      tag: `job-${jobId}`,
+    });
 
     await postToTeams("dispatch", {
       title: notice.teamsTitle,
