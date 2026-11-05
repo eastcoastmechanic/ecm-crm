@@ -2,6 +2,9 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
+import ClockBar from "./ClockBar";
+import { formatEtTime } from "@/lib/tz";
+import { getClockState } from "@/lib/time-clock";
 import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } from "@/lib/field-board";
 import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import FieldNoteForm from "./FieldNoteForm";
@@ -154,7 +157,7 @@ export default async function FieldBoardPage() {
   const isTech = (await headers()).get("x-staff-role") === "tech";
   const secrets = fieldBoardSecretStatus();
   const myStaffId = getMyStaffId();
-  const [sheetResult, allJobs] = await Promise.all([
+  const [sheetResult, rawJobs, myId] = await Promise.all([
     getFieldBoardSheet()
       .then((sheet) => ({ events: sheet.events ?? [], error: null as string | null }))
       .catch((err: unknown) => ({
@@ -169,7 +172,19 @@ export default async function FieldBoardPage() {
         error: err instanceof Error ? err.message : "Field sheet failed",
       })),
     myStaffId.then((id) => getTruckJobs(id)),
+    myStaffId,
   ]);
+  // Time clock: my day shift, and which of my jobs have a running or paused timer.
+  const clock = myId ? await getClockState(myId).catch(() => null) : null;
+  const allJobs = rawJobs.map((job) => ({
+    ...job,
+    timer:
+      clock?.openEntry?.jobId === job.id && clock.openEntry.kind === "work"
+        ? ("running" as const)
+        : clock?.pausedJobIds.includes(job.id)
+          ? ("paused" as const)
+          : null,
+  }));
   const sheetError = sheetResult.error;
 
   const tableMissing = Boolean(sheetError && /field_board_events/i.test(sheetError));
@@ -200,6 +215,12 @@ export default async function FieldBoardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {myId && (
+        <ClockBar
+          shiftStartedAt={clock?.shiftStartedAt ?? null}
+          sinceLabel={clock?.shiftStartedAt ? formatEtTime(clock.shiftStartedAt) : null}
+        />
+      )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className={headingClass}>Today</h1>

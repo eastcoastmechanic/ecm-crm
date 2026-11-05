@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { ingestFieldBoardEvent } from "@/lib/field-board";
 import { requireOffice, requireRole } from "@/lib/require-role";
-import { requireJobAccess } from "@/lib/job-access";
+import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
+import { startJobEntry } from "@/lib/time-clock";
 import { addJobPhotos, markOnWay, updateJobStatus } from "../jobs/actions";
 
 export async function logFieldNote(formData: FormData) {
@@ -61,6 +62,9 @@ export async function truckOnMyWay(formData: FormData): Promise<void> {
   const jobId = String(formData.get("id") ?? "").trim();
   if (!jobId) return;
   await markOnWay(jobId);
+  // Drive time starts. Skipped for the shared owner login, which has no staff row.
+  const staffId = await getMyStaffId();
+  if (staffId) await startJobEntry(jobId, staffId, "drive");
   revalidatePath("/field-board");
 }
 
@@ -69,6 +73,12 @@ export async function truckSetStatus(formData: FormData): Promise<void> {
   const status = String(formData.get("status") ?? "").trim();
   if (!String(formData.get("id") ?? "").trim() || !["in_progress", "complete"].includes(status)) return;
   await updateJobStatus(formData);
+  // I'm here starts the work timer (and ends drive time). Finish is closed out in applyJobStatus.
+  if (status === "in_progress") {
+    const staffId = await getMyStaffId();
+    const id = String(formData.get("id") ?? "").trim();
+    if (staffId) await startJobEntry(id, staffId, "work");
+  }
   revalidatePath("/field-board");
 }
 
