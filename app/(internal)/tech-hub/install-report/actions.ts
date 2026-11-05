@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
+import { requireJobAccess } from "@/lib/job-access";
 import { STARTUP_CHECKLIST_ITEMS, type CheckResult } from "./constants";
 
 function str(formData: FormData, name: string): string | null {
@@ -57,6 +58,8 @@ function readUnits(formData: FormData): Unit[] {
 
 export async function createInstallReport(formData: FormData) {
   const job_id = str(formData, "job_id");
+  // Techs can file a report only for a job they may work. Office and owner are not limited.
+  await requireJobAccess(job_id, { allowClosedJob: true });
   const equipment_id = str(formData, "equipment_id");
 
   let customer_id: string | null = null;
