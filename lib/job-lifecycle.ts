@@ -6,6 +6,7 @@ import { syncJobToGraph } from "@/lib/graph-connector";
 import { syncJobToPlanner } from "@/lib/planner-connector";
 import { formatEtDateTime } from "@/lib/tz";
 import { notifyOwnerOfEvent } from "@/lib/notify-owner";
+import { notifyTech } from "@/lib/tech-notice-send";
 
 // Shared job lifecycle. The Jobs page, the truck screen, the Field Board and the
 // field bot all change status through applyJobStatus so arrived_at, completed_at,
@@ -84,7 +85,7 @@ export async function sendScheduleNotifications(jobId: string) {
 export async function applyJobStatus(id: string, status: string) {
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
-    .select("status, completed_at, on_way_at, arrived_at")
+    .select("status, completed_at, on_way_at, arrived_at, assigned_staff_id")
     .eq("id", id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
@@ -138,6 +139,11 @@ export async function applyJobStatus(id: string, status: string) {
       .eq("job_id", id)
       .eq("status", "due");
     if (visitError) console.error(`Could not mark plan visit complete for job ${id}: ${visitError.message}`);
+  }
+
+  // A cancelled job tells the tech it was assigned to. Best effort.
+  if ((status === "cancelled" || status === "canceled") && existing.status !== status) {
+    await notifyTech({ jobId: id, staffId: existing.assigned_staff_id as string | null, kind: "cancelled" });
   }
 
   await syncJobToGraph(id);
