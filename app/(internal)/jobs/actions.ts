@@ -17,6 +17,7 @@ import { applyJobStatus, sendScheduleNotifications } from "@/lib/job-lifecycle";
 import { requireOffice, requireRole } from "@/lib/require-role";
 import { notifyTech } from "@/lib/tech-notice-send";
 import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
+import { getFinishBlockers } from "@/lib/job-checklist";
 import { parseEtLocal } from "@/lib/tz";
 
 export async function createServiceCall() {
@@ -138,7 +139,13 @@ export async function updateJobStatus(formData: FormData) {
   const status = formData.get("status") as string;
 
   // Office and owner can set any status. A tech can only start or finish their own open job.
-  await requireJobAccess(id, { nextStatus: status });
+  const role = await requireJobAccess(id, { nextStatus: status });
+
+  // A tech cannot finish a job with an open checklist or no photo (the owner can unlock it).
+  if (role === "tech" && status === "complete") {
+    const blockers = await getFinishBlockers(id);
+    if (blockers.length > 0) throw new Error(blockers.join(" "));
+  }
 
   await applyJobStatus(id, status);
 
