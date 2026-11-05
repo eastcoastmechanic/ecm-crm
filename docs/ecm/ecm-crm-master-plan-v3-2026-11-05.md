@@ -125,9 +125,11 @@ Read: ECM already matches recurring plans, dispatch and customer reminders. Behi
 
 ## 10. Decided by Josh (2026-11-05, later that morning)
 1. **Order:** the tech's day first (Phase 1), Stripe invoices after.
-2. **Gusto:** Route B leaning. Gusto's own clock for the full day (needs Plus or higher, confirm price and run a trial); per-job billable time stays in the CRM (`job_time_entries`). The CRM does not build a second payroll clock.
+2. **Gusto, one app for techs (replaces Route B):** the CRM Field Board is the only app a tech uses. Clock in for the day, jobs, per-job On my way / Arrived / Finish, clock out. Hours go to Gusto as a file for its payroll import once per pay period (Route A), with regular and overtime (over 40 a week) split by the CRM; whether Gusto accepts that split is tested with one real pay period. Ask Gusto support in writing whether a single company can get Time Tracking API access; if yes, the file becomes an automatic push. The CRM prompts the 30-minute break on shifts over 6 hours.
 3. **Checklist gate:** hard gate on Finish, with an owner-only unlock that records who and why.
 4. **Teams folders:** live in SharePoint site `ecmjobs`, Shared Documents / Job Notes / one folder per job address (for example "<street> <town>"), with subfolders such as Equipment and Scope. Teams Job Notes channel Files tab shows the same folders. Read from the Microsoft 365 connector 2026-11-05; the Teams list call needs a scope not granted, so channel layout is unchecked.
 5. **Square:** stop the CRM creating Square customers, orders and draft invoices (`routeToSquare`). Square becomes a read-only archive.
 6. **Quo:** already signed in and in use. Not a purchase. CRM work is to connect it (calls, texts, missed-call text-back into the inbox).
 7. Still open: Wisetack financing, Teams phone use by techs, `staff.phone`.
+8. **Tech notices, one app:** alerts for assign, reschedule and cancel arrive inside the Field Board (installed to the phone's home screen, web push). Teams post (Dispatch channel, naming the tech) stays as the office record, and the job card links to the job's Teams Files folder. Email stays as backup. (Josh said the plan is "much" better; his message was cut off, so confirm if he meant otherwise.)
+9. **Folders:** Teams Job Notes channel, Files tab, is the SharePoint `ecmjobs` library underneath. Same folders.
