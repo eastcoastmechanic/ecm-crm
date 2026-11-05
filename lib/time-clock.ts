@@ -64,7 +64,8 @@ async function closeOpenEntry(staffId: string, endedAt: Date, flagReason?: strin
     .from("job_time_entries")
     .update({
       ended_at: endedAt.toISOString(),
-      ...(flagReason ? { flagged: true, flag_reason: flagReason } : {}),
+      // A new flag always needs a fresh look, even if the office reviewed this row before.
+      ...(flagReason ? { flagged: true, reviewed_at: null, flag_reason: flagReason } : {}),
       ...(note ? { note } : {}),
       // Clocking out mid-job: the job shows Resume next day instead of losing its timer controls.
       ...(pauseIfWork && open.kind === "work" ? { note: "paused" } : {}),
@@ -94,7 +95,9 @@ export async function clockOut(staffId: string, breakMinutes: number | null): Pr
     .update({
       ended_at: now.toISOString(),
       break_minutes: breakMinutes ?? 0,
-      ...(shortBreak ? { flagged: true, flag_reason: "Over 6 hours with less than a 30 minute meal break." } : {}),
+      ...(shortBreak
+        ? { flagged: true, reviewed_at: null, flag_reason: "Over 6 hours with less than a 30 minute meal break." }
+        : {}),
     })
     .eq("id", shift.id);
   if (error) return { error: "Could not clock you out. Try again." };
