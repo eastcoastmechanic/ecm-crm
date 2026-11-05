@@ -3,6 +3,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import ClockBar from "./ClockBar";
+import { finishBlockers } from "@/lib/checklist-rules";
+import { ensureChecklists, loadChecklists, unlockedJobIds } from "@/lib/job-checklist";
 import { formatEtTime } from "@/lib/tz";
 import { getClockState } from "@/lib/time-clock";
 import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } from "@/lib/field-board";
@@ -136,6 +138,7 @@ async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
       phone: customer?.phone ?? null,
       address: property?.address ?? null,
       photoCounts: countPhotos(row.photos),
+      photoTotal: Array.isArray(row.photos) ? row.photos.length : 0,
       arrived_at: (row.arrived_at as string | null) ?? null,
       completed_at: (row.completed_at as string | null) ?? null,
       assignedToMe: myStaffId !== null && row.assigned_staff_id === myStaffId,
@@ -154,7 +157,9 @@ async function getTruckJobs(myStaffId: string | null): Promise<TruckJob[]> {
 }
 
 export default async function FieldBoardPage() {
-  const isTech = (await headers()).get("x-staff-role") === "tech";
+  const staffRole = (await headers()).get("x-staff-role");
+  const isTech = staffRole === "tech";
+  const isOwner = staffRole === "owner";
   const secrets = fieldBoardSecretStatus();
   const myStaffId = getMyStaffId();
   const [sheetResult, rawJobs, myId] = await Promise.all([
@@ -176,8 +181,25 @@ export default async function FieldBoardPage() {
   ]);
   // Time clock: my day shift, and which of my jobs have a running or paused timer.
   const clock = myId ? await getClockState(myId).catch(() => null) : null;
+  // Checklists: give each open job its list the first time it shows, then work out what blocks Finish.
+  const openJobs = rawJobs.filter((job) => job.status !== "complete");
+  await ensureChecklists(openJobs.map((job) => ({ id: job.id, job_type: job.job_type })));
+  const [checklists, unlocks] = await Promise.all([
+    loadChecklists(openJobs.map((job) => job.id)),
+    unlockedJobIds(openJobs.map((job) => job.id)),
+  ]);
   const allJobs = rawJobs.map((job) => ({
     ...job,
+    checklist: checklists.get(job.id) ?? [],
+    unlocked: unlocks.has(job.id),
+    blockers:
+      job.status === "complete"
+        ? []
+        : finishBlockers({
+            items: checklists.get(job.id) ?? [],
+            photoCount: job.photoTotal ?? 0,
+            unlocked: unlocks.has(job.id),
+          }),
     timer:
       clock?.openEntry?.jobId === job.id && clock.openEntry.kind === "work"
         ? ("running" as const)
@@ -266,7 +288,7 @@ export default async function FieldBoardPage() {
           <h2 className="mb-3 font-display text-lg font-bold">
             {next.status === "in_progress" ? "On site now" : "Next up"}
           </h2>
-          <TruckJobCard job={next} primary />
+          <TruckJobCard job={next} primary canUnlock={isOwner} />
         </div>
       ) : (
         <p className={itemSubClass}>
@@ -279,7 +301,7 @@ export default async function FieldBoardPage() {
           <h2 className="mb-3 font-display text-lg font-bold">Rest of today</h2>
           <div className="grid gap-3">
             {rest.map((job) => (
-              <TruckJobCard key={job.id} job={job} />
+              <TruckJobCard key={job.id} job={job} canUnlock={isOwner} />
             ))}
           </div>
         </div>
@@ -308,7 +330,7 @@ export default async function FieldBoardPage() {
                   <span className={itemSubClass}>{stamp(job.scheduled_at)}</span>
                 </summary>
                 <div className="px-3 pb-3">
-                  <TruckJobCard job={job} />
+                  <TruckJobCard job={job} canUnlock={isOwner} />
                 </div>
               </details>
             ))}

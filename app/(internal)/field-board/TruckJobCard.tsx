@@ -2,6 +2,8 @@ import SubmitButton from "../SubmitButton";
 import PhotoButtons, { type PhotoCounts } from "./PhotoButtons";
 import { truckOnMyWay, truckSetStatus } from "./actions";
 import { pauseJobAction, resumeJobAction } from "./clock-actions";
+import ChecklistPanel, { type TruckChecklistItem } from "./ChecklistPanel";
+import FinishForm from "./FinishForm";
 import { formatEtTime } from "@/lib/tz";
 import OnSiteLine from "./OnSiteLine";
 
@@ -41,6 +43,12 @@ export type TruckJob = {
   lastVisit?: string | null;
   /** From the time clock: my work timer on this job is running, or paused. */
   timer?: "running" | "paused" | null;
+  /** Job checklist, and why a tech cannot finish yet (empty = they can). */
+  checklist?: TruckChecklistItem[];
+  blockers?: string[];
+  unlocked?: boolean;
+  /** Total photos on the job, any phase. */
+  photoTotal?: number;
 };
 
 function SiteInfo({ job }: { job: TruckJob }) {
@@ -120,13 +128,7 @@ function StepButton({ job }: { job: TruckJob }) {
             </SubmitButton>
           </form>
         )}
-      <form action={truckSetStatus}>
-        <input type="hidden" name="id" value={job.id} />
-        <input type="hidden" name="status" value="complete" />
-        <SubmitButton className={bigButton} pendingText="Saving…">
-          Finish job
-        </SubmitButton>
-      </form>
+      <FinishForm jobId={job.id} blockers={job.blockers ?? []} />
       </div>
     );
   }
@@ -157,7 +159,15 @@ function stateLabel(job: TruckJob) {
   return job.status.replaceAll("_", " ");
 }
 
-export default function TruckJobCard({ job, primary = false }: { job: TruckJob; primary?: boolean }) {
+export default function TruckJobCard({
+  job,
+  primary = false,
+  canUnlock = false,
+}: {
+  job: TruckJob;
+  primary?: boolean;
+  canUnlock?: boolean;
+}) {
   const tel = job.phone ? job.phone.replace(/[^\d+]/g, "") : "";
   const maps = job.address
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`
@@ -238,6 +248,16 @@ export default function TruckJobCard({ job, primary = false }: { job: TruckJob; 
         <div className="mt-3">
           <PhotoButtons jobId={job.id} counts={job.photoCounts} />
         </div>
+      )}
+
+      {(primary || job.status === "in_progress") && (
+        <ChecklistPanel
+          jobId={job.id}
+          items={job.checklist ?? []}
+          blockers={job.blockers ?? []}
+          unlocked={Boolean(job.unlocked)}
+          canUnlock={canUnlock}
+        />
       )}
 
       <div className="mt-3">
