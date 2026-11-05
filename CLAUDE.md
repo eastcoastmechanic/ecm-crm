@@ -34,13 +34,16 @@ Internal app: `app/(internal)`. Customer portal: `app/(portal)`.
 - Calendar/dispatch edits jobs only through existing job actions so Planner/Graph sync and customer notifications keep firing.
 - Field Board status changes go through `updateJobStatus` / job-lifecycle.
 
-## Where things stand (as of 2026-10-25, verify with `gh pr list`)
+## Where things stand (as of 2026-11-05, verify with `gh pr list`)
 - Phase 1 (owner alerts, job billing line, payment link, deposit tracking) merged: #44 to #47.
 - Phase 2 (truck app for techs: job card details, tech account page, service report access, install report access, inventory deduction, tech hours) merged: #48 to #52.
 - #53 (inventory double-deduction fix) merged.
 - #54 (CLAUDE.md and docs/ecm reference docs) merged.
 - #55 (status update) and #56 (PR template, Dependabot config) merged. Branch protection on `main` (PR + `check` + `Vercel` required), Dependabot security updates on.
-- Phase 3: #58 done (#80, 7:00 ET digest). Teams alerts merged (#83 money and finished jobs, #84 field notes to Job Notes). #59 `/dispatch` calendar merged (#85). #60 merged in two parts: part 1 (#86, SQL 0053 run) plans carry `visit_months` (default April and October), a daily cron makes each visit and an unscheduled maintenance job, dispatch lists them under Needs scheduling, dashboard counts overdue ones; part 2 (#88) daily 15:00 UTC booking reminder, one follow-up after 7 days (my choice, Josh has not set it), text only with `sms_consent`, email to anyone with an address. #61 (self-confirm link) is optional and not started. #82 (appointment reminder relation fix) is open.
+- Phase 3: #58 done (#80, 7:00 ET digest). Teams alerts merged (#83 money and finished jobs, #84 field notes to Job Notes). #59 `/dispatch` calendar merged (#85). #60 merged in two parts: part 1 (#86, SQL 0053 run) plans carry `visit_months` (default April and October), a daily cron makes each visit and an unscheduled maintenance job, dispatch lists them under Needs scheduling, dashboard counts overdue ones; part 2 (#88) daily 15:00 UTC booking reminder, one follow-up after 7 days (my choice, Josh has not set it), text only with `sms_consent`, email to anyone with an address. #61 (self-confirm link) is built in #89, still open and not merged (SQL 0054 is already run in the database). #82 (appointment reminder relation fix) merged.
+- Tech's day, Phase 0/1 (Josh's plan v3, 2026-11-05), all merged: #94 tech lockdown (role and ownership checks on job and truck actions), #95 tech assignment alerts (email plus Teams Dispatch), #96 field board API accepts only its own keys (a bot using the cron or MCP key there is now cut off; Josh has not confirmed none does), #97 time clock part 1 (day shift and job timers, pause and resume, SQL 0055 run), #98 time clock part 2 (hours report, flagged time, weekly payroll file for Gusto), #99 job checklist with hard Finish gate and owner unlock that logs who and why (SQL 0056 run, starter checklist wording is placeholder and Josh edits `job_checklist_templates`), #100 Job files button to the Teams Job Notes Files tab (`TEAMS_JOB_FILES_URL` overrides, `off` hides).
+- Stripe/Square: #101 merged, Create invoice on a finished job (amount prefilled with contract total less deposit received, SQL 0058 run, one live balance invoice per job). #102 merged, Square is a read-only archive (the CRM refuses Square writes unless `SQUARE_WRITES_ENABLED=true`; owner-only import of Square customers on /payments; imported customers get `sms_consent=false`). Old Square invoices are not turned into CRM documents; the sync already stores the last year in `square_invoices`/`square_payments`.
+- Open: #103 tech web push alerts (SQL 0057 run; sends nothing until Josh sets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY` on Vercel and redeploys). #89 customer book-my-visit link. #92 and #93 are plan docs.
 - Phase 3-5 items are GitHub Issues #57 to #71 (labels `phase-3`/`phase-4`/`phase-5`, `needs-decision`). Work from "do issue N".
 - Earlier merged: #41 (signed maintenance contract creates plan), #42 (multi-unit install report, migration 0050), #43 (customer/property fields, access notes, migration 0051), #33 (Schedule job button).
 - Anon DB/storage policies were locked down. Photo buckets were still public after that lockdown (Phase 5 item).
@@ -62,6 +65,9 @@ Checked by Claude: the Vercel plan allows sub-daily crons (`square-sync` already
 
 Open decisions for Josh:
 - Text the tech digest too? Needs a `staff.phone` column.
+- Wisetack/financing: yes or no.
+- Does any bot or script hit the field board with the cron or MCP key? (#96 blocks it.)
+- Still to do on his side: save the Stripe webhook signing secret as `STRIPE_WEBHOOK_SECRET` on Vercel, check the Gusto import column names against the hours file, ask Gusto about API access.
 
 ## After Phase 3
 - Phase 4: lead pipeline board, good/better/best estimates, text review requests (plus one reminder), seasonal/lapsed-customer campaigns once consent is confirmed.
