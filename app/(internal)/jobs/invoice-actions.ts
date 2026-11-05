@@ -60,24 +60,36 @@ export async function createBalanceInvoice(_prev: CreateInvoiceState, formData: 
     }
   }
 
+  const input = {
+    customerId: job.customer_id as string,
+    propertyId: (job.property_id as string | null) ?? null,
+    jobId,
+    items: [
+      {
+        category: "Contract balance",
+        description,
+        price_book_item_name: null,
+        qty: 1,
+        unit: "ea",
+        unit_price: centsToDollars(cents),
+        notes,
+      },
+    ],
+  };
+
+  // balance_for_job_id (SQL 0058) lets the database refuse a second live balance invoice for the job.
+  // If that SQL has not been run yet, fall back to the check after the insert below.
   let documentId: string;
   try {
-    const result = await createInvoiceDirect({
-      customerId: job.customer_id as string,
-      propertyId: (job.property_id as string | null) ?? null,
-      jobId,
-      items: [
-        {
-          category: "Contract balance",
-          description,
-          price_book_item_name: null,
-          qty: 1,
-          unit: "ea",
-          unit_price: centsToDollars(cents),
-          notes,
-        },
-      ],
-    });
+    let result;
+    try {
+      result = await createInvoiceDirect({ ...input, extra: { balance_for_job_id: jobId } });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (/documents_one_balance_invoice_per_job_idx/.test(message)) return { error: "This job already has an invoice." };
+      if (/balance_for_job_id/.test(message)) result = await createInvoiceDirect(input);
+      else throw err;
+    }
     documentId = result.documentId;
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not create the invoice." };
