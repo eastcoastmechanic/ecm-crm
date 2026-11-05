@@ -235,6 +235,8 @@ export async function closeStaleTime(now: Date = new Date()): Promise<{ shifts: 
         ended_at: autoCloseAt(s.started_at, SHIFT_CAP_HOURS).toISOString(),
         auto_closed: true,
         flagged: true,
+        // A shift the office already reviewed (for example a missing clock in) needs a fresh look.
+        reviewed_at: null,
         flag_reason: `Never clocked out. Closed after ${SHIFT_CAP_HOURS} hours. Office: fix the end time.`,
       })
       .eq("id", s.id)
@@ -242,8 +244,8 @@ export async function closeStaleTime(now: Date = new Date()): Promise<{ shifts: 
     if (!error) shifts += 1;
   }
 
-  const { data: openEntries } = await supabase.from("job_time_entries").select("id, started_at").is("ended_at", null);
-  for (const e of (openEntries ?? []) as { id: string; started_at: string }[]) {
+  const { data: openEntries } = await supabase.from("job_time_entries").select("id, started_at, kind").is("ended_at", null);
+  for (const e of (openEntries ?? []) as { id: string; started_at: string; kind: string }[]) {
     if (!isStale(e.started_at, ENTRY_CAP_HOURS, now)) continue;
     const { error } = await supabase
       .from("job_time_entries")
@@ -251,6 +253,9 @@ export async function closeStaleTime(now: Date = new Date()): Promise<{ shifts: 
         ended_at: autoCloseAt(e.started_at, ENTRY_CAP_HOURS).toISOString(),
         auto_closed: true,
         flagged: true,
+        reviewed_at: null,
+        // The job is not done, so it shows Resume instead of losing its timer controls.
+        ...(e.kind === "work" ? { note: "paused" } : {}),
         flag_reason: `Never finished. Closed after ${ENTRY_CAP_HOURS} hours. Office: fix the end time.`,
       })
       .eq("id", e.id)
