@@ -25,6 +25,9 @@ export async function logFieldNote(formData: FormData) {
     title: title || body.slice(0, 120),
     body: body || title,
     job_id: jobId || undefined,
+    // A tech's note attaches only to the job they picked. No matching by customer name, which
+    // could land the note on another tech's job.
+    skip_name_match: isTech,
     board_status: isTech ? undefined : boardStatus || undefined,
     crm_status: isTech ? undefined : crmStatus || undefined,
   });
