@@ -15,6 +15,7 @@ import { syncJobToGraph } from "@/lib/graph-connector";
 import { syncJobToPlanner } from "@/lib/planner-connector";
 import { applyJobStatus, sendScheduleNotifications } from "@/lib/job-lifecycle";
 import { requireOffice, requireRole } from "@/lib/require-role";
+import { notifyTech } from "@/lib/tech-notice-send";
 import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
 import { parseEtLocal } from "@/lib/tz";
 
@@ -89,6 +90,17 @@ export async function scheduleJobFromContract(formData: FormData) {
   redirect("/jobs");
 }
 
+/** Tell whoever the job is assigned to (if anyone) that it moved. Best effort. */
+async function notifyAssignedTech(jobId: string, kind: "rescheduled" | "cancelled") {
+  const { data } = await supabase.from("jobs").select("assigned_staff_id").eq("id", jobId).maybeSingle();
+  await notifyTech({
+    jobId,
+    staffId: (data?.assigned_staff_id as string | null | undefined) ?? null,
+    kind,
+    actorStaffId: await getMyStaffId(),
+  });
+}
+
 /** Assign a job to a staff member, or clear it (empty staff_id). */
 export async function assignJob(formData: FormData) {
   await requireOffice();
@@ -96,8 +108,18 @@ export async function assignJob(formData: FormData) {
   const staffId = ((formData.get("staff_id") as string) || "").trim() || null;
   if (!jobId) throw new Error("Job is required");
 
+  const { data: before } = await supabase.from("jobs").select("assigned_staff_id").eq("id", jobId).maybeSingle();
+  const previousStaffId = (before?.assigned_staff_id as string | null | undefined) ?? null;
+
   const { error } = await supabase.from("jobs").update({ assigned_staff_id: staffId }).eq("id", jobId);
   if (error) throw new Error(error.message);
+
+  // Tell the tech who got the job, and the one who lost it. Best effort, never blocks.
+  if (staffId !== previousStaffId) {
+    const actorStaffId = await getMyStaffId();
+    await notifyTech({ jobId, staffId, kind: "assigned", actorStaffId });
+    await notifyTech({ jobId, staffId: previousStaffId, kind: "unassigned", actorStaffId });
+  }
 
   revalidatePath("/jobs");
   revalidatePath("/field-board");
@@ -134,6 +156,7 @@ export async function rescheduleJobAt(jobId: string, localDateTime: string) {
 
   await sendScheduleNotifications(jobId);
   await syncJobToGraph(jobId);
+  await notifyAssignedTech(jobId, "rescheduled");
 
   revalidatePath("/jobs");
   revalidatePath("/dispatch");
@@ -160,6 +183,7 @@ export async function rescheduleJob(jobId: string, newDate: string) {
 
   await sendScheduleNotifications(jobId);
   await syncJobToGraph(jobId);
+  await notifyAssignedTech(jobId, "rescheduled");
 
   revalidatePath("/jobs");
 }
