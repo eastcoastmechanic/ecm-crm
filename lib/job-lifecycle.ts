@@ -7,6 +7,7 @@ import { syncJobToPlanner } from "@/lib/planner-connector";
 import { formatEtDateTime } from "@/lib/tz";
 import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 import { notifyTech } from "@/lib/tech-notice-send";
+import { closeJobEntries, finalizeJobTime } from "@/lib/time-clock";
 
 // Shared job lifecycle. The Jobs page, the truck screen, the Field Board and the
 // field bot all change status through applyJobStatus so arrived_at, completed_at,
@@ -104,12 +105,19 @@ export async function applyJobStatus(id: string, status: string) {
   // silently re-basing old jobs would move numbers someone has already costed.
   const clockStart = arrived_at ?? existing.on_way_at;
 
-  const tracked_hours =
+  const legacy_hours =
     status === "complete" && clockStart && !existing.completed_at
       ? Math.round(
           ((new Date(completed_at!).getTime() - new Date(clockStart).getTime()) / 3600000) * 100
         ) / 100
       : undefined;
+
+  // Jobs worked with the time clock have work entries: their hours are the sum of those
+  // (pauses and drive time excluded). Older jobs, and jobs the office finishes without a
+  // timer, keep the arrived-to-finished number above.
+  const entry_hours =
+    status === "complete" && !existing.completed_at ? await finalizeJobTime(id, completed_at!) : null;
+  const tracked_hours = entry_hours ?? legacy_hours;
 
   const { error } = await supabase
     .from("jobs")
@@ -143,6 +151,7 @@ export async function applyJobStatus(id: string, status: string) {
 
   // A cancelled job tells the tech it was assigned to. Best effort.
   if ((status === "cancelled" || status === "canceled") && existing.status !== status) {
+    await closeJobEntries(id, new Date().toISOString());
     await notifyTech({ jobId: id, staffId: existing.assigned_staff_id as string | null, kind: "cancelled" });
   }
 

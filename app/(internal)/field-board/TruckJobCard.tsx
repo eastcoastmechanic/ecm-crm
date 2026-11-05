@@ -1,6 +1,7 @@
 import SubmitButton from "../SubmitButton";
 import PhotoButtons, { type PhotoCounts } from "./PhotoButtons";
 import { truckOnMyWay, truckSetStatus } from "./actions";
+import { pauseJobAction, resumeJobAction } from "./clock-actions";
 import { formatEtTime } from "@/lib/tz";
 import OnSiteLine from "./OnSiteLine";
 
@@ -38,6 +39,8 @@ export type TruckJob = {
   customerNotes?: string | null;
   equipment?: { type: string | null; brand: string | null; model: string | null; serial: string | null; installDate: string | null }[];
   lastVisit?: string | null;
+  /** From the time clock: my work timer on this job is running, or paused. */
+  timer?: "running" | "paused" | null;
 };
 
 function SiteInfo({ job }: { job: TruckJob }) {
@@ -96,10 +99,27 @@ function timeLabel(value: string | null) {
   });
 }
 
-// One step at a time: On my way -> I'm here -> Finish job.
+// One step at a time: On my way -> I'm here -> Finish job. Pause / Resume sits above Finish.
 function StepButton({ job }: { job: TruckJob }) {
   if (job.status === "in_progress") {
     return (
+      <div className="flex flex-col gap-2">
+        {job.timer === "running" && (
+          <form action={pauseJobAction}>
+            <input type="hidden" name="id" value={job.id} />
+            <SubmitButton className={linkButton} pendingText="Pausing…">
+              Pause timer
+            </SubmitButton>
+          </form>
+        )}
+        {job.timer === "paused" && (
+          <form action={resumeJobAction}>
+            <input type="hidden" name="id" value={job.id} />
+            <SubmitButton className={linkButton} pendingText="Resuming…">
+              Timer paused. Resume
+            </SubmitButton>
+          </form>
+        )}
       <form action={truckSetStatus}>
         <input type="hidden" name="id" value={job.id} />
         <input type="hidden" name="status" value="complete" />
@@ -107,6 +127,7 @@ function StepButton({ job }: { job: TruckJob }) {
           Finish job
         </SubmitButton>
       </form>
+      </div>
     );
   }
   if (job.on_way_at) {
