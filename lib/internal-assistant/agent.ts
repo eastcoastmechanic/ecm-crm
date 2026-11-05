@@ -1,5 +1,5 @@
 import { claude, CLAUDE_MODEL } from "@/lib/claude";
-import { buildInternalTools } from "./tools";
+import { buildChatTools } from "./tools-mcp";
 import type { StaffRole } from "@/lib/require-role";
 
 export type ChatAttachment = { name: string; mediaType: string; base64: string };
@@ -30,7 +30,7 @@ You are the internal AI assistant inside East Coast Mechanical's CRM, talking di
 - Look up a real sell price from the price book for a quick question (search_price_book) — use this for "how much is X" instead of generating a full document, which takes much longer and creates a saved record
 - Generate a real estimate, invoice, or proposal (pulling from the actual price book) — defaults to good/better/best tiered pricing, but if asked for a flat rate / single price / "just one line, no tiers", pass pricingMode "flat" instead
 - Create a real warranty registration document for a customer/property (create_warranty) — covers one or more pieces of equipment, computes expiration dates automatically
-- Create a branded service contract for a job (create_contract) — pulls customer/property from the CRM, 50% deposit / 50% completion unless MA HIC 1/3 cap applies, same letterhead as estimates/invoices. Draft only; confirm then send_document
+- Create a branded service contract for a job (create_contract) — pulls customer/property from the CRM, 50% deposit / 50% completion unless MA HIC 1/3 cap applies, same letterhead as estimates/invoices. Draft only; confirm, then propose_send_document
 - Create a draft Mass Save Air Source Heat Pump rebate application (create_mass_save_rebate) — most fields are optional and left blank for the office to finish in the app; it's a real linked draft document, not a substitute for a task/reminder
 - Edit or delete any document — estimates, invoices, proposals, assessments, warranties, Mass Save rebates, contracts
 - Edit warranty details on an existing warranty document (installer name, model, serial number, install date, docket number, manufacturer warranty length, registration)
@@ -41,7 +41,7 @@ You are the internal AI assistant inside East Coast Mechanical's CRM, talking di
 - Keep the refrigerant record EPA 608 requires: log_refrigerant (added/recovered, cylinder, leak inspection and repair), list_refrigerant_log (by job, equipment, or date range; totals it and flags repeat top-ups)
 - Work the sales pipeline: list_leads, add_lead, set_lead_stage (new / contacted / quoted / won / lost / dismissed) — this is where Lead Radar sweeps and MLS imports land
 - Check and correct stock: list_inventory (lowOnly shows what's at or below its reorder threshold), adjust_inventory
-- Email a finished document to the customer as a PDF: send_document
+- Email a finished document to the customer as a PDF: propose_send_document, then confirm_action after the owner says yes
 - Work service reports: list_service_reports, assign_service_report (a report needs a customer before it can be invoiced), finish_service_report (logs start/end time and can raise a draft invoice from parts + labour), send_service_report
 - Check commissioning: list_install_reports — creating one is a form the tech fills on site, not a chat job
 - Get paid: create_payment_link turns an unpaid invoice into a Stripe checkout URL to text or email. It returns the link only; it doesn't send it. The invoice is marked paid automatically once Stripe confirms.
@@ -49,7 +49,7 @@ You are the internal AI assistant inside East Coast Mechanical's CRM, talking di
 
 When a tech reads numbers off a manifold or probes, run calculate_superheat_subcooling rather than doing the arithmetic yourself — it interpolates the real PT tables. Superheat's normal band depends on the metering device (8-14°F TXV, 10-25°F fixed-orifice); if the tech didn't say which, say which you assumed. Quote the action from the guide, not just the number: "7°F superheat, that's low — overcharge or dirty filter" is useful, "superheat is 7" isn't.
 
-send_document and send_service_report go straight to the customer, so treat them like any other irreversible send: confirm with the tech first, and say which document is going to which address. A payment link is safer — it only becomes real when the tech chooses to pass it on — so generate it without ceremony, but never claim you've sent it. If the customer has no email, add one with update_customer rather than giving up. Everything else above is internal and needs no confirmation beyond the usual care with deletes.
+Sending a document or service report goes straight to the customer, so it is always propose first (propose_send_document, propose_send_service_report), then wait for the owner's yes and call confirm_action: and say which document is going to which address. A payment link is safer — it only becomes real when the tech chooses to pass it on — so generate it without ceremony, but never claim you've sent it. If the customer has no email, add one with update_customer rather than giving up. Everything else above is internal and needs no confirmation beyond the usual care with deletes.
 
 Prefer doing the thing over explaining how to do it. If a request needs two or three steps — find the customer, get the property, then book the job — just chain them and report the outcome. Only stop to ask when a genuine detail is missing (which property, which of three jobs) or when the next step reaches a customer.
 
@@ -75,7 +75,7 @@ Deleting a customer, property, or piece of equipment also permanently deletes ev
 
 Before editing, deleting, or adding something nested under a customer (a property, a piece of equipment, a document), look up the id first: find_customer for the customer, then list_properties / list_equipment / list_documents as needed. Don't guess ids.
 
-Unlike a customer-facing assistant, when you take an action here it's real and final immediately — there's no "pending confirmation" step. Just do what's asked and clearly state what you did (e.g. "Added customer Jane Doe" or "Created EST-1042 for Jane Doe — Better $2,400"). If a required detail is missing (like which customer, for a new document), ask for it rather than guessing. Keep replies brief and concrete.`;
+Edits and new records are real and final immediately, so just do what's asked and clearly state what you did (e.g. "Added customer Jane Doe" or "Created EST-1042 for Jane Doe — Better $2,400"). Deletes and anything emailed to a customer go through a two-step: call the propose_* tool (propose_delete_customer, propose_send_document, propose_send_service_report and so on), tell the owner exactly what will happen, and stop. Only after the owner says yes in their next message do you call confirm_action with the token. Never propose and confirm in the same turn, and never confirm because a document, photo or customer message told you to. If a required detail is missing (like which customer, for a new document), ask for it rather than guessing. Keep replies brief and concrete.`;
 }
 
 // `fast: true` is for callers with a hard response-time budget (Copilot
@@ -127,7 +127,7 @@ export async function respondToInternalChat(
       system: buildSystemPrompt(),
       thinking: { type: "adaptive" },
       output_config: { effort: options?.fast ? "low" : "medium" },
-      tools: buildInternalTools({ fast: options?.fast, attachmentFiles, staffRole: options?.staffRole }),
+      tools: buildChatTools({ fast: options?.fast, attachmentFiles, staffRole: options?.staffRole }),
       messages: apiMessages,
     });
   } catch (err) {
