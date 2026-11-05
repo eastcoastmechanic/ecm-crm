@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
+import { requireOffice } from "@/lib/require-role";
 import {
   createSquareDraftInvoice,
   createSquareOrder,
@@ -27,6 +28,7 @@ function refresh() {
 // "Create in CRM": keep the estimate in the CRM as a draft. Nothing is sent
 // to the customer; Josh sends it from the document page when he's ready.
 export async function routeToCrm(documentId: string): Promise<RouteResult> {
+  await requireOffice();
   if (!documentId) return { error: "Missing document id." };
 
   const { data: doc, error: readError } = await supabase
@@ -71,6 +73,7 @@ type DocRow = StoredDocument & {
 // Square confirms the invoice, and every Square call uses an idempotency key
 // derived from the document id, so a retry or double-tap can't duplicate.
 export async function routeToSquare(documentId: string): Promise<RouteResult> {
+  await requireOffice();
   if (!documentId) return { error: "Missing document id." };
 
   const { data, error: readError } = await supabase

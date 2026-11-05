@@ -14,13 +14,20 @@ import {
 import { syncJobToGraph } from "@/lib/graph-connector";
 import { syncJobToPlanner } from "@/lib/planner-connector";
 import { applyJobStatus, sendScheduleNotifications } from "@/lib/job-lifecycle";
-import { requireOffice } from "@/lib/require-role";
+import { requireOffice, requireRole } from "@/lib/require-role";
+import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
 import { parseEtLocal } from "@/lib/tz";
 
 export async function createServiceCall() {
+  const role = await requireRole(["owner", "office", "tech"]);
+  // A tech who starts a service call owns it, so the ownership checks let them finish it.
+  const assigned_staff_id = role === "tech" ? await getMyStaffId() : null;
+  if (role === "tech" && !assigned_staff_id) throw new Error("Not allowed");
+
   const { data: job, error } = await supabase
     .from("jobs")
     .insert({
+      ...(assigned_staff_id ? { assigned_staff_id } : {}),
       customer_id: null,
       property_id: null,
       status: "in_progress",
@@ -108,6 +115,9 @@ export async function updateJobStatus(formData: FormData) {
   const id = formData.get("id") as string;
   const status = formData.get("status") as string;
 
+  // Office and owner can set any status. A tech can only start or finish their own open job.
+  await requireJobAccess(id, { nextStatus: status });
+
   await applyJobStatus(id, status);
 
   revalidatePath("/jobs");
@@ -156,6 +166,7 @@ export async function rescheduleJob(jobId: string, newDate: string) {
 
 export async function addJobPhotos(formData: FormData) {
   const jobId = formData.get("job_id") as string;
+  await requireJobAccess(jobId, { allowClosedJob: true });
   const caption = (formData.get("caption") as string)?.trim() || null;
   const files = formData.getAll("photos") as File[];
 
@@ -175,6 +186,7 @@ export async function addJobPhotos(formData: FormData) {
 }
 
 export async function markOnWay(jobId: string) {
+  await requireJobAccess(jobId);
   const { data: job } = await supabase
     .from("jobs")
     .select("customers(name, email, phone, sms_consent), properties(address)")

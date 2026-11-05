@@ -17,6 +17,8 @@ import {
   type RefrigerantType,
 } from "@/lib/refrigerant";
 import { syncJobToPlanner } from "@/lib/planner-connector";
+import { requireRole } from "@/lib/require-role";
+import { requireJobAccess } from "@/lib/job-access";
 
 const ScannedReadingsSchema = z.object({
   outdoor_temp: z.number().nullable(),
@@ -37,6 +39,7 @@ const ScannedReadingsSchema = z.object({
 export type ScannedReadings = z.infer<typeof ScannedReadingsSchema>;
 
 export async function scanReadingPhoto(formData: FormData): Promise<ScannedReadings> {
+  await requireRole(["owner", "office", "tech"]);
   const photo = formData.get("photo") as File;
   if (!photo || photo.size === 0) throw new Error("No photo provided");
 
@@ -102,6 +105,9 @@ async function uploadPhotos(files: File[]) {
 export async function generateDiagnosis(formData: FormData) {
   const submittedEquipmentId = (formData.get("equipment_id") as string) || null;
   const job_id = (formData.get("job_id") as string) || null;
+  // Techs can run a diagnosis only on a job they may work. Office and owner are not limited.
+  if (job_id) await requireJobAccess(job_id, { allowClosedJob: true });
+  else await requireRole(["owner", "office", "tech"]);
   const symptoms = (formData.get("symptoms") as string)?.trim();
   const refrigerantOverride = formData.get("refrigerant") as string;
   const photoFiles = formData.getAll("photos") as File[];

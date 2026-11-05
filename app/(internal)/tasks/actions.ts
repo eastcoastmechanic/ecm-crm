@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireOffice } from "@/lib/require-role";
 import { createPlannerTask, completePlannerTask } from "@/lib/planner-connector";
 
 export async function addTask(formData: FormData) {
+  await requireOffice();
   const title = (formData.get("title") as string)?.trim();
   const notes = (formData.get("notes") as string)?.trim();
   const due_date = formData.get("due_date") as string;
@@ -21,6 +23,7 @@ export async function addTask(formData: FormData) {
 }
 
 export async function completeTask(id: string): Promise<{ error?: string }> {
+  await requireOffice();
   const ok = await completePlannerTask(id);
   if (!ok) return { error: "Failed to complete task." };
 
