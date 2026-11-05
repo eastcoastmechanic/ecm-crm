@@ -244,3 +244,13 @@ export async function closeStaleTime(now: Date = new Date()): Promise<{ shifts: 
 
   return { shifts, entries };
 }
+
+/** After the office corrects an entry, refresh a finished job's hours from its entries. */
+export async function recomputeTrackedHours(jobId: string): Promise<void> {
+  const { data: job } = await supabase.from("jobs").select("status").eq("id", jobId).maybeSingle();
+  if (!job || job.status !== "complete") return;
+  const { data } = await supabase.from("job_time_entries").select("kind, started_at, ended_at").eq("job_id", jobId);
+  const entries = (data ?? []) as { kind: string; started_at: string; ended_at: string | null }[];
+  if (!entries.some((e) => e.kind === "work")) return;
+  await supabase.from("jobs").update({ tracked_hours: sumWorkHours(entries) }).eq("id", jobId);
+}
