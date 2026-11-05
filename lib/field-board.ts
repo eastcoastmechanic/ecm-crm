@@ -111,6 +111,8 @@ export type FieldBoardEventBody = {
   job_id?: string;
   external_ref?: string;
   crm_status?: string;
+  /** Skip matching a job by the customer name in the text. Set for techs, who may only note a job they picked. */
+  skip_name_match?: boolean;
 };
 
 function searchToken(value: string) {
@@ -148,6 +150,8 @@ async function resolveJob(input: FieldBoardEventBody): Promise<ResolvedJob | nul
       .maybeSingle();
     if (prior?.job_id) return { id: prior.job_id, confident: true };
   }
+
+  if (input.skip_name_match) return null;
 
   const haystack = `${input.title ?? ""} ${input.body ?? ""}`;
   const tokens = searchToken(haystack);
