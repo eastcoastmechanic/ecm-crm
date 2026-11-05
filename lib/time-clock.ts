@@ -116,7 +116,8 @@ export async function startJobEntry(jobId: string, staffId: string, kind: "work"
   if (open) {
     // Drive to work on the same job is the normal hand-off. Anything else means a step was missed.
     const normal = open.job_id === jobId && open.kind === "drive" && kind === "work";
-    await closeOpenEntry(staffId, now, normal ? undefined : "Closed when the next job step started.");
+    // Switching jobs mid-work leaves the first job resumable (marked paused), not lost.
+    await closeOpenEntry(staffId, now, normal ? undefined : "Closed when the next job step started.", undefined, !normal);
   }
 
   const { error } = await supabase
