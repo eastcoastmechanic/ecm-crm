@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { finishBlockers, type ChecklistItem } from "@/lib/checklist-rules";
+import { finishBlockers, isMissingTable, type ChecklistItem } from "@/lib/checklist-rules";
 
 // Server side of the job checklist. Tables are in 0056_job_checklists.sql.
 // If those tables are not there yet (SQL not run), every function here does nothing or
@@ -61,8 +61,8 @@ export async function unlockedJobIds(jobIds: string[]): Promise<Set<string>> {
 }
 
 /**
- * Why a tech cannot finish this job yet (empty = they can). Fails open when the checklist
- * tables are missing, so the gate only applies once 0056 has been run.
+ * Why a tech cannot finish this job yet (empty = they can). Fails open only when the checklist
+ * tables are missing, so the gate applies once 0056 has been run. Other errors block.
  */
 export async function getFinishBlockers(jobId: string): Promise<string[]> {
   const { data: items, error } = await supabase
@@ -70,8 +70,14 @@ export async function getFinishBlockers(jobId: string): Promise<string[]> {
     .select("id, label, required, done_at")
     .eq("job_id", jobId);
   if (error) {
-    console.error(`[checklist] gate skipped, checklist tables not available: ${error.message}`);
-    return [];
+    // Only a missing table (SQL not run yet) skips the gate. Any other failure blocks, so a
+    // timeout can never let an unfinished job through.
+    if (isMissingTable(error)) {
+      console.error(`[checklist] gate skipped, checklist tables not available: ${error.message}`);
+      return [];
+    }
+    console.error(`[checklist] could not check the checklist: ${error.message}`);
+    return ["Could not check the checklist right now. Try again."];
   }
   const [{ data: job }, unlocked] = await Promise.all([
     supabase.from("jobs").select("photos").eq("id", jobId).maybeSingle(),

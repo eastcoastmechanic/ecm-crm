@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { finishBlockers, type ChecklistItem } from "../checklist-rules";
+import { finishBlockers, isMissingTable, type ChecklistItem } from "../checklist-rules";
 
 const item = (label: string, done: boolean, required = true): ChecklistItem => ({ id: label, label, required, done });
 
@@ -37,5 +37,15 @@ describe("finishBlockers", () => {
   it("a job with no checklist is gated on the photo only", () => {
     expect(finishBlockers({ items: [], photoCount: 0, unlocked: false })).toEqual(["Add at least one job photo."]);
     expect(finishBlockers({ items: [], photoCount: 1, unlocked: false })).toEqual([]);
+  });
+});
+
+describe("isMissingTable", () => {
+  it("is true only for a missing table", () => {
+    expect(isMissingTable({ code: "42P01", message: "x" })).toBe(true);
+    expect(isMissingTable({ code: "PGRST205", message: "Could not find the table 'public.job_checklist_items' in the schema cache" })).toBe(true);
+    expect(isMissingTable({ code: "57014", message: "canceling statement due to statement timeout" })).toBe(false);
+    expect(isMissingTable({ message: "fetch failed" })).toBe(false);
+    expect(isMissingTable(null)).toBe(false);
   });
 });

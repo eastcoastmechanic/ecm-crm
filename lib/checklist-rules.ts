@@ -27,3 +27,9 @@ export function finishBlockers(input: {
   if (input.photoCount < MIN_PHOTOS_TO_FINISH) blockers.push("Add at least one job photo.");
   return blockers;
 }
+
+/** True only when Postgres/PostgREST says the table is not there (0056 not run yet). */
+export function isMissingTable(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "42P01" || error.code === "PGRST205" || /could not find the table|does not exist/i.test(error.message ?? "");
+}
