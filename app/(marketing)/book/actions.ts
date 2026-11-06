@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { supabase } from "@/lib/supabase";
 import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
+import { etDateAtHour } from "@/lib/tz";
 
 const WINDOW_HOURS: Record<string, number> = {
   morning: 8,
@@ -38,9 +39,9 @@ export async function bookService(formData: FormData) {
     address,
   });
 
-  const hour = WINDOW_HOURS[window] ?? 8;
-  const scheduledAt = new Date(`${date}T00:00:00`);
-  scheduledAt.setHours(hour, 0, 0, 0);
+  // The window is New York time; the server clock is UTC.
+  const scheduledAt = etDateAtHour(date, WINDOW_HOURS[window] ?? 8);
+  if (!scheduledAt) throw new Error("Preferred date is required");
 
   const { error } = await supabase.from("jobs").insert({
     customer_id: customerId,
