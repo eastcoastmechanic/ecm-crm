@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
 import { checkAvailabilityTool } from "./tools";
+import { parseEtLocal } from "@/lib/tz";
 
 // Unlike the SMS/voice tools, a website visitor is never a "recognized
 // customer" (no phone-number channel to match against), so there's no
@@ -27,6 +28,10 @@ const createWebBookingRequest = betaZodTool({
       ),
   }),
   run: async ({ name, phone, address, date, time, description, smsConsent }) => {
+    // The visitor means New York time; the server clock is UTC. Checked before anything is saved.
+    const scheduledAt = parseEtLocal(`${date}T${time}`);
+    if (!scheduledAt) return `Couldn't read "${date} ${time}" as a date and time. Use YYYY-MM-DD and HH:MM.`;
+
     let customerId: string;
     let propertyId: string;
     try {
@@ -41,10 +46,6 @@ const createWebBookingRequest = betaZodTool({
     } catch (err) {
       return `Failed to set up customer/property: ${err instanceof Error ? err.message : "unknown error"}`;
     }
-
-    const [year, month, day] = date.split("-").map(Number);
-    const [hour, minute] = time.split(":").map(Number);
-    const scheduledAt = new Date(year, month - 1, day, hour, minute, 0);
 
     const { error: jobError } = await supabase.from("jobs").insert({
       customer_id: customerId,
