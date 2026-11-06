@@ -13,7 +13,13 @@ export default function ScheduleJobForm({ documentId }: { documentId: string }) 
       <input type="hidden" name="document_id" value={documentId} />
       <label className="flex flex-col gap-1 text-xs text-g300">
         Job date and time
-        <input type="datetime-local" name="scheduled_at" required className={inputClass} />
+        <input
+          type="datetime-local"
+          name="scheduled_at"
+          required
+          defaultValue={state?.scheduledAt ?? ""}
+          className={inputClass}
+        />
       </label>
       <SubmitButton className={buttonClass} pendingText="Scheduling…">
         Schedule job
