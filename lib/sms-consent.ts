@@ -31,10 +31,26 @@ export function parseSmsKeyword(body: string): SmsKeyword | null {
 
 type CustomerRow = { id: string; phone: string | null; sms_consent: boolean };
 
+const PAGE = 1000;
+
 async function customersForPhone(key: string): Promise<CustomerRow[]> {
-  const { data, error } = await supabase.from("customers").select("id, phone, sms_consent");
-  if (error) throw new Error(`sms-consent: customers read failed: ${error.message}`);
-  return ((data ?? []) as CustomerRow[]).filter((c) => c.phone && phoneKey(c.phone) === key);
+  // Phones are stored in mixed formats, so match on the last-10-digits key in
+  // code. PostgREST caps one read at 1000 rows, so page through; a customer past
+  // row 1000 must not look like "no customer" (that would let a reply text an
+  // opted-out number).
+  const matches: CustomerRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("id, phone, sms_consent")
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`sms-consent: customers read failed: ${error.message}`);
+    const rows = (data ?? []) as CustomerRow[];
+    matches.push(...rows.filter((c) => c.phone && phoneKey(c.phone) === key));
+    if (rows.length < PAGE) break;
+  }
+  return matches;
 }
 
 async function excludedRowsForPhone(key: string) {

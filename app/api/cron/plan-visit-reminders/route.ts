@@ -1,3 +1,4 @@
+import { canText as canTextNumber } from "@/lib/sms-consent";
 import { NextResponse } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { supabase } from "@/lib/supabase";
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
     if (!kind) continue;
 
     const customer = one(v.customers as unknown as Customer | Customer[] | null);
-    const canText = !!customer?.phone && customer.sms_consent === true;
+    const canText = !!customer?.phone && customer.sms_consent === true && (await canTextNumber(customer.phone));
     const canEmail = !!customer?.email;
     if (!customer || (!canText && !canEmail)) {
       skipped++;

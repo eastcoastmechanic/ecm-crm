@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { sendSMS } from "@/lib/sms";
+import { canText } from "@/lib/sms-consent";
 import { generateJobICS } from "@/lib/ics";
 import { syncJobToGraph } from "@/lib/graph-connector";
 import { syncJobToPlanner } from "@/lib/planner-connector";
@@ -50,7 +51,7 @@ export async function sendScheduleNotifications(jobId: string) {
     });
   }
 
-  if (customer?.phone && customer?.sms_consent) {
+  if (customer?.phone && customer?.sms_consent && (await canText(customer.phone))) {
     const sent = await sendSMS(customer.phone, `East Coast Mechanical: You're scheduled for ${when}${whereText}.`);
     if (!sent.ok) console.error(`Schedule confirmation text failed: ${sent.error}`);
   }
