@@ -20,6 +20,7 @@
  */
 import { supabase } from "@/lib/supabase";
 import { graphConfigured, graphFetchWithRetry } from "@/lib/graph-auth";
+import { ensureJobFolder } from "@/lib/job-folders";
 
 const SITE_ORIGIN = "https://eastcoastmechanical.org";
 export const CONNECTION_ID = process.env.MS_GRAPH_CONNECTION_ID || "ecmcrm";
@@ -107,6 +108,8 @@ export async function deleteCustomerFromGraph(customerId: string): Promise<boole
 }
 
 export async function syncJobToGraph(jobId: string): Promise<boolean> {
+  // Job folder for this address: created the first time a job at it is synced, no-op after.
+  await ensureJobFolder(jobId);
   try {
     const { data: job } = await supabase
       .from("jobs")
