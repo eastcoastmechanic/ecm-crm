@@ -21,11 +21,13 @@ import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
 import { getFinishBlockers } from "@/lib/job-checklist";
 import { moveToEtDate, parseEtLocal } from "@/lib/tz";
 
-export async function createServiceCall() {
+/** Start a service call and open its report. Problems come back inline instead of an error page. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- useActionState passes the previous state first
+export async function createServiceCall(_prev: { error?: string } | null): Promise<{ error?: string }> {
   const role = await requireRole(["owner", "office", "tech"]);
   // A tech who starts a service call owns it, so the ownership checks let them finish it.
   const assigned_staff_id = role === "tech" ? await getMyStaffId() : null;
-  if (role === "tech" && !assigned_staff_id) throw new Error("Not allowed");
+  if (role === "tech" && !assigned_staff_id) return { error: "Your login isn't linked to a staff record. Ask the office." };
 
   const { data: job, error } = await supabase
     .from("jobs")
@@ -41,7 +43,7 @@ export async function createServiceCall() {
     .select("id")
     .single();
 
-  if (error || !job) throw new Error(error?.message ?? "Failed to start service call");
+  if (error || !job) return { error: "Couldn't start the service call. Try again." };
 
   await syncJobToPlanner(job.id, "in_progress");
 
