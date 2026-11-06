@@ -160,22 +160,39 @@ type CustomerContact = {
 } | null;
 type PropertyInfo = { address: string | null } | null;
 
-export async function updateJobStatus(formData: FormData) {
-  const id = formData.get("id") as string;
-  const status = formData.get("status") as string;
+/**
+ * Change a job's status through job-lifecycle. Returns { error } instead of
+ * throwing: production builds hide a thrown server action's message, so the
+ * Jobs list and the Field Board could only show a generic failure.
+ */
+export async function updateJobStatus(formData: FormData): Promise<{ error?: string }> {
+  const id = String(formData.get("id") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim();
+  if (!id) return { error: "Job is required." };
+  if (!status) return { error: "Pick a status." };
 
   // Office and owner can set any status. A tech can only start or finish their own open job.
-  const role = await requireJobAccess(id, { nextStatus: status });
+  let role: Awaited<ReturnType<typeof requireJobAccess>>;
+  try {
+    role = await requireJobAccess(id, { nextStatus: status });
+  } catch (err) {
+    return { error: err instanceof Error && err.message !== "Not allowed" ? err.message : "You can't change this job." };
+  }
 
   // A tech cannot finish a job with an open checklist or no photo (the owner can unlock it).
   if (role === "tech" && status === "complete") {
     const blockers = await getFinishBlockers(id);
-    if (blockers.length > 0) throw new Error(blockers.join(" "));
+    if (blockers.length > 0) return { error: blockers.join(" ") };
   }
 
-  await applyJobStatus(id, status);
+  try {
+    await applyJobStatus(id, status);
+  } catch {
+    return { error: "Couldn't save the status. Try again." };
+  }
 
   revalidatePath("/jobs");
+  return {};
 }
 
 /** Change a job's date and time (New York wall-clock, "2026-10-22T09:30"). Notifies the customer and syncs Graph. */

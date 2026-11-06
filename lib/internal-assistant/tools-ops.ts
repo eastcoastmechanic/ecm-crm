@@ -99,7 +99,8 @@ const updateJobStatusTool = betaZodTool({
     fd.set("id", jobId);
     fd.set("status", status);
     try {
-      await updateJobStatus(fd);
+      const result = await updateJobStatus(fd);
+      if (result.error) return `Failed to update job: ${result.error}`;
 
       // Deliberately does not block the status change. A tech standing in a
       // driveway needs to close the job; withholding that until they take a

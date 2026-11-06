@@ -71,11 +71,14 @@ export async function truckOnMyWay(formData: FormData): Promise<void> {
   revalidatePath("/field-board");
 }
 
-export async function truckSetStatus(formData: FormData): Promise<void> {
+export async function truckSetStatus(formData: FormData): Promise<{ error?: string }> {
   await requireRole(["owner", "office", "tech"]);
   const status = String(formData.get("status") ?? "").trim();
-  if (!String(formData.get("id") ?? "").trim() || !["in_progress", "complete"].includes(status)) return;
-  await updateJobStatus(formData);
+  if (!String(formData.get("id") ?? "").trim() || !["in_progress", "complete"].includes(status)) {
+    return { error: "Missing job." };
+  }
+  const result = await updateJobStatus(formData);
+  if (result.error) return result;
   // I'm here starts the work timer (and ends drive time). Finish is closed out in applyJobStatus.
   if (status === "in_progress") {
     const staffId = await getMyStaffId();
@@ -83,6 +86,13 @@ export async function truckSetStatus(formData: FormData): Promise<void> {
     if (staffId) await startJobEntry(id, staffId, "work");
   }
   revalidatePath("/field-board");
+  return {};
+}
+
+/** I'm here, with the reason shown on the card if it can't be saved. */
+export async function arriveJobAction(_prev: { error?: string } | null, formData: FormData): Promise<{ error?: string }> {
+  formData.set("status", "in_progress");
+  return truckSetStatus(formData);
 }
 
 // One photo per call: each request stays well under Vercel's 4.5MB body cap.
