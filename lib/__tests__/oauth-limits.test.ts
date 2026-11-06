@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { clientIp, loginLocked, redirectHost, registrationAllowed } from "../oauth-limits";
 
+// Counts include the request being handled (it's recorded before counting).
+
 describe("registrationAllowed", () => {
-  it("allows a few per hour and refuses past the cap", () => {
-    expect(registrationAllowed(0)).toBe(true);
-    expect(registrationAllowed(4)).toBe(true);
-    expect(registrationAllowed(5)).toBe(false);
+  it("allows up to 5 an hour, the 6th is refused", () => {
+    expect(registrationAllowed(1)).toBe(true);
+    expect(registrationAllowed(5)).toBe(true);
+    expect(registrationAllowed(6)).toBe(false);
   });
 
   it("refuses when the count is unknown", () => {
@@ -14,18 +16,18 @@ describe("registrationAllowed", () => {
 });
 
 describe("loginLocked", () => {
-  it("locks one address after 5 failures", () => {
-    expect(loginLocked({ ipFailures: 4, allFailures: 4 })).toBe(false);
-    expect(loginLocked({ ipFailures: 5, allFailures: 5 })).toBe(true);
+  it("lets one address fail 5 times, then locks the 6th try", () => {
+    expect(loginLocked({ ipAttempts: 5, allAttempts: 5 })).toBe(false);
+    expect(loginLocked({ ipAttempts: 6, allAttempts: 6 })).toBe(true);
   });
 
   it("locks everyone after 20 failures spread across addresses", () => {
-    expect(loginLocked({ ipFailures: 0, allFailures: 19 })).toBe(false);
-    expect(loginLocked({ ipFailures: 0, allFailures: 20 })).toBe(true);
+    expect(loginLocked({ ipAttempts: 1, allAttempts: 20 })).toBe(false);
+    expect(loginLocked({ ipAttempts: 1, allAttempts: 21 })).toBe(true);
   });
 
   it("locks when the counts can't be read", () => {
-    expect(loginLocked({ ipFailures: null, allFailures: 0 })).toBe(true);
+    expect(loginLocked({ ipAttempts: null, allAttempts: 1 })).toBe(true);
   });
 });
 

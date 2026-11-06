@@ -168,24 +168,32 @@ export async function POST(request: Request) {
 
   // Lockout before the password check, counted in the database (SQL 0063) so
   // it holds across every server instance.
+  // This attempt is recorded before counting, so simultaneous guesses see each
+  // other and can't all slip under the limit. A right password removes it.
+  const lockedPage = () =>
+    htmlResponse(
+      loginFormHtml(req, validation.clientName, `Too many failed sign-ins. Try again in ${LOGIN_WINDOW_MINUTES} minutes.`),
+      429
+    );
+  const { data: attempt, error: attemptError } = await supabase
+    .from("oauth_login_failures")
+    .insert({ ip })
+    .select("id")
+    .single();
+  if (attemptError || !attempt) return lockedPage(); // can't record it: fail closed
+
   const since = new Date(Date.now() - LOGIN_WINDOW_MINUTES * 60 * 1000).toISOString();
   const [ipCount, allCount] = await Promise.all([
     supabase.from("oauth_login_failures").select("id", { count: "exact", head: true }).eq("ip", ip).gte("created_at", since),
     supabase.from("oauth_login_failures").select("id", { count: "exact", head: true }).gte("created_at", since),
   ]);
   const locked = loginLocked({
-    ipFailures: ipCount.error ? null : (ipCount.count ?? 0),
-    allFailures: allCount.error ? null : (allCount.count ?? 0),
+    ipAttempts: ipCount.error ? null : (ipCount.count ?? 0),
+    allAttempts: allCount.error ? null : (allCount.count ?? 0),
   });
-  if (locked) {
-    return htmlResponse(
-      loginFormHtml(req, validation.clientName, `Too many failed sign-ins. Try again in ${LOGIN_WINDOW_MINUTES} minutes.`),
-      429
-    );
-  }
+  if (locked) return lockedPage();
 
   if (!verifyInternalCredentials(username, password)) {
-    await supabase.from("oauth_login_failures").insert({ ip });
     await supabase
       .from("oauth_login_failures")
       .delete()
@@ -194,6 +202,9 @@ export async function POST(request: Request) {
     // signaling anything to redirect_uri before identity is proven.
     return htmlResponse(loginFormHtml(req, validation.clientName, "Incorrect username or password."), 401);
   }
+
+  // Right password: this attempt wasn't a failure.
+  await supabase.from("oauth_login_failures").delete().eq("id", attempt.id);
 
   const code = generateOpaqueToken();
   const { error } = await supabase.from("oauth_authorization_codes").insert({

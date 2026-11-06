@@ -40,11 +40,6 @@ export async function POST(request: Request) {
       { status: 429, headers: { ...corsHeaders, "Retry-After": "3600" } }
     );
   if (isRateLimited(`oauth-register:${clientIp(request.headers)}`, 3)) return tooMany();
-  const { count, error: countError } = await supabase
-    .from("oauth_clients")
-    .select("client_id", { count: "exact", head: true })
-    .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
-  if (!registrationAllowed(countError ? null : (count ?? 0))) return tooMany();
 
   let body: unknown;
   try {
@@ -78,6 +73,17 @@ export async function POST(request: Request) {
     .single();
   if (error) {
     return NextResponse.json({ error: "server_error", error_description: "Could not register client" }, { status: 500, headers: corsHeaders });
+  }
+
+  // Insert first, count after (the count includes this one), so simultaneous
+  // registrations see each other and can't all slip under the hourly cap.
+  const { count, error: countError } = await supabase
+    .from("oauth_clients")
+    .select("client_id", { count: "exact", head: true })
+    .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
+  if (!registrationAllowed(countError ? null : (count ?? 0))) {
+    await supabase.from("oauth_clients").delete().eq("client_id", data.client_id);
+    return tooMany();
   }
 
   return NextResponse.json(

@@ -11,18 +11,26 @@ export const MAX_FAILURES_PER_IP = 5;
 /** Across all addresses, so spreading a guessing run over many IPs still stops. */
 export const MAX_FAILURES_TOTAL = 20;
 
-export function registrationAllowed(registeredLastHour: number | null): boolean {
+/**
+ * The count includes the client just inserted: the route inserts first and
+ * counts after, so simultaneous requests see each other and can't all slip
+ * under the cap.
+ */
+export function registrationAllowed(registeredLastHourIncludingThis: number | null): boolean {
   // Unknown count (query failed): refuse rather than open the door.
-  return registeredLastHour !== null && registeredLastHour < REGISTRATIONS_PER_HOUR;
+  return registeredLastHourIncludingThis !== null && registeredLastHourIncludingThis <= REGISTRATIONS_PER_HOUR;
 }
 
 /**
- * Locked when this address or everyone together has too many recent failures.
- * Checked before the password, so a right guess during a lockout still fails.
+ * Locked when this address or everyone together has too many recent failed
+ * attempts. Counts include the attempt being made now: the route records it
+ * before counting (and removes it if the password is right), so simultaneous
+ * guesses see each other. Checked before the password, so a right guess
+ * during a lockout still fails.
  */
-export function loginLocked(counts: { ipFailures: number | null; allFailures: number | null }): boolean {
-  if (counts.ipFailures === null || counts.allFailures === null) return true;
-  return counts.ipFailures >= MAX_FAILURES_PER_IP || counts.allFailures >= MAX_FAILURES_TOTAL;
+export function loginLocked(counts: { ipAttempts: number | null; allAttempts: number | null }): boolean {
+  if (counts.ipAttempts === null || counts.allAttempts === null) return true;
+  return counts.ipAttempts > MAX_FAILURES_PER_IP || counts.allAttempts > MAX_FAILURES_TOTAL;
 }
 
 /** The site a connection would send its access to, for the sign-in warning. */
