@@ -14,6 +14,7 @@ import { sendPmReportToCustomer } from "@/lib/pm/send";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { markDocumentPaid } from "@/lib/document-paid";
 import { requireOffice } from "@/lib/require-role";
+import { documentTotal, selectedTier } from "@/lib/estimate-tier";
 
 type LineItem = {
   category: string;
@@ -163,7 +164,7 @@ export async function updateDocument(formData: FormData) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("documents")
-    .select("line_items, type, due_date, customer_id, job_id, status")
+    .select("line_items, type, due_date, customer_id, job_id, status, selected_tier")
     .eq("id", id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
@@ -203,6 +204,8 @@ export async function updateDocument(formData: FormData) {
     better: sumTier(items, "better"),
     best: sumTier(items, "best"),
   };
+  // If the customer already picked Good/Better/Best, the total stays on their pick.
+  const docTotal = documentTotal(totals, selectedTier(pricingMode, existing.selected_tier));
 
   const { error } = await supabase
     .from("documents")
@@ -216,9 +219,9 @@ export async function updateDocument(formData: FormData) {
         totals,
         pricing_mode: pricingMode,
       },
-      subtotal: totals.better,
+      subtotal: docTotal,
       tax: 0,
-      total: totals.better,
+      total: docTotal,
       sent_at: status === "sent" ? new Date().toISOString() : undefined,
       due_date: status === "sent" ? dueDateForSend(existing.type, existing.due_date) : undefined,
     })

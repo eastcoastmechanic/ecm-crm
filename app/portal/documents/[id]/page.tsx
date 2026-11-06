@@ -6,6 +6,7 @@ import SignaturePad from "./SignaturePad";
 import ContractView from "./ContractView";
 import SubmitButton from "../../../(internal)/SubmitButton";
 import { buttonClass, headingClass, subTextClass } from "../../../(internal)/ui";
+import { availableTiers, selectedTier, TIER_LABEL } from "@/lib/estimate-tier";
 
 // Illustrative only — no real lender is wired up yet (see Phase 1 plan notes).
 // Standard amortizing-loan formula at a representative APR.
@@ -107,6 +108,13 @@ export default async function PortalDocumentPage({
     pricing_mode?: "tiered" | "flat";
   };
   const isFlat = lineData.pricing_mode === "flat";
+  const chosen = selectedTier(lineData.pricing_mode, doc.selected_tier);
+  // Line prices follow the customer's pick once they've chosen; Better until then.
+  const priceTier = chosen ?? "better";
+  const tierOptions =
+    doc.type === "estimate" && !isFlat
+      ? availableTiers(lineData.totals).map((t) => ({ tier: t, total: lineData.totals[t], brand: lineData.brand?.[t] ?? null }))
+      : [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -143,15 +151,19 @@ export default async function PortalDocumentPage({
             <div
               key={tier}
               className={`rounded-xl border p-4 text-center ${
-                tier === "better"
-                  ? "border-blue bg-blue/20"
-                  : tier === "best"
-                    ? "border-accent/40 bg-accent/10"
-                    : "border-white/8 bg-white/3"
+                chosen
+                  ? tier === chosen
+                    ? "border-green bg-green-l/10"
+                    : "border-white/8 bg-white/3 opacity-60"
+                  : tier === "better"
+                    ? "border-blue bg-blue/20"
+                    : tier === "best"
+                      ? "border-accent/40 bg-accent/10"
+                      : "border-white/8 bg-white/3"
               }`}
             >
               <div className="text-[10px] font-bold uppercase tracking-wide text-g300">
-                {tier === "better" ? "Better ★" : tier}
+                {tier === chosen ? `${TIER_LABEL[tier]}: your choice` : tier === "better" ? "Better ★" : tier}
               </div>
               <div className="mt-1 font-display text-xl font-extrabold">
                 {formatPrice(lineData.totals[tier])}
@@ -162,7 +174,7 @@ export default async function PortalDocumentPage({
         </div>
       )}
 
-      {(doc.type === "estimate" || doc.type === "proposal") && lineData.totals.better > 0 && (
+      {(doc.type === "estimate" || doc.type === "proposal") && lineData.totals[priceTier] > 0 && (
         <div className="rounded-xl border border-white/8 bg-white/3 p-4">
           <div className="text-xs font-bold uppercase tracking-wide text-g300">
             Financing options
@@ -171,14 +183,14 @@ export default async function PortalDocumentPage({
             {FINANCING_TERMS_MONTHS.map((term) => (
               <div key={term}>
                 <div className="font-display text-lg font-extrabold text-white">
-                  {formatPrice(estimateMonthlyPayment(lineData.totals.better, term))}/mo
+                  {formatPrice(estimateMonthlyPayment(lineData.totals[priceTier], term))}/mo
                 </div>
                 <div className="text-xs text-g300">{term} months</div>
               </div>
             ))}
           </div>
           <p className="mt-2 text-xs text-g500">
-            Estimate only, based on the {isFlat ? "quoted" : "Better tier"} price at {ILLUSTRATIVE_APR}%
+            Estimate only, based on the {isFlat ? "quoted" : `${TIER_LABEL[priceTier]} option`} price at {ILLUSTRATIVE_APR}%
             illustrative APR — not a credit offer or pre-qualification.
           </p>
         </div>
@@ -190,7 +202,7 @@ export default async function PortalDocumentPage({
             <tr className="border-b border-white/8 text-left text-[10px] font-bold uppercase tracking-wide text-g300">
               <th className="px-3 py-2">Description</th>
               <th className="px-3 py-2">Qty</th>
-              <th className="px-3 py-2">{isFlat ? "Price" : "Price (selected tier)"}</th>
+              <th className="px-3 py-2">{isFlat ? "Price" : `Price (${TIER_LABEL[priceTier]})`}</th>
             </tr>
           </thead>
           <tbody>
@@ -203,7 +215,7 @@ export default async function PortalDocumentPage({
                 <td className="px-3 py-2 align-top">
                   {item.qty} {item.unit}
                 </td>
-                <td className="px-3 py-2 align-top">{formatPrice(item.better)}</td>
+                <td className="px-3 py-2 align-top">{formatPrice(item[priceTier])}</td>
               </tr>
             ))}
           </tbody>
@@ -228,11 +240,12 @@ export default async function PortalDocumentPage({
       )}
 
       {doc.type === "estimate" && doc.status === "sent" && (
-        <SignaturePad documentId={doc.id} />
+        <SignaturePad documentId={doc.id} options={tierOptions} />
       )}
       {doc.type === "estimate" && doc.status === "approved" && (
         <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">
-          Approved{doc.signed_at ? ` on ${new Date(doc.signed_at).toLocaleDateString()}` : ""}.
+          Approved{chosen ? `: ${TIER_LABEL[chosen]} option, ${formatPrice(lineData.totals[chosen])}` : ""}
+          {doc.signed_at ? ` on ${new Date(doc.signed_at).toLocaleDateString()}` : ""}.
           We&apos;ll be in touch to schedule the work.
         </div>
       )}
