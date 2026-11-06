@@ -19,8 +19,14 @@ const OPT_IN_WORDS = new Set(["start", "unstop"]);
 
 export type SmsKeyword = "opt_out" | "opt_in" | "yes" | "help";
 
-/** Case/whitespace-insensitive exact match on the whole message. */
+// Josh's rule: a text that has the word "stop" anywhere in it is an opt-out, not
+// just a message that is only "stop". Whole word, any case ("Please stop texting
+// me", "STOP!"). Leaning toward unsubscribing is the safe way to be wrong.
+const STOP_AS_A_WORD = /\bstop\b/i;
+
+/** Opt-out words and opt-in/help/yes are exact matches on the whole message; "stop" counts anywhere. */
 export function parseSmsKeyword(body: string): SmsKeyword | null {
+  if (STOP_AS_A_WORD.test(body)) return "opt_out";
   const word = body.trim().toLowerCase().replace(/[.!?\s]+$/g, "");
   if (OPT_OUT_WORDS.has(word)) return "opt_out";
   if (OPT_IN_WORDS.has(word)) return "opt_in";
