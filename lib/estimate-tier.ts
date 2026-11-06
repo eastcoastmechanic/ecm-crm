@@ -1,6 +1,8 @@
 // Good / Better / Best choice on an estimate. The customer picks one in the
-// portal when approving; it is stored as line_items.selected_tier and the
-// document total becomes that option's total. Pure helpers, no I/O.
+// portal when approving; it is stored in documents.selected_tier (SQL 0062)
+// and the document total becomes that option's total. Its own column so the
+// approval never rewrites line_items an office edit may have just changed.
+// Pure helpers, no I/O.
 
 export const TIERS = ["good", "better", "best"] as const;
 export type Tier = (typeof TIERS)[number];
@@ -14,9 +16,9 @@ export function parseTier(value: unknown): Tier | null {
 }
 
 /** The option the customer chose, or null for flat estimates and ones approved before this existed. */
-export function selectedTier(lineItems: { pricing_mode?: string | null; selected_tier?: unknown } | null | undefined): Tier | null {
-  if (!lineItems || lineItems.pricing_mode === "flat") return null;
-  return parseTier(lineItems.selected_tier);
+export function selectedTier(pricingMode: string | null | undefined, storedTier: unknown): Tier | null {
+  if (pricingMode === "flat") return null;
+  return parseTier(storedTier);
 }
 
 /** Total to store on the document: the chosen option's total, otherwise Better (the long-standing default). */

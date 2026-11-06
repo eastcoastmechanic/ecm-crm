@@ -164,7 +164,7 @@ export async function updateDocument(formData: FormData) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("documents")
-    .select("line_items, type, due_date, customer_id, job_id, status")
+    .select("line_items, type, due_date, customer_id, job_id, status, selected_tier")
     .eq("id", id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
@@ -205,7 +205,7 @@ export async function updateDocument(formData: FormData) {
     best: sumTier(items, "best"),
   };
   // If the customer already picked Good/Better/Best, the total stays on their pick.
-  const docTotal = documentTotal(totals, selectedTier({ ...existingData, pricing_mode: pricingMode }));
+  const docTotal = documentTotal(totals, selectedTier(pricingMode, existing.selected_tier));
 
   const { error } = await supabase
     .from("documents")

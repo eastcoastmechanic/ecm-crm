@@ -31,10 +31,11 @@ describe("approvalChoice", () => {
 
 describe("selectedTier and documentTotal", () => {
   it("reads the stored pick and ignores it on flat estimates", () => {
-    expect(selectedTier({ pricing_mode: "tiered", selected_tier: "good" })).toBe("good");
-    expect(selectedTier({ pricing_mode: "flat", selected_tier: "good" })).toBeNull();
-    expect(selectedTier({ selected_tier: "nope" })).toBeNull();
-    expect(selectedTier(null)).toBeNull();
+    expect(selectedTier("tiered", "good")).toBe("good");
+    expect(selectedTier(undefined, "best")).toBe("best");
+    expect(selectedTier("flat", "good")).toBeNull();
+    expect(selectedTier("tiered", "nope")).toBeNull();
+    expect(selectedTier("tiered", null)).toBeNull();
   });
 
   it("keeps the chosen total, defaulting to Better", () => {

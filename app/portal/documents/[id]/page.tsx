@@ -106,10 +106,9 @@ export default async function PortalDocumentPage({
     mass_save_note: string | null;
     totals: { good: number; better: number; best: number };
     pricing_mode?: "tiered" | "flat";
-    selected_tier?: string | null;
   };
   const isFlat = lineData.pricing_mode === "flat";
-  const chosen = selectedTier(lineData);
+  const chosen = selectedTier(lineData.pricing_mode, doc.selected_tier);
   // Line prices follow the customer's pick once they've chosen; Better until then.
   const priceTier = chosen ?? "better";
   const tierOptions =

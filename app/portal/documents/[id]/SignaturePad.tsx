@@ -66,7 +66,10 @@ export default function SignaturePad({ documentId, options = [] }: { documentId:
       const formData = new FormData();
       formData.set("document_id", documentId);
       formData.set("signature_data", dataUrl);
-      if (tier) formData.set("tier", tier);
+      if (tier) {
+        formData.set("tier", tier);
+        formData.set("tier_total", String(options.find((o) => o.tier === tier)?.total ?? ""));
+      }
       const result = await approveEstimate(formData);
       if (result?.error) {
         setError(result.error);

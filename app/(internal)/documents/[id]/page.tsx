@@ -170,7 +170,6 @@ export default async function DocumentPage({
     mass_save_note?: string | null;
     totals?: { good: number; better: number; best: number };
     option_label?: string | null;
-    selected_tier?: string | null;
     pricing_mode?: "tiered" | "flat";
   } | null;
 
@@ -186,7 +185,7 @@ export default async function DocumentPage({
     pricing_mode: rawLineData?.pricing_mode ?? "tiered",
   };
   const isFlat = lineData.pricing_mode === "flat";
-  const chosen = selectedTier(rawLineData);
+  const chosen = selectedTier(lineData.pricing_mode, doc.selected_tier);
 
   return (
     <div className="flex flex-col gap-8">

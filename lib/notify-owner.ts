@@ -132,12 +132,12 @@ export async function notifyOwnerOfEvent(kind: OwnerEvent, id: string) {
     } else {
       const { data: doc } = await supabase
         .from("documents")
-        .select("doc_number, total, line_items, customers(name)")
+        .select("doc_number, total, line_items, selected_tier, customers(name)")
         .eq("id", id)
         .single();
       const customer = Array.isArray(doc?.customers) ? doc?.customers[0] : doc?.customers;
       who = customer?.name ?? who;
-      const tier = selectedTier(doc?.line_items as { pricing_mode?: string; selected_tier?: unknown } | null);
+      const tier = selectedTier((doc?.line_items as { pricing_mode?: string } | null)?.pricing_mode, doc?.selected_tier);
       what = [doc?.doc_number, money(doc?.total), tier ? `${TIER_LABEL[tier]} option` : null].filter(Boolean).join(" · ");
     }
 

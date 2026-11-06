@@ -67,7 +67,7 @@ export async function createCheckoutSession(formData: FormData) {
 
 /**
  * Customer approves an estimate in the portal. On a Good/Better/Best estimate
- * they must pick one; the pick is stored as line_items.selected_tier and the
+ * they must pick one; the pick is stored in documents.selected_tier and the
  * document total becomes that option's total, so the owner alert and the
  * contract made from it carry the right price. Returns { error } (production
  * builds hide a thrown message from the customer).
@@ -94,29 +94,34 @@ export async function approveEstimate(formData: FormData): Promise<{ error?: str
   if (doc.type !== "estimate") return { error: "Only estimates can be approved." };
   if (doc.status !== "sent") return { error: "This estimate can't be approved right now." };
 
-  const lineItems = (doc.line_items ?? {}) as Record<string, unknown> & {
-    pricing_mode?: string | null;
-    totals?: TierTotals | null;
-  };
+  const lineItems = (doc.line_items ?? {}) as { pricing_mode?: string | null; totals?: TierTotals | null };
   const choice = approvalChoice(lineItems, formData.get("tier"));
   if (!choice.ok) return { error: choice.error };
 
-  const { data: approved, error: updateError } = await supabase
+  const changed = "This estimate was just updated. Refresh the page, check the price and sign again.";
+  // The price the customer was shown must still be the price on file.
+  if (choice.tier) {
+    const seen = Number(formData.get("tier_total"));
+    if (!Number.isFinite(seen) || Math.abs(seen - choice.total) > 0.005) return { error: changed };
+  }
+
+  // line_items is never written here, so an office edit saved meanwhile is kept.
+  let update = supabase
     .from("documents")
     .update({
       status: "approved",
       signed_at: new Date().toISOString(),
       signature_data: signatureData,
-      ...(choice.tier
-        ? { line_items: { ...lineItems, selected_tier: choice.tier }, subtotal: choice.total, tax: 0, total: choice.total }
-        : {}),
+      ...(choice.tier ? { selected_tier: choice.tier, subtotal: choice.total, tax: 0, total: choice.total } : {}),
     })
     .eq("id", documentId)
-    .eq("status", "sent")
-    .select("id");
+    .eq("status", "sent");
+  // And the chosen option's price must not have changed between the read above and this write.
+  if (choice.tier) update = update.eq(`line_items->totals->>${choice.tier}`, String(choice.total));
+  const { data: approved, error: updateError } = await update.select("id");
 
   if (updateError) return { error: "Couldn't save your approval. Please try again." };
-  if (!approved || approved.length === 0) return { error: "This estimate can't be approved right now." };
+  if (!approved || approved.length === 0) return { error: choice.tier ? changed : "This estimate can't be approved right now." };
 
   await notifyOwnerOfEvent("estimate_approved", documentId);
 

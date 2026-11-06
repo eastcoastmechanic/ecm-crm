@@ -9,7 +9,7 @@ type EstimateLineItem = { category: string; description: string; qty: number; un
 async function loadPrefill(estimateId: string) {
   const { data: estimate } = await supabase
     .from("documents")
-    .select("customer_id, property_id, total, line_items")
+    .select("customer_id, property_id, total, line_items, selected_tier")
     .eq("id", estimateId)
     .eq("type", "estimate")
     .single();
@@ -19,13 +19,12 @@ async function loadPrefill(estimateId: string) {
   const lineItems = estimate.line_items as {
     items?: EstimateLineItem[];
     pricing_mode?: string;
-    selected_tier?: unknown;
     totals?: TierTotals;
     brand?: Partial<Record<Tier, string | null>>;
   } | null;
   const items = lineItems?.items ?? [];
   // The customer's Good/Better/Best pick sets the price, never the Better default.
-  const tier = selectedTier(lineItems);
+  const tier = selectedTier(lineItems?.pricing_mode, estimate.selected_tier);
   const tierLine = tier
     ? `Option chosen: ${TIER_LABEL[tier]}${lineItems?.brand?.[tier] ? ` (${lineItems.brand[tier]})` : ""}`
     : null;
