@@ -14,6 +14,7 @@ import EditCustomerForm from "../../customers/[id]/EditCustomerForm";
 import SubmitButton from "../../SubmitButton";
 import DocumentDeleteButton from "../DocumentDeleteButton";
 import { headingClass, subTextClass, buttonClass, buttonSecondaryClass } from "../../ui";
+import { selectedTier, TIER_LABEL } from "@/lib/estimate-tier";
 
 type LineItem = {
   category: string;
@@ -169,6 +170,7 @@ export default async function DocumentPage({
     mass_save_note?: string | null;
     totals?: { good: number; better: number; best: number };
     option_label?: string | null;
+    selected_tier?: string | null;
     pricing_mode?: "tiered" | "flat";
   } | null;
 
@@ -184,6 +186,7 @@ export default async function DocumentPage({
     pricing_mode: rawLineData?.pricing_mode ?? "tiered",
   };
   const isFlat = lineData.pricing_mode === "flat";
+  const chosen = selectedTier(rawLineData);
 
   return (
     <div className="flex flex-col gap-8">
@@ -268,7 +271,9 @@ export default async function DocumentPage({
             <div
               key={tier}
               className={`rounded-xl border p-4 text-center ${
-                tier === "better"
+                tier === chosen
+                  ? "border-green bg-green-l/10"
+                  : tier === "better"
                   ? "border-blue bg-blue/20"
                   : tier === "best"
                     ? "border-accent/40 bg-accent/10"
@@ -276,7 +281,7 @@ export default async function DocumentPage({
               }`}
             >
               <div className="text-[10px] font-bold uppercase tracking-wide text-g300">
-                {tier === "better" ? "Better ★" : tier}
+                {tier === chosen ? `${TIER_LABEL[tier]}: customer picked` : tier === "better" ? "Better ★" : tier}
               </div>
               <div className="mt-1 font-display text-xl font-extrabold">
                 {formatPrice(lineData.totals[tier])}

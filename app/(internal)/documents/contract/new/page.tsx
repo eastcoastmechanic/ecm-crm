@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { DEFAULT_PAYMENT_TERMS, DEFAULT_WARRANTY_TERMS } from "@/lib/contract-terms";
 import ContractForm from "./ContractForm";
+import { selectedTier, TIER_LABEL, type Tier, type TierTotals } from "@/lib/estimate-tier";
 import { headingClass, subTextClass } from "../../../ui";
 
 type EstimateLineItem = { category: string; description: string; qty: number; unit: string };
@@ -15,15 +16,30 @@ async function loadPrefill(estimateId: string) {
 
   if (!estimate) return null;
 
-  const items = (estimate.line_items as { items?: EstimateLineItem[] } | null)?.items ?? [];
-  const scopeOfWork = items
-    .map((item) => `${item.qty} ${item.unit} — ${item.description}${item.category ? ` (${item.category})` : ""}`)
+  const lineItems = estimate.line_items as {
+    items?: EstimateLineItem[];
+    pricing_mode?: string;
+    selected_tier?: unknown;
+    totals?: TierTotals;
+    brand?: Partial<Record<Tier, string | null>>;
+  } | null;
+  const items = lineItems?.items ?? [];
+  // The customer's Good/Better/Best pick sets the price, never the Better default.
+  const tier = selectedTier(lineItems);
+  const tierLine = tier
+    ? `Option chosen: ${TIER_LABEL[tier]}${lineItems?.brand?.[tier] ? ` (${lineItems.brand[tier]})` : ""}`
+    : null;
+  const scopeOfWork = [
+    tierLine,
+    ...items.map((item) => `${item.qty} ${item.unit} — ${item.description}${item.category ? ` (${item.category})` : ""}`),
+  ]
+    .filter(Boolean)
     .join("\n");
 
   return {
     customerId: estimate.customer_id as string | null,
     propertyId: estimate.property_id as string | null,
-    price: estimate.total as number | null,
+    price: (tier && lineItems?.totals ? lineItems.totals[tier] : estimate.total) as number | null,
     scopeOfWork,
     fromDocumentId: estimateId,
   };

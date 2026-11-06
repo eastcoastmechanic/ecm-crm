@@ -9,6 +9,7 @@ import { supabase as adminDb } from "@/lib/supabase";
 import type { ContractLineItems } from "@/lib/contract-terms";
 import { etDateKey } from "@/lib/tz";
 import { notifyOwnerOfEvent } from "@/lib/notify-owner";
+import { approvalChoice, type TierTotals } from "@/lib/estimate-tier";
 
 export async function createCheckoutSession(formData: FormData) {
   const documentId = formData.get("document_id") as string;
@@ -64,7 +65,14 @@ export async function createCheckoutSession(formData: FormData) {
   redirect(session.url);
 }
 
-export async function approveEstimate(formData: FormData) {
+/**
+ * Customer approves an estimate in the portal. On a Good/Better/Best estimate
+ * they must pick one; the pick is stored as line_items.selected_tier and the
+ * document total becomes that option's total, so the owner alert and the
+ * contract made from it carry the right price. Returns { error } (production
+ * builds hide a thrown message from the customer).
+ */
+export async function approveEstimate(formData: FormData): Promise<{ error?: string }> {
   const documentId = formData.get("document_id") as string;
   const signatureData = formData.get("signature_data") as string;
   const supabase = await createPortalServerClient();
@@ -74,17 +82,24 @@ export async function approveEstimate(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login");
 
-  if (!signatureData) throw new Error("A signature is required to approve this estimate");
+  if (!signatureData) return { error: "A signature is required to approve this estimate." };
 
   const { data: doc, error } = await supabase
     .from("documents")
-    .select("id, type, status")
+    .select("id, type, status, line_items")
     .eq("id", documentId)
     .single();
 
-  if (error || !doc) throw new Error("Estimate not found");
-  if (doc.type !== "estimate") throw new Error("Only estimates can be approved");
-  if (doc.status !== "sent") throw new Error("This estimate can't be approved right now");
+  if (error || !doc) return { error: "Estimate not found." };
+  if (doc.type !== "estimate") return { error: "Only estimates can be approved." };
+  if (doc.status !== "sent") return { error: "This estimate can't be approved right now." };
+
+  const lineItems = (doc.line_items ?? {}) as Record<string, unknown> & {
+    pricing_mode?: string | null;
+    totals?: TierTotals | null;
+  };
+  const choice = approvalChoice(lineItems, formData.get("tier"));
+  if (!choice.ok) return { error: choice.error };
 
   const { data: approved, error: updateError } = await supabase
     .from("documents")
@@ -92,13 +107,16 @@ export async function approveEstimate(formData: FormData) {
       status: "approved",
       signed_at: new Date().toISOString(),
       signature_data: signatureData,
+      ...(choice.tier
+        ? { line_items: { ...lineItems, selected_tier: choice.tier }, subtotal: choice.total, tax: 0, total: choice.total }
+        : {}),
     })
     .eq("id", documentId)
     .eq("status", "sent")
     .select("id");
 
-  if (updateError) throw new Error(updateError.message);
-  if (!approved || approved.length === 0) throw new Error("This estimate can't be approved right now");
+  if (updateError) return { error: "Couldn't save your approval. Please try again." };
+  if (!approved || approved.length === 0) return { error: "This estimate can't be approved right now." };
 
   await notifyOwnerOfEvent("estimate_approved", documentId);
 

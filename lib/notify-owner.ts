@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
 import { postToTeams } from "@/lib/teams";
 import { formatEtDateTime } from "@/lib/tz";
+import { selectedTier, TIER_LABEL } from "@/lib/estimate-tier";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
@@ -131,12 +132,13 @@ export async function notifyOwnerOfEvent(kind: OwnerEvent, id: string) {
     } else {
       const { data: doc } = await supabase
         .from("documents")
-        .select("doc_number, total, customers(name)")
+        .select("doc_number, total, line_items, customers(name)")
         .eq("id", id)
         .single();
       const customer = Array.isArray(doc?.customers) ? doc?.customers[0] : doc?.customers;
       who = customer?.name ?? who;
-      what = [doc?.doc_number, money(doc?.total)].filter(Boolean).join(" · ");
+      const tier = selectedTier(doc?.line_items as { pricing_mode?: string; selected_tier?: unknown } | null);
+      what = [doc?.doc_number, money(doc?.total), tier ? `${TIER_LABEL[tier]} option` : null].filter(Boolean).join(" · ");
     }
 
     const headline = {
