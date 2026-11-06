@@ -181,6 +181,11 @@ export async function POST(request: Request) {
     .select("id")
     .single();
   if (attemptError || !attempt) return lockedPage(); // can't record it: fail closed
+  // Keep a day of rows, on every attempt (including locked-out ones).
+  await supabase
+    .from("oauth_login_failures")
+    .delete()
+    .lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
   const since = new Date(Date.now() - LOGIN_WINDOW_MINUTES * 60 * 1000).toISOString();
   const [ipCount, allCount] = await Promise.all([
@@ -194,10 +199,6 @@ export async function POST(request: Request) {
   if (locked) return lockedPage();
 
   if (!verifyInternalCredentials(username, password)) {
-    await supabase
-      .from("oauth_login_failures")
-      .delete()
-      .lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     // Never redirect on a bad password -- retry locally rather than
     // signaling anything to redirect_uri before identity is proven.
     return htmlResponse(loginFormHtml(req, validation.clientName, "Incorrect username or password."), 401);
