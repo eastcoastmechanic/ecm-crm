@@ -1,11 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { resolveJobPhotos } from "@/lib/job-photos";
 import { listOpenPlannerTasksSafe } from "@/lib/planner-connector";
-import { createServiceCall } from "./actions";
+import NewServiceCallForm from "./NewServiceCallForm";
 import { balanceDueCents, formatMoney } from "@/lib/job-invoice-rules";
 import JobsView from "./JobsView";
-import SubmitButton from "../SubmitButton";
-import { buttonClass, errorClass, headingClass, subTextClass } from "../ui";
+import { errorClass, headingClass, subTextClass } from "../ui";
 
 export default async function JobsPage() {
   const [{ data: jobs, error }, plannerTasks, { data: staffRows }] = await Promise.all([
@@ -95,11 +94,7 @@ export default async function JobsPage() {
             Scheduled service and installs, including requests submitted through the customer portal.
           </p>
         </div>
-        <form action={createServiceCall}>
-          <SubmitButton className={buttonClass} pendingText="Creating…">
-            + New Service Call
-          </SubmitButton>
-        </form>
+        <NewServiceCallForm />
       </div>
 
       {error && <p className={errorClass}>Error loading jobs: {error.message}</p>}
