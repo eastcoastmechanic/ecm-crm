@@ -104,6 +104,12 @@ export function toEtLocalInput(date: Date | string): string {
   return `${etDateKey(d)}T${get("hour")}:${get("minute")}`;
 }
 
+/** The instant a New York day ("YYYY-MM-DD") reaches `hour`:00. Null if the date is unreadable. */
+export function etDateAtHour(dateKey: string, hour: number): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey ?? "") || !Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+  return parseEtLocal(`${dateKey}T${String(hour).padStart(2, "0")}:00`);
+}
+
 /**
  * New York datetime-local value for an ISO date/time. With a zone ("Z", "-05:00")
  * it is converted; without one ("2026-11-12T10:00") it is already New York time,

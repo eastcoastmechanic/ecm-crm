@@ -2,6 +2,7 @@ import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
 import { postToTeams } from "@/lib/teams";
+import { formatEtDateTime } from "@/lib/tz";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
@@ -33,7 +34,7 @@ export async function notifyOwnerOfWebLead(params: {
 Name: ${customerName}
 Phone: ${phone ?? "not provided"}
 Address: ${address}
-Requested time: ${scheduledAt.toLocaleString()}
+Requested time: ${formatEtDateTime(scheduledAt)} ET
 Details: ${description}
 
 Review and confirm in the Jobs tab.`,

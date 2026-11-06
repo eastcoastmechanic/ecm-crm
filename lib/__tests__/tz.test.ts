@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { etLocalFromIso, moveToEtDate, toEtLocalInput } from "../tz";
+import { etDateAtHour, etLocalFromIso, moveToEtDate, toEtLocalInput } from "../tz";
 
 // Results are compared as New York wall-clock strings, so the server's own
 // timezone (UTC on Vercel) never matters.
@@ -46,5 +46,23 @@ describe("etLocalFromIso", () => {
     expect(etLocalFromIso("next tuesday")).toBeNull();
     expect(etLocalFromIso("2026-11-12")).toBeNull();
     expect(etLocalFromIso("")).toBeNull();
+  });
+});
+
+describe("etDateAtHour", () => {
+  it("puts a morning window at 8:00 AM New York, not 8:00 UTC", () => {
+    expect(etDateAtHour("2026-11-10", 8)?.toISOString()).toBe("2026-11-10T13:00:00.000Z"); // EST
+    expect(etDateAtHour("2026-07-15", 8)?.toISOString()).toBe("2026-07-15T12:00:00.000Z"); // EDT
+  });
+
+  it("keeps afternoon and evening windows on the chosen day", () => {
+    expect(et(etDateAtHour("2026-11-10", 12))).toBe("2026-11-10T12:00");
+    expect(et(etDateAtHour("2026-11-10", 16))).toBe("2026-11-10T16:00");
+  });
+
+  it("returns null for a bad date or hour", () => {
+    expect(etDateAtHour("", 8)).toBeNull();
+    expect(etDateAtHour("11/10/2026", 8)).toBeNull();
+    expect(etDateAtHour("2026-11-10", 24)).toBeNull();
   });
 });
