@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { verifyInternalCredentials } from "@/lib/internal-auth";
 import { generateOpaqueToken, AUTH_CODE_TTL_SECONDS } from "@/lib/oauth";
+import { clientIp, LOGIN_WINDOW_MINUTES, loginLocked, redirectHost } from "@/lib/oauth-limits";
 
 /**
  * Authorization endpoint (OAuth 2.1 + PKCE). This is the one piece of the
@@ -41,7 +42,7 @@ function readAuthParams(params: URLSearchParams): AuthRequest {
 async function validateClientAndRedirect(
   clientId: string,
   redirectUri: string
-): Promise<{ ok: true } | { ok: false; errorPage: Response }> {
+): Promise<{ ok: true; clientName: string | null } | { ok: false; errorPage: Response }> {
   const notFound = () => ({
     ok: false as const,
     errorPage: new Response("Unknown client or redirect_uri. This connector needs to register again.", {
@@ -54,7 +55,7 @@ async function validateClientAndRedirect(
 
   const { data: client } = await supabase
     .from("oauth_clients")
-    .select("redirect_uris")
+    .select("redirect_uris, client_name")
     .eq("client_id", clientId)
     .single();
   if (!client) return notFound();
@@ -62,10 +63,10 @@ async function validateClientAndRedirect(
   const registered = client.redirect_uris as string[];
   if (!registered.includes(redirectUri)) return notFound();
 
-  return { ok: true };
+  return { ok: true, clientName: (client.client_name as string | null) ?? null };
 }
 
-function loginFormHtml(req: AuthRequest, errorMessage?: string) {
+function loginFormHtml(req: AuthRequest, clientName: string | null, errorMessage?: string) {
   const hidden = (name: string, value: string | null) =>
     value !== null ? `<input type="hidden" name="${name}" value="${escapeHtml(value)}" />` : "";
 
@@ -80,11 +81,17 @@ function loginFormHtml(req: AuthRequest, errorMessage?: string) {
   input[type="text"], input[type="password"] { width: 100%; box-sizing: border-box; padding: 0.5rem; margin-bottom: 1rem; border-radius: 4px; border: 1px solid #2c3841; background: #10151a; color: #e7ecee; }
   button { width: 100%; padding: 0.6rem; border-radius: 4px; border: none; background: #a8582a; color: white; font-weight: 600; cursor: pointer; }
   .error { color: #e88b7e; font-size: 0.85rem; margin-bottom: 1rem; }
+  .warn { font-size: 0.85rem; line-height: 1.4; background: #2a2116; border: 1px solid #a8582a; border-radius: 4px; padding: 0.6rem; margin-bottom: 1rem; }
 </style>
 </head>
 <body>
   <form method="POST">
-    <h1>Sign in to connect Claude</h1>
+    <h1>Sign in to connect an app</h1>
+    <div class="warn">
+      <strong>${escapeHtml(clientName || "An unnamed app")}</strong> wants full access to the ECM CRM.
+      Access goes to <strong>${escapeHtml(redirectHost(req.redirectUri))}</strong>.
+      Only sign in if you just started connecting this yourself.
+    </div>
     ${errorMessage ? `<div class="error">${escapeHtml(errorMessage)}</div>` : ""}
     <label>Username</label>
     <input type="text" name="username" autocomplete="username" required />
@@ -132,7 +139,7 @@ export async function GET(request: Request) {
     return redirectWithError(req.redirectUri, "invalid_request", req.state);
   }
 
-  return htmlResponse(loginFormHtml(req));
+  return htmlResponse(loginFormHtml(req, validation.clientName));
 }
 
 export async function POST(request: Request) {
@@ -157,11 +164,35 @@ export async function POST(request: Request) {
 
   const username = (formData.get("username") as string) || "";
   const password = (formData.get("password") as string) || "";
+  const ip = clientIp(request.headers);
+
+  // Lockout before the password check, counted in the database (SQL 0063) so
+  // it holds across every server instance.
+  const since = new Date(Date.now() - LOGIN_WINDOW_MINUTES * 60 * 1000).toISOString();
+  const [ipCount, allCount] = await Promise.all([
+    supabase.from("oauth_login_failures").select("id", { count: "exact", head: true }).eq("ip", ip).gte("created_at", since),
+    supabase.from("oauth_login_failures").select("id", { count: "exact", head: true }).gte("created_at", since),
+  ]);
+  const locked = loginLocked({
+    ipFailures: ipCount.error ? null : (ipCount.count ?? 0),
+    allFailures: allCount.error ? null : (allCount.count ?? 0),
+  });
+  if (locked) {
+    return htmlResponse(
+      loginFormHtml(req, validation.clientName, `Too many failed sign-ins. Try again in ${LOGIN_WINDOW_MINUTES} minutes.`),
+      429
+    );
+  }
 
   if (!verifyInternalCredentials(username, password)) {
+    await supabase.from("oauth_login_failures").insert({ ip });
+    await supabase
+      .from("oauth_login_failures")
+      .delete()
+      .lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
     // Never redirect on a bad password -- retry locally rather than
     // signaling anything to redirect_uri before identity is proven.
-    return htmlResponse(loginFormHtml(req, "Incorrect username or password."), 401);
+    return htmlResponse(loginFormHtml(req, validation.clientName, "Incorrect username or password."), 401);
   }
 
   const code = generateOpaqueToken();
@@ -173,7 +204,7 @@ export async function POST(request: Request) {
     code_challenge_method: req.codeChallengeMethod,
     expires_at: new Date(Date.now() + AUTH_CODE_TTL_SECONDS * 1000).toISOString(),
   });
-  if (error) return htmlResponse(loginFormHtml(req, "Something went wrong. Try again."), 500);
+  if (error) return htmlResponse(loginFormHtml(req, validation.clientName, "Something went wrong. Try again."), 500);
 
   const redirectUrl = new URL(req.redirectUri);
   redirectUrl.searchParams.set("code", code);
