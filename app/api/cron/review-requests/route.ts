@@ -31,7 +31,9 @@ export async function GET(request: Request) {
 
   const { data: jobs, error } = await supabase
     .from("jobs")
-    .select("id, completed_at, review_request_sent_at, review_reminder_sent_at, customers(name, phone, sms_consent)")
+    .select(
+      "id, completed_at, follow_up_sent_at, review_request_sent_at, review_reminder_sent_at, customers(name, phone, sms_consent)"
+    )
     .in("status", ["complete", "completed"])
     .gte("completed_at", since)
     .is("review_reminder_sent_at", null)
@@ -83,6 +85,7 @@ export async function GET(request: Request) {
       }),
       requestSentAt: job.review_request_sent_at as string | null,
       reminderSentAt: job.review_reminder_sent_at as string | null,
+      emailedAt: job.follow_up_sent_at as string | null,
       answered: answered.has(jobId),
       now,
     });

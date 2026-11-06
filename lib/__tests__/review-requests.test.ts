@@ -74,6 +74,16 @@ describe("nextReviewText", () => {
     expect(nextReviewText({ ...base, triggerAt: ago(30), requestSentAt: ago(20) })).toBeNull();
   });
 
+  it("does not ask by text if the survey email already went out", () => {
+    expect(nextReviewText({ ...base, triggerAt: ago(2), emailedAt: ago(1) })).toBeNull();
+  });
+
+  it("still sends the reminder when the ask itself was a text", () => {
+    expect(
+      nextReviewText({ ...base, triggerAt: ago(7), requestSentAt: ago(6), emailedAt: ago(8) })
+    ).toBe("reminder");
+  });
+
   it("stops once they answered, before or after the ask", () => {
     expect(nextReviewText({ ...base, triggerAt: ago(2), answered: true })).toBeNull();
     expect(nextReviewText({ ...base, triggerAt: ago(7), requestSentAt: ago(6), answered: true })).toBeNull();

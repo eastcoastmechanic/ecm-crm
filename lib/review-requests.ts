@@ -33,18 +33,24 @@ export function reviewTriggerAt(opts: { completedAt: string | null; invoices: In
 
 export type ReviewTextKind = "request" | "reminder";
 
-/** Which text a job is owed right now, if any. One ask, then at most one reminder, and nothing once they answered. */
+/**
+ * Which text a job is owed right now, if any. One ask, then at most one reminder, and nothing once they
+ * answered. A customer who already got the survey email (`emailedAt`, from before texts took over) has been
+ * asked, so they are not asked again by text.
+ */
 export function nextReviewText(opts: {
   triggerAt: string | null;
   requestSentAt: string | null;
   reminderSentAt: string | null;
+  emailedAt?: string | null;
   answered: boolean;
   now: Date;
 }): ReviewTextKind | null {
-  const { triggerAt, requestSentAt, reminderSentAt, answered, now } = opts;
+  const { triggerAt, requestSentAt, reminderSentAt, emailedAt, answered, now } = opts;
   if (answered) return null;
 
   if (!requestSentAt) {
+    if (emailedAt) return null;
     if (!triggerAt) return null;
     const age = now.getTime() - new Date(triggerAt).getTime();
     return age >= REQUEST_AFTER_DAYS * DAY_MS && age <= LOOKBACK_DAYS * DAY_MS ? "request" : null;

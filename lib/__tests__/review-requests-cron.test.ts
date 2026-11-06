@@ -117,6 +117,12 @@ describe("review-requests cron", () => {
     expect(h.sms).not.toHaveBeenCalled();
   });
 
+  it("does not text a customer who already got the survey email", async () => {
+    h.jobs = [job({ follow_up_sent_at: ago(1) })];
+    expect((await run()).sent).toBe(0);
+    expect(h.sms).not.toHaveBeenCalled();
+  });
+
   it("does not text once they answered the survey", async () => {
     h.surveys = [{ job_id: "j1" }];
     expect((await run()).sent).toBe(0);
