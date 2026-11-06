@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   updateLeadDraft,
   markContacted,
@@ -11,6 +11,7 @@ import {
   deleteLead,
 } from "./actions";
 import SubmitButton from "../SubmitButton";
+import LeadBoard, { type BoardLead } from "./LeadBoard";
 import {
   inputClass,
   itemSubClass,
@@ -362,6 +363,27 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
   const [showAdd, setShowAdd] = useState(false);
   const [localStatus, setLocalStatus] = useState<Record<string, string>>({});
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"board" | "list">("board");
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [stageError, setStageError] = useState("");
+  const latestChange = useRef<Record<string, number>>({});
+  const savedStatus = useRef<Record<string, string>>({});
+
+  // Remember List or Board on this device. Restored after mount (no localStorage
+  // during SSR, so a lazy initializer would cause a hydration mismatch). Best effort.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("leads-view");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time post-hydration restore from localStorage
+      if (saved === "list" || saved === "board") setView(saved);
+    } catch {}
+  }, []);
+  function chooseView(next: "board" | "list") {
+    setView(next);
+    try {
+      window.localStorage.setItem("leads-view", next);
+    } catch {}
+  }
 
   const liveLeads = useMemo(() => leads.filter((l) => !deletedIds.has(l.id)), [leads, deletedIds]);
 
@@ -381,7 +403,7 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
     return liveLeads
       .map((l) => (localStatus[l.id] ? { ...l, status: localStatus[l.id] } : l))
       .filter((lead) => {
-        if (statusFilter !== "all" && lead.status !== statusFilter) return false;
+        if (view === "list" && statusFilter !== "all" && lead.status !== statusFilter) return false;
         if (town && !(lead.town ?? "").toLowerCase().includes(town.toLowerCase())) return false;
         if (!query) return true;
         return [lead.summary, leadName(lead), lead.contact_info, lead.address]
@@ -389,15 +411,52 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
           .some((field) => field!.toLowerCase().includes(query));
       })
       .sort((a, b) => b.urgency_score - a.urgency_score);
-  }, [liveLeads, search, town, statusFilter, localStatus]);
+  }, [liveLeads, search, town, statusFilter, localStatus, view]);
 
-  function handleStatusChange(id: string, status: string) {
+  async function handleStatusChange(id: string, status: string) {
+    // Only the latest change for a lead may roll it back, so an older failed
+    // save can't undo a newer one that succeeded.
+    const token = (latestChange.current[id] ?? 0) + 1;
+    latestChange.current[id] = token;
+    setStageError("");
     setLocalStatus((prev) => ({ ...prev, [id]: status }));
+    setSavingId(id);
     const fd = new FormData();
     fd.set("id", id);
     fd.set("status", status);
-    setLeadStage(fd);
+    let error: string | undefined;
+    try {
+      error = (await setLeadStage(fd)).error;
+    } catch {
+      error = "Couldn't save the stage. Check your connection and try again.";
+    }
+    if (!error) savedStatus.current[id] = status;
+    if (latestChange.current[id] !== token) return;
+    if (error) {
+      // Put the card back to the last stage that actually saved (or what the page loaded with).
+      const saved = savedStatus.current[id];
+      setLocalStatus((prev) => {
+        const next = { ...prev };
+        if (saved) next[id] = saved;
+        else delete next[id];
+        return next;
+      });
+      setStageError(error);
+    }
+    setSavingId(null);
   }
+
+  const boardLeads: BoardLead[] = filtered.map((lead) => ({
+    id: lead.id,
+    status: lead.status,
+    source: lead.source,
+    name: leadName(lead),
+    town: lead.town,
+    phone: leadPhone(lead),
+    summary: lead.summary,
+    urgency: lead.urgency_score,
+    createdAt: lead.created_at,
+  }));
 
   function handleDelete(id: string) {
     setDeletedIds((prev) => new Set(prev).add(id));
@@ -431,31 +490,52 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
             onChange={(e) => setTown(e.target.value)}
             className={inputClass}
           />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            aria-label="Filter by status"
-            className={inputClass}
-          >
-            <option value="all">All statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          {view === "list" && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label="Filter by status"
+              className={inputClass}
+            >
+              <option value="all">All statuses</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="flex rounded-lg bg-white/8 p-0.5" role="group" aria-label="Leads view">
+          {(["board", "list"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => chooseView(v)}
+              aria-pressed={view === v}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize ${view === v ? "bg-white/15 text-white" : "text-g300"}`}
+            >
+              {v}
+            </button>
+          ))}
         </div>
         <button type="button" onClick={() => setShowAdd(true)} className={buttonClass}>
           + Add lead
         </button>
       </div>
 
-      <div className="flex flex-col gap-3">
-        {filtered.length === 0 && <p className={subTextClass}>No leads match.</p>}
-        {filtered.map((lead) => (
-          <LeadCard key={lead.id} lead={lead} onStatusChange={handleStatusChange} onDelete={handleDelete} />
-        ))}
-      </div>
+      {stageError && <p className={errorClass}>{stageError}</p>}
+
+      {view === "board" ? (
+        <LeadBoard leads={boardLeads} onMove={handleStatusChange} savingId={savingId} />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filtered.length === 0 && <p className={subTextClass}>No leads match.</p>}
+          {filtered.map((lead) => (
+            <LeadCard key={lead.id} lead={lead} onStatusChange={handleStatusChange} onDelete={handleDelete} />
+          ))}
+        </div>
+      )}
 
       {showAdd && <AddLeadModal onClose={() => setShowAdd(false)} />}
     </div>
