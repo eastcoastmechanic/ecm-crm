@@ -3,10 +3,11 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addJobPhotos, assignJob, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
+import { addJobPhotos, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
 import { addTask, completeTask } from "../tasks/actions";
 import SubmitButton from "../SubmitButton";
 import CreateInvoiceForm from "./CreateInvoiceForm";
+import AssignJobForm from "./AssignJobForm";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 
 const statusOptions = ["requested", "scheduled", "in_progress", "complete", "cancelled"];
@@ -506,26 +507,7 @@ export default function JobsView({
               </div>
             </form>
 
-              <form action={assignJob} className="flex items-center gap-2">
-                <input type="hidden" name="job_id" value={job.id} />
-                <label className="flex items-center gap-2 text-[11px] text-g300">
-                  Assigned to
-                  <select
-                    name="staff_id"
-                    defaultValue={job.assigned_staff_id ?? ""}
-                    className={inputClass}
-                    aria-label="Assign job to"
-                  >
-                    <option value="">Unassigned</option>
-                    {staff.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <SubmitButton className={buttonSecondaryClass}>Assign</SubmitButton>
-              </form>
+              <AssignJobForm jobId={job.id} assignedStaffId={job.assigned_staff_id ?? null} staff={staff} />
 
               {job.photos && job.photos.length > 0 && (
                 <div className="flex flex-wrap gap-2">
