@@ -1,6 +1,7 @@
 import SubmitButton from "../SubmitButton";
 import PhotoButtons, { type PhotoCounts } from "./PhotoButtons";
-import { truckOnMyWay, truckSetStatus } from "./actions";
+import { truckOnMyWay } from "./actions";
+import ArriveForm from "./ArriveForm";
 import { pauseJobAction, resumeJobAction } from "./clock-actions";
 import ChecklistPanel, { type TruckChecklistItem } from "./ChecklistPanel";
 import FinishForm from "./FinishForm";
@@ -134,15 +135,7 @@ function StepButton({ job }: { job: TruckJob }) {
     );
   }
   if (job.on_way_at) {
-    return (
-      <form action={truckSetStatus}>
-        <input type="hidden" name="id" value={job.id} />
-        <input type="hidden" name="status" value="in_progress" />
-        <SubmitButton className={bigButton} pendingText="Saving…">
-          I&apos;m here
-        </SubmitButton>
-      </form>
-    );
+    return <ArriveForm jobId={job.id} className={bigButton} />;
   }
   return (
     <form action={truckOnMyWay}>

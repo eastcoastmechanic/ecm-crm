@@ -35,8 +35,7 @@ export async function finishJobAction(_prev: Result | null, formData: FormData):
     if (blockers.length > 0) return { error: blockers.join(" ") };
   }
   formData.set("status", "complete");
-  await truckSetStatus(formData);
-  return {};
+  return truckSetStatus(formData);
 }
 
 /** Owner only: let a stuck job be finished, with who and why on record. */

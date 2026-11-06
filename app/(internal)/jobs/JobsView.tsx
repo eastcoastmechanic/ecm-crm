@@ -192,6 +192,20 @@ export default function JobsView({
     }
   }
 
+  async function handleStatusSave(formData: FormData) {
+    setActionError(null);
+    try {
+      const result = await updateJobStatus(formData);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setActionError("Couldn't save the status. Check your connection and try again.");
+    }
+  }
+
   async function handleDrop(day: Date, jobId: string) {
     await moveJobToDay(jobId, toDateKey(day));
   }
@@ -416,7 +430,7 @@ export default function JobsView({
           {filteredJobs.map((job) => (
             <div key={job.id} className="flex flex-col gap-2 py-3">
             <form
-              action={updateJobStatus}
+              action={handleStatusSave}
               className="flex flex-wrap items-center justify-between gap-3"
             >
               <input type="hidden" name="id" value={job.id} />
