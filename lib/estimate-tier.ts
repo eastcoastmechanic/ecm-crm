@@ -31,6 +31,31 @@ export function availableTiers(totals: TierTotals): Tier[] {
   return TIERS.filter((t) => Number(totals?.[t]) > 0);
 }
 
+type TieredLine = { good: number | null; better: number | null; best: number | null };
+
+/**
+ * Once an option is picked, a document shows only that option: every line and
+ * total carries the picked price, and it renders like a one-price document.
+ */
+export function collapseToTier<L extends TieredLine>(
+  data: {
+    line_items: L[];
+    totals: TierTotals;
+    brand: { good: string | null; better: string | null; best: string | null };
+  },
+  tier: Tier
+) {
+  const price = data.totals[tier];
+  const brand = data.brand?.[tier] ?? null;
+  return {
+    line_items: data.line_items.map((l) => ({ ...l, good: l[tier], better: l[tier], best: l[tier] })),
+    totals: { good: price, better: price, best: price },
+    brand: { good: brand, better: brand, best: brand },
+    pricing_mode: "flat" as const,
+    chosen_option: TIER_LABEL[tier],
+  };
+}
+
 export type OfficeTierResult = { ok: true; tier: Tier | null } | { ok: false; error: string };
 
 /**
