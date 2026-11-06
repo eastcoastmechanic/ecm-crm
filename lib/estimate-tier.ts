@@ -31,6 +31,40 @@ export function availableTiers(totals: TierTotals): Tier[] {
   return TIERS.filter((t) => Number(totals?.[t]) > 0);
 }
 
+export type OfficeTierResult = { ok: true; tier: Tier | null } | { ok: false; error: string };
+
+/**
+ * The pick to store when the office saves a document from the CRM (e.g. the
+ * customer approved over the phone). Only estimates carry a pick, and only
+ * while approved. Moving one back to draft/sent clears it so the portal asks
+ * again. Approving a tiered estimate needs a priced option, except an old
+ * estimate that was already approved before picks existed.
+ */
+export function officeTierUpdate(input: {
+  type: string;
+  pricingMode: string | null | undefined;
+  newStatus: string;
+  prevStatus: string;
+  prevTier: unknown;
+  picked: unknown;
+  totals: TierTotals;
+}): OfficeTierResult {
+  const prevTier = parseTier(input.prevTier);
+  if (input.type !== "estimate") return { ok: true, tier: prevTier };
+  if (input.pricingMode === "flat" || input.newStatus === "draft" || input.newStatus === "sent") return { ok: true, tier: null };
+  if (input.newStatus !== "approved") return { ok: true, tier: prevTier };
+  const picked = parseTier(input.picked);
+  const tier = picked ?? prevTier;
+  if (!tier) {
+    if (input.prevStatus === "approved") return { ok: true, tier: null };
+    return { ok: false, error: "Pick which option the customer chose (Good, Better or Best) before marking it approved." };
+  }
+  if (!availableTiers(input.totals).includes(tier)) {
+    return { ok: false, error: `The ${TIER_LABEL[tier]} option has no price on this estimate. Pick another or add prices.` };
+  }
+  return { ok: true, tier };
+}
+
 export type ApprovalChoice = { ok: true; tier: Tier | null; total: number } | { ok: false; error: string };
 
 /**

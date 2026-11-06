@@ -298,6 +298,8 @@ export default async function DocumentPage({
         status={doc.status}
         items={lineData.items}
         pricingMode={lineData.pricing_mode}
+        docType={doc.type}
+        selectedTier={chosen}
         canSeeProfit={canSeeProfit}
       />
 
