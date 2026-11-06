@@ -28,7 +28,8 @@ export async function saveDispatchEdit(_prev: DispatchState, formData: FormData)
       if (assigned.error) return { error: assigned.error };
     }
     if (when && when !== originalWhen) {
-      await rescheduleJobAt(jobId, when);
+      const moved = await rescheduleJobAt(jobId, when);
+      if (moved.error) return { error: moved.error };
     }
     revalidatePath("/dispatch");
     return { saved: true };

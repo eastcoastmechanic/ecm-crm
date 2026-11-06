@@ -179,13 +179,21 @@ export async function updateJobStatus(formData: FormData) {
 }
 
 /** Change a job's date and time (New York wall-clock, "2026-10-22T09:30"). Notifies the customer and syncs Graph. */
-export async function rescheduleJobAt(jobId: string, localDateTime: string) {
+// Reschedule actions return { error } instead of throwing: production builds hide a
+// thrown server action's message, so the caller could only show a generic failure.
+
+/** Move a job to a New York date and time ("2026-10-22T09:30"). Used by dispatch. */
+export async function rescheduleJobAt(jobId: string, localDateTime: string): Promise<{ error?: string }> {
   await requireOffice();
   const next = parseEtLocal(localDateTime);
-  if (!next) throw new Error("Pick a valid date and time");
+  if (!next) return { error: "Pick a valid date and time." };
+
+  const { data: job, error: readError } = await supabase.from("jobs").select("id").eq("id", jobId).maybeSingle();
+  if (readError) return { error: "Couldn't load the job. Try again." };
+  if (!job) return { error: "Job not found." };
 
   const { error } = await supabase.from("jobs").update({ scheduled_at: next.toISOString() }).eq("id", jobId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the new time. Try again." };
 
   await sendScheduleNotifications(jobId);
   await syncJobToGraph(jobId);
@@ -193,16 +201,21 @@ export async function rescheduleJobAt(jobId: string, localDateTime: string) {
 
   revalidatePath("/jobs");
   revalidatePath("/dispatch");
+  return {};
 }
 
-export async function rescheduleJob(jobId: string, newDate: string) {
+/** Move a job to another day ("YYYY-MM-DD"), keeping its time. Used by the jobs list date box and drag-and-drop. */
+export async function rescheduleJob(jobId: string, newDate: string): Promise<{ error?: string }> {
   await requireOffice();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return { error: "Pick a valid date." };
+
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
     .select("scheduled_at")
     .eq("id", jobId)
-    .single();
-  if (fetchError) throw new Error(fetchError.message);
+    .maybeSingle();
+  if (fetchError) return { error: "Couldn't load the job. Try again." };
+  if (!existing) return { error: "Job not found." };
 
   const [year, month, day] = newDate.split("-").map(Number);
   const next = existing.scheduled_at ? new Date(existing.scheduled_at) : new Date(year, month - 1, day, 9, 0, 0);
@@ -212,13 +225,14 @@ export async function rescheduleJob(jobId: string, newDate: string) {
     .from("jobs")
     .update({ scheduled_at: next.toISOString() })
     .eq("id", jobId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the new date. Try again." };
 
   await sendScheduleNotifications(jobId);
   await syncJobToGraph(jobId);
   await notifyAssignedTech(jobId, "rescheduled");
 
   revalidatePath("/jobs");
+  return {};
 }
 
 export async function addJobPhotos(formData: FormData) {
