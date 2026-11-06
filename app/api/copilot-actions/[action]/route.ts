@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCopilotActionTools } from "@/lib/copilot-actions";
 import { runAsStaffRole } from "@/lib/require-role";
+import { tokenMatches } from "@/lib/bearer-auth";
 
 /**
  * The endpoint Copilot Studio's custom connector calls, one action per
@@ -12,8 +13,9 @@ import { runAsStaffRole } from "@/lib/require-role";
 export const maxDuration = 60;
 
 export async function POST(request: Request, { params }: { params: Promise<{ action: string }> }) {
-  const apiKey = request.headers.get("x-api-key");
-  if (!apiKey || apiKey !== process.env.COPILOT_ACTIONS_API_KEY) {
+  // Timing-safe, and fails closed when COPILOT_ACTIONS_API_KEY is unset.
+  const apiKey = request.headers.get("x-api-key") ?? "";
+  if (!tokenMatches(apiKey, process.env.COPILOT_ACTIONS_API_KEY)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
