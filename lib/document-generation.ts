@@ -7,6 +7,7 @@ import { fetchAllPriceBookItems, formatPriceBookForPrompt, type PriceBookRowWith
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { buildFileContentBlocks } from "@/lib/vision-extract";
 import { syncDocumentToGraph } from "@/lib/graph-connector";
+import { tierTotals } from "@/lib/estimate-tier";
 
 const LineItemSchema = z.object({
   category: z.string(),
@@ -94,14 +95,6 @@ function buildCostLookup(rows: PriceBookRowWithCost[]): Map<string, number | nul
     }
   }
   return map;
-}
-
-function sumTier(items: z.infer<typeof LineItemSchema>[], tier: "good" | "better" | "best") {
-  const total = items.reduce((sum, item) => {
-    const price = item[tier];
-    return price === null ? sum : sum + price * item.qty;
-  }, 0);
-  return Math.round(total * 100) / 100;
 }
 
 export type GenerateDocumentInput = {
@@ -268,11 +261,7 @@ ${input.rawRequest}`;
   // type, so concurrent calls could read the same count and collide on the
   // same doc_number before either insert lands.
   for (const doc of parsed.documents) {
-    const totals = {
-      good: sumTier(doc.line_items, "good"),
-      better: sumTier(doc.line_items, "better"),
-      best: sumTier(doc.line_items, "best"),
-    };
+    const totals = tierTotals(doc.line_items);
     // Internal-only: attach unit cost by matching the price book item Claude
     // referenced, so staff can see profit without this ever going near the
     // prompt or the customer-facing PDF/portal (neither reads this field).
