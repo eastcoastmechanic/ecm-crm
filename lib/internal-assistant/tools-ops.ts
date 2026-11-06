@@ -153,7 +153,8 @@ const rescheduleJobTool = betaZodTool({
     const when = new Date(scheduledAt);
     if (Number.isNaN(when.getTime())) return `Couldn't read "${scheduledAt}" as a date/time.`;
     try {
-      await rescheduleJob(jobId, when.toISOString());
+      const result = await rescheduleJob(jobId, when.toISOString());
+      if (result.error) return `Failed to reschedule: ${result.error}`;
       return `Moved job ${jobId} to ${when.toLocaleString("en-US", { timeZone: "America/New_York" })} ET.`;
     } catch (err) {
       return `Failed to reschedule: ${err instanceof Error ? err.message : "unknown error"}`;

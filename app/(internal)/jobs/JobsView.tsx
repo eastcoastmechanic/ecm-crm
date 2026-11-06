@@ -178,25 +178,27 @@ export default function JobsView({
     }
   }
 
-  async function handleDrop(day: Date, jobId: string) {
+  async function moveJobToDay(jobId: string, newDate: string) {
     setActionError(null);
     try {
-      await rescheduleJob(jobId, toDateKey(day));
+      const result = await rescheduleJob(jobId, newDate);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
       router.refresh();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to reschedule job");
+    } catch {
+      setActionError("Couldn't reschedule the job. Check your connection and try again.");
     }
+  }
+
+  async function handleDrop(day: Date, jobId: string) {
+    await moveJobToDay(jobId, toDateKey(day));
   }
 
   async function handleRescheduleInput(jobId: string, newDate: string) {
     if (!newDate) return;
-    setActionError(null);
-    try {
-      await rescheduleJob(jobId, newDate);
-      router.refresh();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to reschedule job");
-    }
+    await moveJobToDay(jobId, newDate);
   }
 
   async function handleOnWay(jobId: string) {
