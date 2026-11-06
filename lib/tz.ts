@@ -103,3 +103,29 @@ export function toEtLocalInput(date: Date | string): string {
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
   return `${etDateKey(d)}T${get("hour")}:${get("minute")}`;
 }
+
+/**
+ * New York datetime-local value for an ISO date/time. With a zone ("Z", "-05:00")
+ * it is converted; without one ("2026-11-12T10:00") it is already New York time,
+ * not the server's. Null if unreadable.
+ */
+export function etLocalFromIso(value: string): string | null {
+  const trimmed = (value ?? "").trim();
+  if (/(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(trimmed)) {
+    const when = new Date(trimmed);
+    return Number.isNaN(when.getTime()) ? null : toEtLocalInput(when);
+  }
+  const m = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/.exec(trimmed);
+  return m && parseEtLocal(`${m[1]}T${m[2]}`) ? `${m[1]}T${m[2]}` : null;
+}
+
+/**
+ * Move to another New York calendar day ("YYYY-MM-DD"), keeping the New York
+ * time of day (an 8 PM job stays 8 PM, across DST too). With no current time,
+ * lands at `defaultTime`. Null if the date is unreadable.
+ */
+export function moveToEtDate(current: Date | string | null, dateKey: string, defaultTime = "09:00"): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+  const time = current ? toEtLocalInput(current).slice(11) : defaultTime;
+  return parseEtLocal(`${dateKey}T${time}`);
+}

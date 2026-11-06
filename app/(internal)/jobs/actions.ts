@@ -19,7 +19,7 @@ import { requireOffice, requireRole } from "@/lib/require-role";
 import { notifyTech } from "@/lib/tech-notice-send";
 import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
 import { getFinishBlockers } from "@/lib/job-checklist";
-import { parseEtLocal } from "@/lib/tz";
+import { moveToEtDate, parseEtLocal } from "@/lib/tz";
 
 export async function createServiceCall() {
   const role = await requireRole(["owner", "office", "tech"]);
@@ -204,7 +204,10 @@ export async function rescheduleJobAt(jobId: string, localDateTime: string): Pro
   return {};
 }
 
-/** Move a job to another day ("YYYY-MM-DD"), keeping its time. Used by the jobs list date box and drag-and-drop. */
+/**
+ * Move a job to another New York day ("YYYY-MM-DD"), keeping its New York time
+ * (9:00 AM if it had none). Used by the jobs list date box and drag-and-drop.
+ */
 export async function rescheduleJob(jobId: string, newDate: string): Promise<{ error?: string }> {
   await requireOffice();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return { error: "Pick a valid date." };
@@ -217,9 +220,8 @@ export async function rescheduleJob(jobId: string, newDate: string): Promise<{ e
   if (fetchError) return { error: "Couldn't load the job. Try again." };
   if (!existing) return { error: "Job not found." };
 
-  const [year, month, day] = newDate.split("-").map(Number);
-  const next = existing.scheduled_at ? new Date(existing.scheduled_at) : new Date(year, month - 1, day, 9, 0, 0);
-  next.setFullYear(year, month - 1, day);
+  const next = moveToEtDate((existing.scheduled_at as string | null) ?? null, newDate);
+  if (!next) return { error: "Pick a valid date." };
 
   const { error } = await supabase
     .from("jobs")
