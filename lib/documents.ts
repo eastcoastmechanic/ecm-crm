@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import type { PdfDocumentData } from "@/lib/pdf";
 import { customerFacingJobPhotos, jobIdForDocument } from "@/lib/job-photos";
+import { collapseToTier, selectedTier } from "@/lib/estimate-tier";
 
 export async function getDocumentForPdf(id: string): Promise<{
   data: PdfDocumentData | null;
@@ -43,6 +44,12 @@ export async function getDocumentForPdf(id: string): Promise<{
     pricing_mode: rawLineData?.pricing_mode ?? "tiered",
   };
 
+  // A picked Good/Better/Best option: the PDF shows only that option.
+  const tier = selectedTier(lineData.pricing_mode, doc.selected_tier);
+  const picked = tier
+    ? collapseToTier({ line_items: lineData.items, totals: lineData.totals, brand: lineData.brand }, tier)
+    : null;
+
   return {
     data: {
       doc_number: doc.doc_number,
@@ -50,12 +57,13 @@ export async function getDocumentForPdf(id: string): Promise<{
       created_at: doc.created_at,
       customer_name: doc.customers?.name ?? "Customer",
       property_address: doc.properties?.address ?? null,
-      line_items: lineData.items,
-      brand: lineData.brand,
+      line_items: picked?.line_items ?? lineData.items,
+      brand: picked?.brand ?? lineData.brand,
       mass_save_eligible: lineData.mass_save_eligible,
       mass_save_note: lineData.mass_save_note,
-      totals: lineData.totals,
-      pricing_mode: lineData.pricing_mode,
+      totals: picked?.totals ?? lineData.totals,
+      pricing_mode: picked?.pricing_mode ?? lineData.pricing_mode,
+      chosen_option: picked?.chosen_option,
       // If this document came out of a job, the arrival/completion photos go
       // on it. That's what makes an invoice defensible: the customer sees the
       // condition they paid to fix, next to the number.

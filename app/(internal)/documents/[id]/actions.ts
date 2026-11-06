@@ -373,9 +373,9 @@ export async function sendDocumentEmail(formData: FormData) {
     replyTo: RESEND_REPLY_TO,
     to: customerEmail,
     subject: `${label} ${data.doc_number ?? ""} from East Coast Mechanical`,
-    text: `Hi ${data.customer_name},\n\nAttached is your ${label.toLowerCase()} ${data.doc_number ?? ""} (Better tier total: ${formatPrice(
-      data.totals.better
-    )}).\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
+    text: `Hi ${data.customer_name},\n\nAttached is your ${label.toLowerCase()} ${data.doc_number ?? ""} (${
+      data.chosen_option ? `${data.chosen_option} option total` : data.pricing_mode === "flat" ? "Total" : "Better tier total"
+    }: ${formatPrice(data.totals.better)}).\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
     attachments: [
       {
         filename: `${data.doc_number ?? label}.pdf`,

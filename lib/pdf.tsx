@@ -27,6 +27,8 @@ export type PdfDocumentData = {
   mass_save_note: string | null;
   totals: { good: number; better: number; best: number };
   pricing_mode?: "tiered" | "flat";
+  // "Good" / "Better" / "Best" when the customer picked one; the document is then shown one-price.
+  chosen_option?: string;
   // Documentation photos from the linked job — the arrival/completion record
   // that backs up what's being charged for. url is null when an object
   // couldn't be signed. Absent on documents with no job.
@@ -447,7 +449,9 @@ export function DocumentPdf({ doc, logo }: { doc: PdfDocumentData; logo: string 
 
           {isFlat ? (
             <View style={styles.flatTotalCard}>
-              <Text style={styles.ribbon}>TOTAL</Text>
+              <Text style={styles.ribbon}>
+                {doc.chosen_option ? `${doc.chosen_option.toUpperCase()} OPTION` : "TOTAL"}
+              </Text>
               <Text style={{ ...styles.tierPrice, ...styles.tierPriceLight }}>
                 {formatPrice(doc.totals.better)}
               </Text>

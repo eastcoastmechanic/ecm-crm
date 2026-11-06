@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvalChoice, availableTiers, documentTotal, officeTierUpdate, parseTier, selectedTier } from "../estimate-tier";
+import { approvalChoice, availableTiers, collapseToTier, documentTotal, officeTierUpdate, parseTier, selectedTier } from "../estimate-tier";
 
 const totals = { good: 8000, better: 10000, best: 13500 };
 
@@ -79,6 +79,24 @@ describe("officeTierUpdate", () => {
 
   it("leaves non-estimates alone", () => {
     expect(officeTierUpdate({ ...base, type: "invoice", newStatus: "paid", prevTier: null })).toEqual({ ok: true, tier: null });
+  });
+});
+
+describe("collapseToTier", () => {
+  it("puts the picked option's price on every line and total", () => {
+    const out = collapseToTier(
+      {
+        line_items: [{ description: "Heat pump", good: 7000, better: 9000, best: 12000 }],
+        totals,
+        brand: { good: "Brand A", better: "Brand B", best: "Brand C" },
+      },
+      "good"
+    );
+    expect(out.line_items[0]).toEqual({ description: "Heat pump", good: 7000, better: 7000, best: 7000 });
+    expect(out.totals).toEqual({ good: 8000, better: 8000, best: 8000 });
+    expect(out.brand.better).toBe("Brand A");
+    expect(out.pricing_mode).toBe("flat");
+    expect(out.chosen_option).toBe("Good");
   });
 });
 
