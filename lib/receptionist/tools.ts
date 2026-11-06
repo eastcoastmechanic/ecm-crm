@@ -2,14 +2,14 @@ import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { supabase } from "@/lib/supabase";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
-import { BUSINESS_HOURS, DEFAULT_JOB_DURATION_HOURS } from "./config";
+import { etDayRange, formatEtDateTime, parseEtLocal } from "@/lib/tz";
+import { BUSINESS_HOURS } from "./config";
+import { openHoursFor, weekdayOf } from "./availability";
 
-function dayBounds(date: string) {
-  const [year, month, day] = date.split("-").map(Number);
-  const start = new Date(year, month - 1, day, 0, 0, 0);
-  const end = new Date(year, month - 1, day, 23, 59, 59);
-  return { start, end };
-}
+// All dates and times the receptionist hears or says are New York time. The
+// server clock is UTC, so nothing here uses new Date(y, m, d, h) or getHours().
+
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
 // Channel-agnostic — doesn't depend on caller identity, so it's shared by
 // the SMS/voice receptionist and the website chatbot rather than rebuilt
@@ -17,37 +17,26 @@ function dayBounds(date: string) {
 export const checkAvailabilityTool = betaZodTool({
   name: "check_availability",
   description:
-    "Check job availability for a given date (YYYY-MM-DD) during business hours. Returns booked time slots and open time slots so you can offer real options to the caller.",
+    "Check job availability for a given date (YYYY-MM-DD) during business hours. Returns booked time slots and open time slots so you can offer real options to the caller. Times are New York time.",
   inputSchema: z.object({
     date: z.string().describe("Date to check, format YYYY-MM-DD"),
   }),
   run: async ({ date }) => {
-    const { start, end } = dayBounds(date);
+    if (!DATE_KEY.test(date)) return `Couldn't read "${date}" as a date. Use YYYY-MM-DD.`;
+    if (!BUSINESS_HOURS.daysOfWeek.includes(weekdayOf(date))) {
+      return "That date is outside business hours (Mon-Fri). Offer the caller a weekday instead.";
+    }
+
+    const { start, end } = etDayRange(date);
     const { data: jobs } = await supabase
       .from("jobs")
       .select("scheduled_at")
       .gte("scheduled_at", start.toISOString())
-      .lte("scheduled_at", end.toISOString())
+      .lt("scheduled_at", end.toISOString())
       .in("status", ["requested", "scheduled", "in_progress"]);
 
-    const [year, month, day] = date.split("-").map(Number);
-    const weekday = new Date(year, month - 1, day).getDay();
-    if (!BUSINESS_HOURS.daysOfWeek.includes(weekday)) {
-      return "That date is outside business hours (Mon-Fri). Offer the caller a weekday instead.";
-    }
-
-    const busyHours = new Set<number>();
-    for (const j of jobs ?? []) {
-      const startHour = new Date(j.scheduled_at as string).getHours();
-      for (let h = startHour; h < startHour + DEFAULT_JOB_DURATION_HOURS; h++) {
-        busyHours.add(h);
-      }
-    }
-    const openHours: string[] = [];
-    for (let h = BUSINESS_HOURS.startHour; h < BUSINESS_HOURS.endHour; h++) {
-      if (!busyHours.has(h)) openHours.push(`${String(h).padStart(2, "0")}:00`);
-    }
-    return JSON.stringify({ date, openHours, busyCount: busyHours.size });
+    const { openHours, busyCount } = openHoursFor((jobs ?? []).map((j) => j.scheduled_at as string));
+    return JSON.stringify({ date, openHours, busyCount });
   },
 });
 
@@ -61,7 +50,7 @@ export function buildReceptionistTools(params: {
   const getCustomerJobs = betaZodTool({
     name: "get_customer_jobs",
     description:
-      "Get the caller's upcoming jobs, if they are a known/matched customer. Use this to answer questions like 'when's my appointment'.",
+      "Get the caller's upcoming jobs, if they are a known/matched customer. Use this to answer questions like 'when's my appointment'. Use the `when` field (New York time) when telling the caller a time.",
     inputSchema: z.object({}),
     run: async () => {
       if (!customerId) return "This caller is not a recognized customer yet.";
@@ -71,7 +60,12 @@ export function buildReceptionistTools(params: {
         .eq("customer_id", customerId)
         .in("status", ["requested", "scheduled", "in_progress"])
         .order("scheduled_at", { ascending: true });
-      return JSON.stringify(jobs ?? []);
+      return JSON.stringify(
+        (jobs ?? []).map((j) => ({
+          ...j,
+          when: j.scheduled_at ? `${formatEtDateTime(j.scheduled_at as string)} ET` : "not scheduled yet",
+        }))
+      );
     },
   });
 
@@ -81,7 +75,7 @@ export function buildReceptionistTools(params: {
       "Propose a new job booking. This creates a REQUEST pending owner confirmation, not a final booking — always tell the caller it's pending confirmation. If the caller is not a recognized customer, customerName is required to create their record.",
     inputSchema: z.object({
       date: z.string().describe("Date, format YYYY-MM-DD"),
-      time: z.string().describe("Time, 24-hour format HH:MM"),
+      time: z.string().describe("Time, 24-hour format HH:MM, New York time"),
       address: z.string().describe("Service address"),
       description: z.string().describe("What the customer needs done"),
       customerName: z.string().optional().describe("Required only if this is a new/unrecognized caller"),
@@ -96,6 +90,10 @@ export function buildReceptionistTools(params: {
       if (!customerId && !customerName) {
         return "Cannot book: this is a new caller and no name was provided. Ask for their name first.";
       }
+
+      // Checked before anything is saved, so a bad time never leaves a customer with no job.
+      const scheduledAt = parseEtLocal(`${date}T${time}`);
+      if (!scheduledAt) return `Couldn't read "${date} ${time}" as a date and time. Use YYYY-MM-DD and HH:MM.`;
 
       // Texting in is itself consent for the SMS channel; for a phone call,
       // only enroll the number if the caller explicitly agreed when asked.
@@ -116,10 +114,6 @@ export function buildReceptionistTools(params: {
       } catch (err) {
         return `Failed to set up customer/property: ${err instanceof Error ? err.message : "unknown error"}`;
       }
-
-      const [year, month, day] = date.split("-").map(Number);
-      const [hour, minute] = time.split(":").map(Number);
-      const scheduledAt = new Date(year, month - 1, day, hour, minute, 0);
 
       const { error: jobError } = await supabase.from("jobs").insert({
         customer_id: finalCustomerId,
@@ -142,10 +136,13 @@ export function buildReceptionistTools(params: {
     inputSchema: z.object({
       jobId: z.string().describe("The job's id, from get_customer_jobs"),
       newDate: z.string().describe("New date, format YYYY-MM-DD"),
-      newTime: z.string().describe("New time, 24-hour format HH:MM"),
+      newTime: z.string().describe("New time, 24-hour format HH:MM, New York time"),
     }),
     run: async ({ jobId, newDate, newTime }) => {
       if (!customerId) return "Cannot reschedule: caller is not a recognized customer.";
+
+      const scheduledAt = parseEtLocal(`${newDate}T${newTime}`);
+      if (!scheduledAt) return `Couldn't read "${newDate} ${newTime}" as a date and time. Use YYYY-MM-DD and HH:MM.`;
 
       const { data: job } = await supabase
         .from("jobs")
@@ -155,10 +152,6 @@ export function buildReceptionistTools(params: {
       if (!job || job.customer_id !== customerId) {
         return "That job was not found for this customer.";
       }
-
-      const [year, month, day] = newDate.split("-").map(Number);
-      const [hour, minute] = newTime.split(":").map(Number);
-      const scheduledAt = new Date(year, month - 1, day, hour, minute, 0);
 
       const { error } = await supabase
         .from("jobs")
