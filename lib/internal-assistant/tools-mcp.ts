@@ -12,7 +12,10 @@ import { deleteLead } from "@/app/(internal)/leads/actions";
 import { deletePriceBookItem } from "@/app/(internal)/price-book/actions";
 import { deletePurchaseOrder } from "@/app/(internal)/procurement/actions";
 import { sendDocumentEmail } from "@/app/(internal)/documents/[id]/actions";
+import { sendServiceReportEmail } from "@/app/(internal)/diagnostics/[id]/actions";
 import { chargeCustomerCard } from "@/lib/customer-charges";
+import { createTurnGate, SAME_TURN_MESSAGE } from "@/lib/chat-confirm-gate";
+import type { StaffRole } from "@/lib/require-role";
 
 /**
  * buildInternalTools() returns a union of ~40 differently-typed tools --
@@ -245,6 +248,19 @@ const proposeChargeCustomerTool = betaZodTool({
   },
 });
 
+const proposeSendServiceReportTool = betaZodTool({
+  name: "propose_send_service_report",
+  description: "Preview emailing a finished service report to its customer as a PDF. Returns a confirmation token — call confirm_action with it to actually send.",
+  inputSchema: z.object({ diagnosticId: z.string() }),
+  run: async ({ diagnosticId }) => {
+    const { data: report } = await supabase.from("diagnostics").select("id").eq("id", diagnosticId).single();
+    if (!report) return `Service report ${diagnosticId} not found.`;
+    const preview = `This will email service report ${diagnosticId} as a PDF to the customer on file.`;
+    const { token, expiresInMinutes } = await createPendingAction("send_service_report", { diagnosticId }, preview);
+    return `${preview} Call confirm_action with token "${token}" to proceed. Expires in ${expiresInMinutes} minutes.`;
+  },
+});
+
 // -------------------------------------------------------------- confirm
 
 const executors: Record<string, ActionExecutor> = {
@@ -297,6 +313,13 @@ const executors: Record<string, ActionExecutor> = {
     await sendDocumentEmail(fd);
     return `Sent document ${documentId}.`;
   },
+  send_service_report: async (input) => {
+    const { diagnosticId } = input as { diagnosticId: string };
+    const fd = new FormData();
+    fd.set("id", diagnosticId);
+    await sendServiceReportEmail(fd);
+    return `Sent service report ${diagnosticId}.`;
+  },
   charge_customer: async (input) => {
     const { customerId, amountDollars, reason } = input as { customerId: string; amountDollars: number; reason: string };
     return chargeCustomerCard(customerId, amountDollars, reason);
@@ -321,6 +344,7 @@ const GATED_TOOL_NAMES = new Set([
   "delete_price_book_item",
   "delete_purchase_order",
   "send_document",
+  "send_service_report",
 ]);
 
 export function buildMcpTools(): McpTool[] {
@@ -336,8 +360,53 @@ export function buildMcpTools(): McpTool[] {
     proposeDeletePriceBookItemTool,
     proposeDeletePurchaseOrderTool,
     proposeSendDocumentTool,
+    proposeSendServiceReportTool,
     proposeChargeCustomerTool,
     confirmActionTool,
   ] as unknown as McpTool[];
   return [...base, ...gated];
+}
+
+type ChatToolOptions = Parameters<typeof buildInternalTools>[0];
+
+/**
+ * Tools for the chat assistant and the Teams/Copilot agent. Same delete and
+ * send gating as the MCP connector (propose, then confirm), plus a same-turn
+ * guard so the model can't propose and confirm in one go. Card charges stay
+ * MCP-only. Only the owner gets the gated tools, matching buildInternalTools.
+ */
+export function buildChatTools(options?: ChatToolOptions): ReturnType<typeof buildInternalTools> {
+  const owner = !options?.staffRole || (options.staffRole as StaffRole) === "owner";
+  const base = (buildInternalTools(options) as unknown as McpTool[]).filter(
+    (tool) => !GATED_TOOL_NAMES.has(tool.name)
+  );
+  if (!owner) return base as unknown as ReturnType<typeof buildInternalTools>;
+
+  const gate = createTurnGate();
+  const proposals = [
+    proposeDeleteCustomerTool,
+    proposeDeletePropertyTool,
+    proposeDeleteEquipmentTool,
+    proposeDeleteDocumentTool,
+    proposeDeleteLeadTool,
+    proposeDeletePriceBookItemTool,
+    proposeDeletePurchaseOrderTool,
+    proposeSendDocumentTool,
+    proposeSendServiceReportTool,
+  ].map((tool) => ({
+    ...tool,
+    run: async (input: never, ctx?: never) => {
+      const out = await (tool.run as (i: never, c?: never) => Promise<unknown>)(input, ctx);
+      if (typeof out === "string") gate.noteProposal(out);
+      return out;
+    },
+  }));
+  const confirm = {
+    ...confirmActionTool,
+    run: async (input: { token: string }, ctx?: never) => {
+      if (gate.blocksConfirm(input.token)) return SAME_TURN_MESSAGE;
+      return (confirmActionTool.run as (i: unknown, c?: never) => Promise<unknown>)(input, ctx);
+    },
+  };
+  return [...base, ...proposals, confirm] as unknown as ReturnType<typeof buildInternalTools>;
 }
