@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
+import { etDateAtHour } from "@/lib/tz";
 
 const WINDOW_HOURS: Record<string, number> = {
   morning: 8,
@@ -30,9 +31,9 @@ export async function requestService(formData: FormData) {
   if (!date) throw new Error("Preferred date is required");
   if (!notes) throw new Error("Describe what you need service for");
 
-  const hour = WINDOW_HOURS[window] ?? 8;
-  const scheduled_at = new Date(`${date}T00:00:00`);
-  scheduled_at.setHours(hour, 0, 0, 0);
+  // The window is New York time; the server clock is UTC.
+  const scheduled_at = etDateAtHour(date, WINDOW_HOURS[window] ?? 8);
+  if (!scheduled_at) throw new Error("Preferred date is required");
 
   const { error } = await supabase.from("jobs").insert({
     customer_id: customer.id,
