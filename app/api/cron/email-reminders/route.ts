@@ -5,6 +5,7 @@ import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { movePlannerTaskForJob, createPlannerTask } from "@/lib/planner-connector";
 import { sendWarrantyAlerts } from "@/lib/warranty-alerts";
 import { sendMaintenancePlanCharges } from "@/lib/plan-renewal";
+import { canText } from "@/lib/sms-consent";
 
 function todayISODate() {
   return new Date().toISOString().slice(0, 10);
@@ -123,7 +124,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app";
 async function sendJobFollowUps() {
   const { data: jobs, error } = await supabase
     .from("jobs")
-    .select("id, completed_at, customers(name, email), properties(address)")
+    .select("id, completed_at, customers(name, email, phone, sms_consent), properties(address)")
     .eq("status", "complete")
     .lte("completed_at", daysAgoISO(1))
     .gte("completed_at", daysAgoISO(2))
@@ -135,10 +136,14 @@ async function sendJobFollowUps() {
   let sent = 0;
 
   for (const job of jobs ?? []) {
-    const customer = job.customers as unknown as CustomerContact;
+    const customer = job.customers as unknown as (CustomerContact & { phone?: string | null; sms_consent?: boolean | null });
     const property = job.properties as unknown as { address: string | null } | null;
     const email = customer?.email;
     if (!email) continue;
+
+    // Customers we can text get the review request by text after the invoice is paid (review-requests
+    // cron), so they do not also get this email.
+    if (customer?.phone && customer.sms_consent === true && (await canText(customer.phone))) continue;
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
