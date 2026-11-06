@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { metadataCorsOptionsRequestHandler } from "mcp-handler";
 import { supabase } from "@/lib/supabase";
+import { isRateLimited } from "@/lib/rate-limit";
+import { clientIp, registrationAllowed } from "@/lib/oauth-limits";
 
 /**
  * Dynamic Client Registration (RFC 7591) -- public, unauthenticated by
@@ -30,6 +32,15 @@ function isAllowedRedirectUri(uri: string): boolean {
 const corsHeaders = { "Access-Control-Allow-Origin": "*" };
 
 export async function POST(request: Request) {
+  // Registration is open by design, so it's capped: a few new clients an hour
+  // across everyone (counted in the database), plus a per-address limit.
+  const tooMany = () =>
+    NextResponse.json(
+      { error: "too_many_requests", error_description: "Too many registrations. Try again later." },
+      { status: 429, headers: { ...corsHeaders, "Retry-After": "3600" } }
+    );
+  if (isRateLimited(`oauth-register:${clientIp(request.headers)}`, 3)) return tooMany();
+
   let body: unknown;
   try {
     body = await request.json();
@@ -61,7 +72,18 @@ export async function POST(request: Request) {
     .select("client_id")
     .single();
   if (error) {
-    return NextResponse.json({ error: "server_error", error_description: error.message }, { status: 500, headers: corsHeaders });
+    return NextResponse.json({ error: "server_error", error_description: "Could not register client" }, { status: 500, headers: corsHeaders });
+  }
+
+  // Insert first, count after (the count includes this one), so simultaneous
+  // registrations see each other and can't all slip under the hourly cap.
+  const { count, error: countError } = await supabase
+    .from("oauth_clients")
+    .select("client_id", { count: "exact", head: true })
+    .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
+  if (!registrationAllowed(countError ? null : (count ?? 0))) {
+    await supabase.from("oauth_clients").delete().eq("client_id", data.client_id);
+    return tooMany();
   }
 
   return NextResponse.json(
