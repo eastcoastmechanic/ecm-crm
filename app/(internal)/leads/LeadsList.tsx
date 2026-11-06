@@ -40,6 +40,8 @@ type Lead = {
   town: string | null;
   address: string | null;
   created_at: string;
+  next_step?: string | null;
+  follow_up_on?: string | null;
   customers: { name: string | null; phone: string | null; email: string | null } | null;
 };
 
@@ -456,6 +458,9 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
     summary: lead.summary,
     urgency: lead.urgency_score,
     createdAt: lead.created_at,
+    // null until SQL 0061 adds the columns
+    nextStep: lead.next_step ?? null,
+    followUpOn: lead.follow_up_on ?? null,
   }));
 
   function handleDelete(id: string) {

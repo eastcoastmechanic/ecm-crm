@@ -1,6 +1,9 @@
 "use client";
 
 import { subTextClass } from "../ui";
+import { followUpState, shortDate } from "@/lib/lead-follow-up";
+import { etDateKey } from "@/lib/tz";
+import LeadFollowUpForm from "./LeadFollowUpForm";
 
 // Pipeline board over the existing lead stages. "sent" (auto outreach went out)
 // sits with Contacted, and "dismissed" (not a real lead) sits with Lost.
@@ -24,6 +27,8 @@ export type BoardLead = {
   summary: string | null;
   urgency: number;
   createdAt: string;
+  nextStep: string | null;
+  followUpOn: string | null;
 };
 
 const sourceLabel: Record<string, string> = {
@@ -40,17 +45,28 @@ function daysAgo(iso: string): string {
   return days === 1 ? "1 day" : `${days} days`;
 }
 
+const followUpStyle = {
+  overdue: { text: "text-red-400", border: "#ef4444", label: "Overdue" },
+  today: { text: "text-gold", border: "var(--gold)", label: "Today" },
+  upcoming: { text: "text-g300", border: "rgba(255,255,255,.08)", label: "" },
+  none: { text: "text-g300", border: "rgba(255,255,255,.08)", label: "" },
+} as const;
+
 function BoardCard({
   lead,
   onMove,
   saving,
+  todayKey,
 }: {
   lead: BoardLead;
   onMove: (id: string, status: string) => void;
   saving: boolean;
+  todayKey: string;
 }) {
+  const due = followUpState(lead.followUpOn, lead.status, todayKey);
+  const style = followUpStyle[due];
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-white/8 bg-white/3 p-3">
+    <div className="flex flex-col gap-1.5 rounded-lg border bg-white/3 p-3" style={{ borderColor: style.border }}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 font-medium text-white">
           <span className="break-words">{lead.name}</span>
@@ -64,6 +80,14 @@ function BoardCard({
         {[lead.town, `added ${daysAgo(lead.createdAt)} ago`].filter(Boolean).join(" · ")}
       </div>
       {lead.summary && <p className="line-clamp-3 text-xs text-white/80">{lead.summary}</p>}
+      {(lead.nextStep || lead.followUpOn) && (
+        <p className={`text-xs font-semibold ${style.text}`}>
+          {style.label && `${style.label}: `}
+          {lead.nextStep || "Follow up"}
+          {lead.followUpOn && ` · by ${shortDate(lead.followUpOn)}`}
+        </p>
+      )}
+      <LeadFollowUpForm leadId={lead.id} nextStep={lead.nextStep} followUpOn={lead.followUpOn} />
       <div className="mt-1 flex items-center justify-between gap-2">
         {lead.phone ? (
           <a href={`tel:${lead.phone}`} className="text-xs font-semibold text-green underline">
@@ -101,7 +125,18 @@ export default function LeadBoard({
   onMove: (id: string, status: string) => void;
   savingId: string | null;
 }) {
+  const todayKey = etDateKey();
+  const dueCount = leads.filter((l) => {
+    const s = followUpState(l.followUpOn, l.status, todayKey);
+    return s === "overdue" || s === "today";
+  }).length;
   return (
+    <div className="flex flex-col gap-2">
+    {dueCount > 0 && (
+      <p className="text-sm font-semibold text-gold">
+        {dueCount} follow-up{dueCount === 1 ? "" : "s"} due today or overdue (outlined on the board).
+      </p>
+    )}
     <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
       <div className="grid min-w-[56rem] grid-cols-5 gap-3">
         {BOARD_COLUMNS.map((col) => {
@@ -116,12 +151,13 @@ export default function LeadBoard({
               </div>
               {inCol.length === 0 && <p className={`${subTextClass} text-xs`}>None</p>}
               {inCol.map((lead) => (
-                <BoardCard key={lead.id} lead={lead} onMove={onMove} saving={savingId === lead.id} />
+                <BoardCard key={lead.id} lead={lead} onMove={onMove} saving={savingId === lead.id} todayKey={todayKey} />
               ))}
             </div>
           );
         })}
       </div>
+    </div>
     </div>
   );
 }
