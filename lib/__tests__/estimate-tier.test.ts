@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvalChoice, availableTiers, collapseToTier, documentTotal, officeTierUpdate, parseTier, selectedTier } from "../estimate-tier";
+import { approvalChoice, availableTiers, collapseToTier, documentTotal, officeTierUpdate, parseTier, selectedTier, tierTotals } from "../estimate-tier";
 
 const totals = { good: 8000, better: 10000, best: 13500 };
 
@@ -110,5 +110,24 @@ describe("availableTiers and parseTier", () => {
     expect(parseTier("best")).toBe("best");
     expect(parseTier("BEST")).toBeNull();
     expect(parseTier(3)).toBeNull();
+  });
+});
+
+describe("tierTotals", () => {
+  it("sums price x qty per option and rounds to cents", () => {
+    const items = [
+      { qty: 1, good: 7000, better: 9000, best: 12000 },
+      { qty: 3, good: 125, better: 125, best: 125 },
+      { qty: 2, good: 19.995, better: 19.995, best: 19.995 },
+    ];
+    expect(tierTotals(items)).toEqual({ good: 7414.99, better: 9414.99, best: 12414.99 });
+  });
+
+  it("skips options a line has no price for", () => {
+    expect(tierTotals([{ qty: 1, good: null, better: 500, best: 800 }])).toEqual({ good: 0, better: 500, best: 800 });
+  });
+
+  it("is zero for no lines", () => {
+    expect(tierTotals([])).toEqual({ good: 0, better: 0, best: 0 });
   });
 });

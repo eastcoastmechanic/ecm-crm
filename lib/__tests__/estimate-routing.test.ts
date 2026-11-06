@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- vitest isn't on main yet; it lands with PR #29 (chore/ci-lint-tests). Remove this line then.
 import { describe, expect, it } from "vitest";
 import { depositSplit, idempotencyKey, mapLineItems, paymentRequests, toCents } from "../estimate-routing";
 

@@ -14,7 +14,7 @@ import { sendPmReportToCustomer } from "@/lib/pm/send";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { markDocumentPaid } from "@/lib/document-paid";
 import { requireOffice } from "@/lib/require-role";
-import { documentTotal, officeTierUpdate } from "@/lib/estimate-tier";
+import { documentTotal, officeTierUpdate, tierTotals } from "@/lib/estimate-tier";
 
 type LineItem = {
   category: string;
@@ -33,14 +33,6 @@ function parseNullableNumber(value: FormDataEntryValue | null): number | null {
   if (value === null || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-}
-
-function sumTier(items: LineItem[], tier: "good" | "better" | "best") {
-  const total = items.reduce((sum, item) => {
-    const price = item[tier];
-    return price === null ? sum : sum + price * item.qty;
-  }, 0);
-  return Math.round(total * 100) / 100;
 }
 
 const CRAFTSMANSHIP_WARRANTY_YEARS = 1;
@@ -202,11 +194,7 @@ export async function updateDocument(_prev: UpdateDocumentState, formData: FormD
     });
   }
 
-  const totals = {
-    good: sumTier(items, "good"),
-    better: sumTier(items, "better"),
-    best: sumTier(items, "best"),
-  };
+  const totals = tierTotals(items);
   // The Good/Better/Best pick (customer's in the portal, or the office's for a
   // phone approval) sets the total; Better when there is none.
   const tierUpdate = officeTierUpdate({

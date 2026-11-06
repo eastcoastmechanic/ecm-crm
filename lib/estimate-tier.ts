@@ -107,3 +107,14 @@ export function approvalChoice(
   if (!availableTiers(totals).includes(tier)) return { ok: false, error: "That option isn't available on this estimate." };
   return { ok: true, tier, total: totals[tier] };
 }
+
+/**
+ * Good / Better / Best totals for a set of line items: price x qty, summed,
+ * rounded to cents. A line with no price for an option adds nothing to it.
+ * Shared by the CRM editor save and AI document generation.
+ */
+export function tierTotals(items: { qty: number; good: number | null; better: number | null; best: number | null }[]): TierTotals {
+  const sum = (tier: Tier) =>
+    Math.round(items.reduce((total, item) => (item[tier] === null ? total : total + item[tier] * item.qty), 0) * 100) / 100;
+  return { good: sum("good"), better: sum("better"), best: sum("best") };
+}
