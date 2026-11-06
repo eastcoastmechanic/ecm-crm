@@ -56,17 +56,40 @@ export async function confirmPendingAction(
     return `No executor registered for "${pending.action_name}" — this is a bug, tell Josh.`;
   }
 
+  // Claim the token BEFORE running anything. The read above is only for the
+  // friendly messages: two confirms can both pass it, and a delete, send or card
+  // charge must not run twice. The conditional update lets exactly one caller
+  // through; the other sees no row come back.
+  const claimedAt = new Date().toISOString();
+  const { data: claimed, error: claimError } = await supabase
+    .from("pending_actions")
+    .update({ consumed_at: claimedAt })
+    .eq("id", token)
+    .is("consumed_at", null)
+    .gt("expires_at", claimedAt)
+    .select("id")
+    .maybeSingle();
+  if (claimError) {
+    return `Could not confirm: ${claimError.message}. Nothing was changed — you can try again.`;
+  }
+  if (!claimed) {
+    return "This action was already executed, or is running right now. Propose it again if you need to repeat it.";
+  }
+
   let result: string;
   try {
     result = await executor(pending.tool_input);
   } catch (err) {
-    return `Execution failed: ${err instanceof Error ? err.message : "unknown error"}. Nothing was changed — you can try confirming again.`;
+    // Give the token back so a failed run can be retried.
+    const { error: releaseError } = await supabase
+      .from("pending_actions")
+      .update({ consumed_at: null })
+      .eq("id", token);
+    const note = releaseError ? " The token could not be released, so propose the action again." : " You can try confirming again.";
+    return `Execution failed: ${err instanceof Error ? err.message : "unknown error"}. It may not have completed.${note}`;
   }
 
-  await supabase
-    .from("pending_actions")
-    .update({ consumed_at: new Date().toISOString(), result })
-    .eq("id", token);
+  await supabase.from("pending_actions").update({ result }).eq("id", token);
 
   return result;
 }

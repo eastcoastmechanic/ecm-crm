@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { sendSMS } from "@/lib/sms";
+import { canText } from "@/lib/sms-consent";
 import {
   appendJobPhotos,
   uploadJobPhotoFiles,
@@ -18,7 +19,7 @@ import { requireOffice, requireRole } from "@/lib/require-role";
 import { notifyTech } from "@/lib/tech-notice-send";
 import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
 import { getFinishBlockers } from "@/lib/job-checklist";
-import { parseEtLocal } from "@/lib/tz";
+import { moveToEtDate, parseEtLocal } from "@/lib/tz";
 
 export async function createServiceCall() {
   const role = await requireRole(["owner", "office", "tech"]);
@@ -49,19 +50,23 @@ export async function createServiceCall() {
 }
 
 /** Create the install job for a signed contract. One job per contract; a repeat just opens the existing one. */
-export async function scheduleJobFromContract(formData: FormData) {
+/** `scheduledAt` echoes what was typed so the form can keep it after an error (React clears uncontrolled fields). */
+export type ScheduleJobState = { error: string; scheduledAt: string } | null;
+
+export async function scheduleJobFromContract(_prev: ScheduleJobState, formData: FormData): Promise<ScheduleJobState> {
   await requireOffice();
   const documentId = formData.get("document_id") as string;
-  const when = parseEtLocal(formData.get("scheduled_at") as string);
-  if (!when) throw new Error("Pick a date and time for the job");
+  const typedAt = String(formData.get("scheduled_at") ?? "");
+  const when = parseEtLocal(typedAt);
+  if (!when) return { error: "Pick a date and time for the job.", scheduledAt: typedAt };
 
   const { data: doc, error: docError } = await supabase
     .from("documents")
     .select("id, type, status, customer_id, property_id, line_items")
     .eq("id", documentId)
     .single();
-  if (docError || !doc) throw new Error("Contract not found");
-  if (doc.type !== "contract" || doc.status !== "signed") throw new Error("Only a signed contract can be scheduled");
+  if (docError || !doc) return { error: "Contract not found.", scheduledAt: typedAt };
+  if (doc.type !== "contract" || doc.status !== "signed") return { error: "Only a signed contract can be scheduled.", scheduledAt: typedAt };
 
   const { data: existing } = await supabase.from("jobs").select("id").eq("document_id", documentId).limit(1);
   if (existing && existing.length > 0) redirect("/jobs");
@@ -81,7 +86,7 @@ export async function scheduleJobFromContract(formData: FormData) {
     })
     .select("id")
     .single();
-  if (error || !job) throw new Error(error?.message ?? "Failed to schedule job");
+  if (error || !job) return { error: error?.message ?? "Couldn't schedule the job. Try again.", scheduledAt: typedAt };
 
   await syncJobToPlanner(job.id, "scheduled");
   await syncJobToGraph(job.id);
@@ -102,18 +107,38 @@ async function notifyAssignedTech(jobId: string, kind: "rescheduled" | "cancelle
   });
 }
 
-/** Assign a job to a staff member, or clear it (empty staff_id). */
-export async function assignJob(formData: FormData) {
-  await requireOffice();
-  const jobId = formData.get("job_id") as string;
-  const staffId = ((formData.get("staff_id") as string) || "").trim() || null;
-  if (!jobId) throw new Error("Job is required");
+/** `staffId` echoes the pick so the select keeps it after an error (React resets uncontrolled fields). */
+export type AssignJobState = { error: string; staffId: string } | null;
 
-  const { data: before } = await supabase.from("jobs").select("assigned_staff_id").eq("id", jobId).maybeSingle();
-  const previousStaffId = (before?.assigned_staff_id as string | null | undefined) ?? null;
+/** Assign from the jobs list. Problems come back inline instead of an error page. */
+export async function assignJob(_prev: AssignJobState, formData: FormData): Promise<AssignJobState> {
+  const jobId = String(formData.get("job_id") ?? "");
+  const picked = String(formData.get("staff_id") ?? "").trim();
+  const result = await assignJobToStaff(jobId, picked || null);
+  return result.error ? { error: result.error, staffId: picked } : null;
+}
+
+/** Assign a job to a staff member, or clear it (null). Shared by the jobs list and dispatch. */
+export async function assignJobToStaff(jobId: string, staffId: string | null): Promise<{ error?: string }> {
+  await requireOffice();
+  if (!jobId) return { error: "Job is required." };
+
+  const { data: before, error: readError } = await supabase
+    .from("jobs")
+    .select("assigned_staff_id")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (readError) return { error: "Couldn't load the job. Try again." };
+  if (!before) return { error: "Job not found." };
+  const previousStaffId = (before.assigned_staff_id as string | null | undefined) ?? null;
+
+  if (staffId) {
+    const { data: staffRow } = await supabase.from("staff").select("id").eq("id", staffId).maybeSingle();
+    if (!staffRow) return { error: "That staff member no longer exists. Refresh and pick again." };
+  }
 
   const { error } = await supabase.from("jobs").update({ assigned_staff_id: staffId }).eq("id", jobId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the assignment. Try again." };
 
   // Tell the tech who got the job, and the one who lost it. Best effort, never blocks.
   if (staffId !== previousStaffId) {
@@ -124,6 +149,7 @@ export async function assignJob(formData: FormData) {
 
   revalidatePath("/jobs");
   revalidatePath("/field-board");
+  return {};
 }
 
 type CustomerContact = {
@@ -153,13 +179,21 @@ export async function updateJobStatus(formData: FormData) {
 }
 
 /** Change a job's date and time (New York wall-clock, "2026-10-22T09:30"). Notifies the customer and syncs Graph. */
-export async function rescheduleJobAt(jobId: string, localDateTime: string) {
+// Reschedule actions return { error } instead of throwing: production builds hide a
+// thrown server action's message, so the caller could only show a generic failure.
+
+/** Move a job to a New York date and time ("2026-10-22T09:30"). Used by dispatch. */
+export async function rescheduleJobAt(jobId: string, localDateTime: string): Promise<{ error?: string }> {
   await requireOffice();
   const next = parseEtLocal(localDateTime);
-  if (!next) throw new Error("Pick a valid date and time");
+  if (!next) return { error: "Pick a valid date and time." };
+
+  const { data: job, error: readError } = await supabase.from("jobs").select("id").eq("id", jobId).maybeSingle();
+  if (readError) return { error: "Couldn't load the job. Try again." };
+  if (!job) return { error: "Job not found." };
 
   const { error } = await supabase.from("jobs").update({ scheduled_at: next.toISOString() }).eq("id", jobId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the new time. Try again." };
 
   await sendScheduleNotifications(jobId);
   await syncJobToGraph(jobId);
@@ -167,32 +201,40 @@ export async function rescheduleJobAt(jobId: string, localDateTime: string) {
 
   revalidatePath("/jobs");
   revalidatePath("/dispatch");
+  return {};
 }
 
-export async function rescheduleJob(jobId: string, newDate: string) {
+/**
+ * Move a job to another New York day ("YYYY-MM-DD"), keeping its New York time
+ * (9:00 AM if it had none). Used by the jobs list date box and drag-and-drop.
+ */
+export async function rescheduleJob(jobId: string, newDate: string): Promise<{ error?: string }> {
   await requireOffice();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return { error: "Pick a valid date." };
+
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
     .select("scheduled_at")
     .eq("id", jobId)
-    .single();
-  if (fetchError) throw new Error(fetchError.message);
+    .maybeSingle();
+  if (fetchError) return { error: "Couldn't load the job. Try again." };
+  if (!existing) return { error: "Job not found." };
 
-  const [year, month, day] = newDate.split("-").map(Number);
-  const next = existing.scheduled_at ? new Date(existing.scheduled_at) : new Date(year, month - 1, day, 9, 0, 0);
-  next.setFullYear(year, month - 1, day);
+  const next = moveToEtDate((existing.scheduled_at as string | null) ?? null, newDate);
+  if (!next) return { error: "Pick a valid date." };
 
   const { error } = await supabase
     .from("jobs")
     .update({ scheduled_at: next.toISOString() })
     .eq("id", jobId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the new date. Try again." };
 
   await sendScheduleNotifications(jobId);
   await syncJobToGraph(jobId);
   await notifyAssignedTech(jobId, "rescheduled");
 
   revalidatePath("/jobs");
+  return {};
 }
 
 export async function addJobPhotos(formData: FormData) {
@@ -246,7 +288,7 @@ export async function markOnWay(jobId: string) {
     });
   }
 
-  if (customer?.phone && customer?.sms_consent) {
+  if (customer?.phone && customer?.sms_consent && (await canText(customer.phone))) {
     const sent = await sendSMS(customer.phone, message);
     if (!sent.ok) console.error(`On-the-way text failed: ${sent.error}`);
   }

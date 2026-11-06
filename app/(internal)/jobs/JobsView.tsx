@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addJobPhotos, assignJob, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
+import { addJobPhotos, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
 import { addTask, completeTask } from "../tasks/actions";
 import SubmitButton from "../SubmitButton";
+import CreateInvoiceForm from "./CreateInvoiceForm";
+import AssignJobForm from "./AssignJobForm";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 
 const statusOptions = ["requested", "scheduled", "in_progress", "complete", "cancelled"];
@@ -36,6 +38,8 @@ type Task = {
 type Job = {
   id: string;
   invoices?: { id: string; doc_number: string | null; status: string; total: number | null }[];
+  /** For the Create invoice form: contract total less deposit received, when the job has a contract. */
+  invoiceHint?: { suggested: string; note: string | null };
   job_type?: string | null;
   scheduled_at: string | null;
   status: string;
@@ -78,10 +82,25 @@ function monthGrid(cursor: Date) {
   });
 }
 
-function BillingLine({ status, invoices }: { status: string; invoices: NonNullable<Job["invoices"]> }) {
+function BillingLine({
+  jobId,
+  status,
+  invoices,
+  hint,
+}: {
+  jobId: string;
+  status: string;
+  invoices: NonNullable<Job["invoices"]>;
+  hint?: Job["invoiceHint"];
+}) {
   if (invoices.length === 0) {
     if (status !== "complete") return null;
-    return <div className="mt-1 text-xs font-semibold text-amber-400">Finished — no invoice linked yet</div>;
+    return (
+      <div className="mt-1">
+        <div className="text-xs font-semibold text-amber-400">Finished — no invoice linked yet</div>
+        <CreateInvoiceForm jobId={jobId} suggested={hint?.suggested ?? ""} hint={hint?.note ?? null} />
+      </div>
+    );
   }
   const owed = invoices.filter((i) => i.status !== "paid" && i.status !== "void");
   const owedTotal = owed.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
@@ -159,25 +178,27 @@ export default function JobsView({
     }
   }
 
-  async function handleDrop(day: Date, jobId: string) {
+  async function moveJobToDay(jobId: string, newDate: string) {
     setActionError(null);
     try {
-      await rescheduleJob(jobId, toDateKey(day));
+      const result = await rescheduleJob(jobId, newDate);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
       router.refresh();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to reschedule job");
+    } catch {
+      setActionError("Couldn't reschedule the job. Check your connection and try again.");
     }
+  }
+
+  async function handleDrop(day: Date, jobId: string) {
+    await moveJobToDay(jobId, toDateKey(day));
   }
 
   async function handleRescheduleInput(jobId: string, newDate: string) {
     if (!newDate) return;
-    setActionError(null);
-    try {
-      await rescheduleJob(jobId, newDate);
-      router.refresh();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to reschedule job");
-    }
+    await moveJobToDay(jobId, newDate);
   }
 
   async function handleOnWay(jobId: string) {
@@ -432,7 +453,7 @@ export default function JobsView({
                       }`
                     : ""}
                 </div>
-                {job.invoices && <BillingLine status={job.status} invoices={job.invoices} />}
+                {job.invoices && <BillingLine jobId={job.id} status={job.status} invoices={job.invoices} hint={job.invoiceHint} />}
               </div>
               <div className="flex items-center gap-2">
                 {job.diagnostics && job.diagnostics.length > 0 ? (
@@ -488,26 +509,7 @@ export default function JobsView({
               </div>
             </form>
 
-              <form action={assignJob} className="flex items-center gap-2">
-                <input type="hidden" name="job_id" value={job.id} />
-                <label className="flex items-center gap-2 text-[11px] text-g300">
-                  Assigned to
-                  <select
-                    name="staff_id"
-                    defaultValue={job.assigned_staff_id ?? ""}
-                    className={inputClass}
-                    aria-label="Assign job to"
-                  >
-                    <option value="">Unassigned</option>
-                    {staff.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <SubmitButton className={buttonSecondaryClass}>Assign</SubmitButton>
-              </form>
+              <AssignJobForm jobId={job.id} assignedStaffId={job.assigned_staff_id ?? null} staff={staff} />
 
               {job.photos && job.photos.length > 0 && (
                 <div className="flex flex-wrap gap-2">

@@ -1,3 +1,4 @@
+import { squareWritesEnabled } from "@/lib/square-import-rules";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import RouteButtons from "./RouteButtons";
@@ -53,7 +54,7 @@ export default async function EstimateInboxPage() {
           )}
         </h1>
         <p className={subTextClass}>
-          Drafts from the bots. Pick where each one goes. Square makes a draft invoice only; you send it from Square.
+          Drafts from the bots. Create each one in the CRM, then send it from there. Square is read-only now.
         </p>
       </div>
 
@@ -77,7 +78,7 @@ export default async function EstimateInboxPage() {
                 · {formatPrice(row.total)} · {formatWhen(row.created_at)}
               </p>
             </div>
-            <RouteButtons documentId={row.id} />
+            <RouteButtons documentId={row.id} squareEnabled={squareWritesEnabled()} />
           </div>
         ))}
       </div>

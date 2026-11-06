@@ -19,8 +19,14 @@ const OPT_IN_WORDS = new Set(["start", "unstop"]);
 
 export type SmsKeyword = "opt_out" | "opt_in" | "yes" | "help";
 
-/** Case/whitespace-insensitive exact match on the whole message. */
+// Josh's rule: a text that has the word "stop" anywhere in it is an opt-out, not
+// just a message that is only "stop". Whole word, any case ("Please stop texting
+// me", "STOP!"). Leaning toward unsubscribing is the safe way to be wrong.
+const STOP_AS_A_WORD = /\bstop\b/i;
+
+/** Opt-out words and opt-in/help/yes are exact matches on the whole message; "stop" counts anywhere. */
 export function parseSmsKeyword(body: string): SmsKeyword | null {
+  if (STOP_AS_A_WORD.test(body)) return "opt_out";
   const word = body.trim().toLowerCase().replace(/[.!?\s]+$/g, "");
   if (OPT_OUT_WORDS.has(word)) return "opt_out";
   if (OPT_IN_WORDS.has(word)) return "opt_in";
@@ -31,10 +37,26 @@ export function parseSmsKeyword(body: string): SmsKeyword | null {
 
 type CustomerRow = { id: string; phone: string | null; sms_consent: boolean };
 
+const PAGE = 1000;
+
 async function customersForPhone(key: string): Promise<CustomerRow[]> {
-  const { data, error } = await supabase.from("customers").select("id, phone, sms_consent");
-  if (error) throw new Error(`sms-consent: customers read failed: ${error.message}`);
-  return ((data ?? []) as CustomerRow[]).filter((c) => c.phone && phoneKey(c.phone) === key);
+  // Phones are stored in mixed formats, so match on the last-10-digits key in
+  // code. PostgREST caps one read at 1000 rows, so page through; a customer past
+  // row 1000 must not look like "no customer" (that would let a reply text an
+  // opted-out number).
+  const matches: CustomerRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("id, phone, sms_consent")
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`sms-consent: customers read failed: ${error.message}`);
+    const rows = (data ?? []) as CustomerRow[];
+    matches.push(...rows.filter((c) => c.phone && phoneKey(c.phone) === key));
+    if (rows.length < PAGE) break;
+  }
+  return matches;
 }
 
 async function excludedRowsForPhone(key: string) {

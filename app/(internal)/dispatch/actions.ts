@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assignJob, rescheduleJobAt } from "../jobs/actions";
+import { assignJobToStaff, rescheduleJobAt } from "../jobs/actions";
 import { requireOffice } from "@/lib/require-role";
 import { supabase } from "@/lib/supabase";
 
@@ -24,13 +24,12 @@ export async function saveDispatchEdit(_prev: DispatchState, formData: FormData)
     if (!job) return { error: "Job not found" };
 
     if (staffId !== originalStaff) {
-      const fd = new FormData();
-      fd.set("job_id", jobId);
-      fd.set("staff_id", staffId);
-      await assignJob(fd);
+      const assigned = await assignJobToStaff(jobId, staffId || null);
+      if (assigned.error) return { error: assigned.error };
     }
     if (when && when !== originalWhen) {
-      await rescheduleJobAt(jobId, when);
+      const moved = await rescheduleJobAt(jobId, when);
+      if (moved.error) return { error: moved.error };
     }
     revalidatePath("/dispatch");
     return { saved: true };

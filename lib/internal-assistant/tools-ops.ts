@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { supabase } from "@/lib/supabase";
-import { updateJobStatus, rescheduleJob } from "@/app/(internal)/jobs/actions";
+import { updateJobStatus, rescheduleJobAt } from "@/app/(internal)/jobs/actions";
+import { etLocalFromIso, formatEtDateTime, parseEtLocal } from "@/lib/tz";
 import { setLeadStage, addManualLead, dismissLead, deleteLead } from "@/app/(internal)/leads/actions";
 import { adjustInventoryQty } from "@/app/(internal)/inventory/actions";
 import { sendDocumentEmail } from "@/app/(internal)/documents/[id]/actions";
@@ -147,14 +148,19 @@ const rescheduleJobTool = betaZodTool({
   description: "Move an existing job to a different date/time. Use list_jobs to get the jobId.",
   inputSchema: z.object({
     jobId: z.string(),
-    scheduledAt: z.string().describe("New ISO 8601 datetime"),
+    scheduledAt: z
+      .string()
+      .describe("New date and time, ISO 8601. Without a zone (e.g. 2026-11-12T10:00) it is read as New York time."),
   }),
   run: async ({ jobId, scheduledAt }) => {
-    const when = new Date(scheduledAt);
-    if (Number.isNaN(when.getTime())) return `Couldn't read "${scheduledAt}" as a date/time.`;
+    const local = etLocalFromIso(scheduledAt);
+    if (!local) return `Couldn't read "${scheduledAt}" as a date/time.`;
     try {
-      await rescheduleJob(jobId, when.toISOString());
-      return `Moved job ${jobId} to ${when.toLocaleString("en-US", { timeZone: "America/New_York" })} ET.`;
+      // Same path as dispatch: exact New York date and time, notifications and sync included.
+      const result = await rescheduleJobAt(jobId, local);
+      if (result.error) return `Failed to reschedule: ${result.error}`;
+      const when = parseEtLocal(local)!;
+      return `Moved job ${jobId} to ${formatEtDateTime(when)} ET.`;
     } catch (err) {
       return `Failed to reschedule: ${err instanceof Error ? err.message : "unknown error"}`;
     }

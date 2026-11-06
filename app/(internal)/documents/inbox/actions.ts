@@ -1,5 +1,6 @@
 "use server";
 
+import { squareWritesEnabled } from "@/lib/square-import-rules";
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireOffice } from "@/lib/require-role";
@@ -75,6 +76,8 @@ type DocRow = StoredDocument & {
 export async function routeToSquare(documentId: string): Promise<RouteResult> {
   await requireOffice();
   if (!documentId) return { error: "Missing document id." };
+  // Square is a read-only archive now. Writes stay off unless SQUARE_WRITES_ENABLED=true on Vercel.
+  if (!squareWritesEnabled()) return { error: "Square is read-only now. Create it in the CRM instead." };
 
   const { data, error: readError } = await supabase
     .from("documents")

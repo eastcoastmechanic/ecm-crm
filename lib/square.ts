@@ -220,6 +220,29 @@ export async function listSquareInvoices(locationId: string): Promise<SquareInvo
   return invoices;
 }
 
+/** Every customer on the Square account (read only). Follows all pages, up to 20,000 customers. */
+export async function listSquareCustomers(): Promise<SquareCustomer[]> {
+  const headers = squareHeaders();
+  if (!headers) throw new Error("SQUARE_ACCESS_TOKEN is not set.");
+
+  const customers: SquareCustomer[] = [];
+  let cursor: string | undefined;
+  let pages = 0;
+  do {
+    const url = new URL(`${SQUARE_BASE_URL}/v2/customers`);
+    url.searchParams.set("limit", "100");
+    if (cursor) url.searchParams.set("cursor", cursor);
+    const res = await fetch(url.toString(), { headers, cache: "no-store" });
+    if (!res.ok) throw new Error(`Square customers list failed (${res.status}): ${await res.text()}`);
+    const json = (await res.json()) as { customers?: SquareCustomer[]; cursor?: string };
+    customers.push(...(json.customers ?? []));
+    cursor = json.cursor;
+    pages += 1;
+  } while (cursor && pages < 200);
+  if (cursor) throw new Error("Square has more than 20,000 customers; stopped before importing a partial list.");
+  return customers;
+}
+
 export async function bulkRetrieveSquareCustomers(customerIds: string[]): Promise<Map<string, SquareCustomer>> {
   const headers = squareHeaders();
   const found = new Map<string, SquareCustomer>();

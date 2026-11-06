@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { sendDocumentEmail } from "./actions";
 import SubmitButton from "../../SubmitButton";
-import { scheduleJobFromContract } from "../../jobs/actions";
-import { buttonClass, buttonSecondaryClass, inputClass, subTextClass } from "../../ui";
+import ScheduleJobForm from "./ScheduleJobForm";
+import { buttonClass, buttonSecondaryClass, subTextClass } from "../../ui";
 import DocumentDeleteButton from "../DocumentDeleteButton";
 import DepositPanel from "./DepositPanel";
 import { BrandedFormShell } from "@/lib/branded-form-shell";
@@ -112,16 +112,7 @@ export default function ContractDetail({
               </Link>
             </p>
           ) : (
-            <form action={scheduleJobFromContract} className="flex flex-wrap items-end gap-3">
-              <input type="hidden" name="document_id" value={doc.id} />
-              <label className="flex flex-col gap-1 text-xs text-g300">
-                Job date and time
-                <input type="datetime-local" name="scheduled_at" required className={inputClass} />
-              </label>
-              <SubmitButton className={buttonClass} pendingText="Scheduling…">
-                Schedule job
-              </SubmitButton>
-            </form>
+            <ScheduleJobForm documentId={doc.id} />
           )}
         </div>
       )}

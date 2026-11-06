@@ -365,6 +365,8 @@ export async function createInvoiceDirect(input: {
   propertyId: string | null;
   items: DirectLineItem[];
   jobId?: string;
+  /** Extra columns for the new row (for example a marker the database keeps unique). */
+  extra?: Record<string, unknown>;
 }): Promise<CreateInvoiceDirectResult> {
   if (input.items.length === 0) throw new Error("Add at least one line item before creating an invoice");
 
@@ -394,6 +396,7 @@ export async function createInvoiceDirect(input: {
       property_id: input.propertyId,
       job_id: input.jobId ?? null,
       status: "draft",
+      ...(input.extra ?? {}),
       line_items: {
         items: itemsForStorage,
         brand: { good: null, better: null, best: null },
