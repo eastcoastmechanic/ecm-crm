@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   updateLeadDraft,
   markContacted,
@@ -366,6 +366,8 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
   const [view, setView] = useState<"board" | "list">("board");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [stageError, setStageError] = useState("");
+  const latestChange = useRef<Record<string, number>>({});
+  const savedStatus = useRef<Record<string, string>>({});
 
   // Remember List or Board on this device. Restored after mount (no localStorage
   // during SSR, so a lazy initializer would cause a hydration mismatch). Best effort.
@@ -412,7 +414,10 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
   }, [liveLeads, search, town, statusFilter, localStatus, view]);
 
   async function handleStatusChange(id: string, status: string) {
-    const previous = localStatus[id];
+    // Only the latest change for a lead may roll it back, so an older failed
+    // save can't undo a newer one that succeeded.
+    const token = (latestChange.current[id] ?? 0) + 1;
+    latestChange.current[id] = token;
     setStageError("");
     setLocalStatus((prev) => ({ ...prev, [id]: status }));
     setSavingId(id);
@@ -425,11 +430,14 @@ export default function LeadsList({ leads }: { leads: Lead[] }) {
     } catch {
       error = "Couldn't save the stage. Check your connection and try again.";
     }
+    if (!error) savedStatus.current[id] = status;
+    if (latestChange.current[id] !== token) return;
     if (error) {
-      // Put the card back where it was so the screen matches what is saved.
+      // Put the card back to the last stage that actually saved (or what the page loaded with).
+      const saved = savedStatus.current[id];
       setLocalStatus((prev) => {
         const next = { ...prev };
-        if (previous) next[id] = previous;
+        if (saved) next[id] = saved;
         else delete next[id];
         return next;
       });
