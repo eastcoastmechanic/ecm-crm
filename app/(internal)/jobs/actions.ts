@@ -50,19 +50,21 @@ export async function createServiceCall() {
 }
 
 /** Create the install job for a signed contract. One job per contract; a repeat just opens the existing one. */
-export async function scheduleJobFromContract(formData: FormData) {
+export type ScheduleJobState = { error: string } | null;
+
+export async function scheduleJobFromContract(_prev: ScheduleJobState, formData: FormData): Promise<ScheduleJobState> {
   await requireOffice();
   const documentId = formData.get("document_id") as string;
   const when = parseEtLocal(formData.get("scheduled_at") as string);
-  if (!when) throw new Error("Pick a date and time for the job");
+  if (!when) return { error: "Pick a date and time for the job." };
 
   const { data: doc, error: docError } = await supabase
     .from("documents")
     .select("id, type, status, customer_id, property_id, line_items")
     .eq("id", documentId)
     .single();
-  if (docError || !doc) throw new Error("Contract not found");
-  if (doc.type !== "contract" || doc.status !== "signed") throw new Error("Only a signed contract can be scheduled");
+  if (docError || !doc) return { error: "Contract not found." };
+  if (doc.type !== "contract" || doc.status !== "signed") return { error: "Only a signed contract can be scheduled." };
 
   const { data: existing } = await supabase.from("jobs").select("id").eq("document_id", documentId).limit(1);
   if (existing && existing.length > 0) redirect("/jobs");
@@ -82,7 +84,7 @@ export async function scheduleJobFromContract(formData: FormData) {
     })
     .select("id")
     .single();
-  if (error || !job) throw new Error(error?.message ?? "Failed to schedule job");
+  if (error || !job) return { error: error?.message ?? "Couldn't schedule the job. Try again." };
 
   await syncJobToPlanner(job.id, "scheduled");
   await syncJobToGraph(job.id);
