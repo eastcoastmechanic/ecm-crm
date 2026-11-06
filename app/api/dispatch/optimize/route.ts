@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { requireOffice } from "@/lib/require-role";
+import { one } from "@/lib/appointment-reminder";
+import { etDayRange, toEtLocalInput } from "@/lib/tz";
+import { routeSlotTimes } from "@/lib/route-slots";
+import { rescheduleJobAt } from "@/app/(internal)/jobs/actions";
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const SHOP_ADDRESS = process.env.SHOP_ADDRESS;
 
-// Slot spacing between stops on the optimized route — a simple fixed
-// estimate since real per-job duration isn't tracked ahead of time.
-const SLOT_HOURS = 1.5;
-const DAY_START_HOUR = 8;
-
 export async function POST(request: Request) {
+  try {
+    await requireOffice();
+  } catch {
+    return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  }
+
   if (!GOOGLE_MAPS_API_KEY || !SHOP_ADDRESS) {
     return NextResponse.json(
       {
@@ -21,27 +27,27 @@ export async function POST(request: Request) {
   }
 
   const { date } = (await request.json().catch(() => ({}))) as { date?: string };
-  if (!date) return NextResponse.json({ error: "Missing date" }, { status: 400 });
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: "Missing date" }, { status: 400 });
 
-  const [year, month, day] = date.split("-").map(Number);
-  const dayStart = new Date(year, month - 1, day, 0, 0, 0);
-  const dayEnd = new Date(year, month - 1, day, 23, 59, 59);
+  // The route day is the New York calendar day, not the server's (UTC) day.
+  const day = etDayRange(date);
 
   const { data: jobs, error } = await supabase
     .from("jobs")
     .select("id, scheduled_at, properties(address)")
-    .gte("scheduled_at", dayStart.toISOString())
-    .lte("scheduled_at", dayEnd.toISOString())
+    .gte("scheduled_at", day.start.toISOString())
+    .lt("scheduled_at", day.end.toISOString())
     .in("status", ["requested", "scheduled", "in_progress"]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const stops = (jobs ?? [])
     .map((j) => ({
-      id: j.id,
-      address: (j.properties as unknown as { address: string | null }[] | null)?.[0]?.address,
+      id: j.id as string,
+      scheduledAt: j.scheduled_at as string,
+      address: one(j.properties as { address: string | null } | { address: string | null }[] | null)?.address,
     }))
-    .filter((s): s is { id: string; address: string } => !!s.address);
+    .filter((s): s is { id: string; scheduledAt: string; address: string } => !!s.address);
 
   if (stops.length < 2) {
     return NextResponse.json({ optimized: false, reason: "Fewer than 2 addressed stops that day." });
@@ -76,14 +82,23 @@ export async function POST(request: Request) {
   }
 
   const orderedStops = order.map((i) => stops[i]);
+  const slots = routeSlotTimes(date, orderedStops.length);
 
+  // Each move goes through the normal job action, so the customer's schedule
+  // notice, the calendar sync and the tech alert fire like any other reschedule.
+  // A stop already at its slot is left alone.
+  const errors: string[] = [];
+  let moved = 0;
   for (let i = 0; i < orderedStops.length; i++) {
-    const slotTime = new Date(dayStart);
-    slotTime.setHours(DAY_START_HOUR, 0, 0, 0);
-    slotTime.setMinutes(slotTime.getMinutes() + i * SLOT_HOURS * 60);
-
-    await supabase.from("jobs").update({ scheduled_at: slotTime.toISOString() }).eq("id", orderedStops[i].id);
+    const stop = orderedStops[i];
+    if (toEtLocalInput(stop.scheduledAt) === slots[i]) continue;
+    const result = await rescheduleJobAt(stop.id, slots[i]);
+    if (result.error) errors.push(`${stop.address}: ${result.error}`);
+    else moved++;
   }
 
-  return NextResponse.json({ optimized: true, order: orderedStops.map((s) => s.id) });
+  if (errors.length) {
+    return NextResponse.json({ error: `Moved ${moved}, failed ${errors.length}: ${errors.join("; ")}` }, { status: 500 });
+  }
+  return NextResponse.json({ optimized: true, moved, order: orderedStops.map((s) => s.id) });
 }

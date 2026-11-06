@@ -229,7 +229,9 @@ export default function JobsView({
       } else if (!data.optimized) {
         setOptimizeMessage(data.reason ?? "Nothing to optimize.");
       } else {
-        setOptimizeMessage(`Route optimized for ${optimizeDate} — ${data.order.length} stops reordered.`);
+        setOptimizeMessage(
+          `Route optimized for ${optimizeDate}: ${data.moved} of ${data.order.length} stops got a new time, and those customers were sent it.`
+        );
         router.refresh();
       }
     } catch {
