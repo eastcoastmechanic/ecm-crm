@@ -107,18 +107,38 @@ async function notifyAssignedTech(jobId: string, kind: "rescheduled" | "cancelle
   });
 }
 
-/** Assign a job to a staff member, or clear it (empty staff_id). */
-export async function assignJob(formData: FormData) {
-  await requireOffice();
-  const jobId = formData.get("job_id") as string;
-  const staffId = ((formData.get("staff_id") as string) || "").trim() || null;
-  if (!jobId) throw new Error("Job is required");
+/** `staffId` echoes the pick so the select keeps it after an error (React resets uncontrolled fields). */
+export type AssignJobState = { error: string; staffId: string } | null;
 
-  const { data: before } = await supabase.from("jobs").select("assigned_staff_id").eq("id", jobId).maybeSingle();
-  const previousStaffId = (before?.assigned_staff_id as string | null | undefined) ?? null;
+/** Assign from the jobs list. Problems come back inline instead of an error page. */
+export async function assignJob(_prev: AssignJobState, formData: FormData): Promise<AssignJobState> {
+  const jobId = String(formData.get("job_id") ?? "");
+  const picked = String(formData.get("staff_id") ?? "").trim();
+  const result = await assignJobToStaff(jobId, picked || null);
+  return result.error ? { error: result.error, staffId: picked } : null;
+}
+
+/** Assign a job to a staff member, or clear it (null). Shared by the jobs list and dispatch. */
+export async function assignJobToStaff(jobId: string, staffId: string | null): Promise<{ error?: string }> {
+  await requireOffice();
+  if (!jobId) return { error: "Job is required." };
+
+  const { data: before, error: readError } = await supabase
+    .from("jobs")
+    .select("assigned_staff_id")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (readError) return { error: "Couldn't load the job. Try again." };
+  if (!before) return { error: "Job not found." };
+  const previousStaffId = (before.assigned_staff_id as string | null | undefined) ?? null;
+
+  if (staffId) {
+    const { data: staffRow } = await supabase.from("staff").select("id").eq("id", staffId).maybeSingle();
+    if (!staffRow) return { error: "That staff member no longer exists. Refresh and pick again." };
+  }
 
   const { error } = await supabase.from("jobs").update({ assigned_staff_id: staffId }).eq("id", jobId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the assignment. Try again." };
 
   // Tell the tech who got the job, and the one who lost it. Best effort, never blocks.
   if (staffId !== previousStaffId) {
@@ -129,6 +149,7 @@ export async function assignJob(formData: FormData) {
 
   revalidatePath("/jobs");
   revalidatePath("/field-board");
+  return {};
 }
 
 type CustomerContact = {
