@@ -181,7 +181,8 @@ export default function LineItemsEditor({
                         type="number"
                         step="0.01"
                         name={`good_${i}`}
-                        defaultValue={item.good ?? ""}
+                        value={item.good ?? ""}
+                        onChange={(e) => updateRow(item.rowId, { good: e.target.value === "" ? null : Number(e.target.value) })}
                         className={numberInputClass}
                       />
                     </td>
@@ -190,7 +191,8 @@ export default function LineItemsEditor({
                         type="number"
                         step="0.01"
                         name={`better_${i}`}
-                        defaultValue={item.better ?? ""}
+                        value={item.better ?? ""}
+                        onChange={(e) => updateRow(item.rowId, { better: e.target.value === "" ? null : Number(e.target.value) })}
                         className={numberInputClass}
                       />
                     </td>
@@ -199,7 +201,8 @@ export default function LineItemsEditor({
                         type="number"
                         step="0.01"
                         name={`best_${i}`}
-                        defaultValue={item.best ?? ""}
+                        value={item.best ?? ""}
+                        onChange={(e) => updateRow(item.rowId, { best: e.target.value === "" ? null : Number(e.target.value) })}
                         className={numberInputClass}
                       />
                     </td>
@@ -211,7 +214,8 @@ export default function LineItemsEditor({
                       type="number"
                       step="0.01"
                       name={`cost_${i}`}
-                      defaultValue={item.cost ?? ""}
+                      value={item.cost ?? ""}
+                      onChange={(e) => updateRow(item.rowId, { cost: e.target.value === "" ? null : Number(e.target.value) })}
                       placeholder="Cost"
                       className={`${numberInputClass} border-gold/30`}
                     />
