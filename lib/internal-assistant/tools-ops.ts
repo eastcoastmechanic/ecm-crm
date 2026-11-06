@@ -211,7 +211,10 @@ const setLeadStageTool = betaZodTool({
     fd.set("status", status);
     try {
       if (status === "dismissed") await dismissLead(fd);
-      else await setLeadStage(fd);
+      else {
+        const result = await setLeadStage(fd);
+        if (result.error) return `Failed to update lead: ${result.error}`;
+      }
       return `Lead ${leadId} is now "${status}".`;
     } catch (err) {
       return `Failed to update lead: ${err instanceof Error ? err.message : "unknown error"}`;

@@ -99,21 +99,27 @@ export async function addManualLead(formData: FormData) {
   revalidatePath("/leads");
 }
 
-export async function setLeadStage(formData: FormData) {
+const LEAD_STAGES = ["new", "contacted", "quoted", "won", "lost", "sent", "dismissed"];
+
+/** Move a lead to a stage. Returns { error } so the board can put the card back if the save fails. */
+export async function setLeadStage(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
-  const id = formData.get("id") as string;
-  const status = formData.get("status") as string;
+  const id = String(formData.get("id") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim();
+  if (!id) return { error: "Lead is required." };
+  if (!LEAD_STAGES.includes(status)) return { error: "Pick a stage." };
 
   const update: Record<string, unknown> = { status };
   if (status === "contacted") update.contacted_at = new Date().toISOString();
   if (status === "lost") update.dismissed_at = new Date().toISOString();
 
   const { error } = await supabase.from("leads").update(update).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the stage. Try again." };
 
   await syncLeadToGraph(id);
 
   revalidatePath("/leads");
+  return {};
 }
 
 export async function deleteLead(id: string): Promise<{ error?: string }> {
