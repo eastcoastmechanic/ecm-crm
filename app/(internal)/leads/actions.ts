@@ -122,6 +122,33 @@ export async function setLeadStage(formData: FormData): Promise<{ error?: string
   return {};
 }
 
+/** Echoes what was typed so the form keeps it after an error (React resets uncontrolled fields). */
+export type LeadFollowUpState = { error?: string; saved?: boolean; nextStep?: string; followUpOn?: string } | null;
+
+/** Set or clear a lead's next step and follow-up date (SQL 0061). Problems come back inline. */
+export async function setLeadFollowUp(_prev: LeadFollowUpState, formData: FormData): Promise<LeadFollowUpState> {
+  await requireOffice();
+  const id = String(formData.get("id") ?? "").trim();
+  const nextStep = String(formData.get("next_step") ?? "").trim().slice(0, 300);
+  const followUpOn = String(formData.get("follow_up_on") ?? "").trim();
+  const typed = { nextStep, followUpOn };
+  if (!id) return { error: "Lead is required.", ...typed };
+  if (followUpOn && !/^\d{4}-\d{2}-\d{2}$/.test(followUpOn)) return { error: "Pick a valid date.", ...typed };
+
+  const { error } = await supabase
+    .from("leads")
+    .update({ next_step: nextStep || null, follow_up_on: followUpOn || null })
+    .eq("id", id);
+  if (error) {
+    // Before SQL 0061 is run the columns don't exist yet.
+    if (/next_step|follow_up_on/.test(error.message)) return { error: "Run SQL 0061 first (lead follow-up columns).", ...typed };
+    return { error: "Couldn't save the follow-up. Try again.", ...typed };
+  }
+
+  revalidatePath("/leads");
+  return { saved: true };
+}
+
 export async function deleteLead(id: string): Promise<{ error?: string }> {
   await requireOffice();
   const { error } = await supabase.from("leads").delete().eq("id", id);
