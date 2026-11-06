@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { sendSMS } from "@/lib/sms";
+import { canText } from "@/lib/sms-consent";
 import {
   appendJobPhotos,
   uploadJobPhotoFiles,
@@ -246,7 +247,7 @@ export async function markOnWay(jobId: string) {
     });
   }
 
-  if (customer?.phone && customer?.sms_consent) {
+  if (customer?.phone && customer?.sms_consent && (await canText(customer.phone))) {
     const sent = await sendSMS(customer.phone, message);
     if (!sent.ok) console.error(`On-the-way text failed: ${sent.error}`);
   }

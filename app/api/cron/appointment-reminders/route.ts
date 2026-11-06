@@ -2,6 +2,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { sendSMS } from "@/lib/sms";
+import { canText } from "@/lib/sms-consent";
 import { addDaysToDateKey, etDateKey, etDayRange } from "@/lib/tz";
 import { appointmentReminder, type ReminderJobRow } from "@/lib/appointment-reminder";
 
@@ -36,6 +37,11 @@ export async function GET(request: Request) {
     }
 
     try {
+      // The customer flag is not the whole story: STOP and the exclusion list live in sms-consent.
+      if (!(await canText(decision.phone))) {
+        skipped.no_consent = (skipped.no_consent ?? 0) + 1;
+        continue;
+      }
       const result = await sendSMS(decision.phone, decision.body);
       if (!result.ok) {
         errors.push(`job ${job.id}: ${result.error ?? "send failed"}`);
