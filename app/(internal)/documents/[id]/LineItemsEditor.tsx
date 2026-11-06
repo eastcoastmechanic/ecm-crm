@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import { updateDocument } from "./actions";
 import SubmitButton from "../../SubmitButton";
-import { buttonClass, buttonSecondaryClass, inputClass } from "../../ui";
+import { buttonClass, buttonSecondaryClass, errorClass, inputClass } from "../../ui";
+import { TIERS, TIER_LABEL, type Tier } from "@/lib/estimate-tier";
+
+const money = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 
 type LineItem = {
   category: string;
@@ -27,18 +30,29 @@ export default function LineItemsEditor({
   status,
   items,
   pricingMode = "tiered",
+  docType = "",
+  selectedTier = null,
   canSeeProfit = false,
 }: {
   documentId: string;
   status: string;
   items: LineItem[];
   pricingMode?: "tiered" | "flat";
+  docType?: string;
+  selectedTier?: Tier | null;
   canSeeProfit?: boolean;
 }) {
   const isFlat = pricingMode === "flat";
   const [rows, setRows] = useState(() =>
     items.map((item) => ({ rowId: nextRowId++, ...item }))
   );
+  const [state, formAction] = useActionState(updateDocument, null);
+  // Controlled so a failed save doesn't reset them (React 19 resets forms after an action).
+  const [statusValue, setStatusValue] = useState(status);
+  const [tierValue, setTierValue] = useState<Tier | "">(selectedTier ?? "");
+  // A phone approval: the office records which option the customer picked.
+  const showTierPick = docType === "estimate" && !isFlat && statusValue === "approved";
+  const tierTotal = (t: Tier) => rows.reduce((sum, r) => sum + (r[t] ?? 0) * (r.qty || 0), 0);
 
   function updateRow(rowId: number, patch: Partial<LineItem>) {
     setRows((prev) => prev.map((r) => (r.rowId === rowId ? { ...r, ...patch } : r)));
@@ -68,7 +82,7 @@ export default function LineItemsEditor({
   }
 
   return (
-    <form action={updateDocument} className="flex flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="id" value={documentId} />
       <input type="hidden" name="item_count" value={rows.length} />
       <input type="hidden" name="pricing_mode" value={pricingMode} />
@@ -167,7 +181,8 @@ export default function LineItemsEditor({
                         type="number"
                         step="0.01"
                         name={`good_${i}`}
-                        defaultValue={item.good ?? ""}
+                        value={item.good ?? ""}
+                        onChange={(e) => updateRow(item.rowId, { good: e.target.value === "" ? null : Number(e.target.value) })}
                         className={numberInputClass}
                       />
                     </td>
@@ -176,7 +191,8 @@ export default function LineItemsEditor({
                         type="number"
                         step="0.01"
                         name={`better_${i}`}
-                        defaultValue={item.better ?? ""}
+                        value={item.better ?? ""}
+                        onChange={(e) => updateRow(item.rowId, { better: e.target.value === "" ? null : Number(e.target.value) })}
                         className={numberInputClass}
                       />
                     </td>
@@ -185,7 +201,8 @@ export default function LineItemsEditor({
                         type="number"
                         step="0.01"
                         name={`best_${i}`}
-                        defaultValue={item.best ?? ""}
+                        value={item.best ?? ""}
+                        onChange={(e) => updateRow(item.rowId, { best: e.target.value === "" ? null : Number(e.target.value) })}
                         className={numberInputClass}
                       />
                     </td>
@@ -197,7 +214,8 @@ export default function LineItemsEditor({
                       type="number"
                       step="0.01"
                       name={`cost_${i}`}
-                      defaultValue={item.cost ?? ""}
+                      value={item.cost ?? ""}
+                      onChange={(e) => updateRow(item.rowId, { cost: e.target.value === "" ? null : Number(e.target.value) })}
                       placeholder="Cost"
                       className={`${numberInputClass} border-gold/30`}
                     />
@@ -223,20 +241,45 @@ export default function LineItemsEditor({
         + Add Line Item
       </button>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-xs font-bold uppercase tracking-wide text-g300">
           Status
-          <select name="status" defaultValue={status} className={inputClass}>
+          <select
+            name="status"
+            value={statusValue}
+            onChange={(e) => setStatusValue(e.target.value)}
+            className={inputClass}
+          >
             <option value="draft">Draft</option>
             <option value="sent">Sent</option>
             <option value="approved">Approved</option>
             <option value="paid">Paid</option>
           </select>
         </label>
+        {showTierPick && (
+          <label className="flex flex-col gap-1 text-xs font-bold uppercase tracking-wide text-g300">
+            Customer picked
+            <select
+              name="selected_tier"
+              value={tierValue}
+              onChange={(e) => setTierValue(e.target.value as Tier | "")}
+              className={inputClass}
+            >
+              <option value="">Choose option…</option>
+              {TIERS.map((t) => (
+                <option key={t} value={t} disabled={tierTotal(t) <= 0}>
+                  {TIER_LABEL[t]} ({money(tierTotal(t))})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <SubmitButton className={buttonClass} pendingText="Saving…">
           Save Changes
         </SubmitButton>
       </div>
+      {state?.error && <p className={errorClass}>{state.error}</p>}
+      {state?.saved && <p className="text-sm text-green">Saved.</p>}
     </form>
   );
 }

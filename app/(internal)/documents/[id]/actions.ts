@@ -14,7 +14,7 @@ import { sendPmReportToCustomer } from "@/lib/pm/send";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { markDocumentPaid } from "@/lib/document-paid";
 import { requireOffice } from "@/lib/require-role";
-import { documentTotal, selectedTier } from "@/lib/estimate-tier";
+import { documentTotal, officeTierUpdate } from "@/lib/estimate-tier";
 
 type LineItem = {
   category: string;
@@ -155,7 +155,10 @@ export async function updateWarranty(formData: FormData) {
   revalidatePath("/documents");
 }
 
-export async function updateDocument(formData: FormData) {
+export type UpdateDocumentState = { error?: string; saved?: boolean } | null;
+
+/** Save line items and status from the CRM. Returns { error } so the page shows the reason. */
+export async function updateDocument(_prev: UpdateDocumentState, formData: FormData): Promise<UpdateDocumentState> {
   await requireOffice();
   const id = formData.get("id") as string;
   const status = formData.get("status") as string;
@@ -167,7 +170,7 @@ export async function updateDocument(formData: FormData) {
     .select("line_items, type, due_date, customer_id, job_id, status, selected_tier")
     .eq("id", id)
     .single();
-  if (fetchError) throw new Error(fetchError.message);
+  if (fetchError || !existing) return { error: "Couldn't load this document. Refresh and try again." };
 
   const existingData = existing.line_items as {
     items: LineItem[];
@@ -204,8 +207,19 @@ export async function updateDocument(formData: FormData) {
     better: sumTier(items, "better"),
     best: sumTier(items, "best"),
   };
-  // If the customer already picked Good/Better/Best, the total stays on their pick.
-  const docTotal = documentTotal(totals, selectedTier(pricingMode, existing.selected_tier));
+  // The Good/Better/Best pick (customer's in the portal, or the office's for a
+  // phone approval) sets the total; Better when there is none.
+  const tierUpdate = officeTierUpdate({
+    type: existing.type,
+    pricingMode,
+    newStatus: status,
+    prevStatus: existing.status,
+    prevTier: existing.selected_tier,
+    picked: formData.get("selected_tier"),
+    totals,
+  });
+  if (!tierUpdate.ok) return { error: tierUpdate.error };
+  const docTotal = documentTotal(totals, tierUpdate.tier);
 
   const { error } = await supabase
     .from("documents")
@@ -219,6 +233,7 @@ export async function updateDocument(formData: FormData) {
         totals,
         pricing_mode: pricingMode,
       },
+      ...(existing.type === "estimate" ? { selected_tier: tierUpdate.tier } : {}),
       subtotal: docTotal,
       tax: 0,
       total: docTotal,
@@ -227,15 +242,16 @@ export async function updateDocument(formData: FormData) {
     })
     .eq("id", id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the changes. Try again." };
 
   if (status === "paid") {
     const paid = await markDocumentPaid(id, { source: "manual" });
-    if (paid.error) throw new Error(paid.error);
+    if (paid.error) return { error: paid.error };
   }
 
   revalidatePath(`/documents/${id}`);
   revalidatePath("/documents");
+  return { saved: true };
 }
 
 const typeLabel: Record<string, string> = {
