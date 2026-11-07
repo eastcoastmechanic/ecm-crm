@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { fieldBoardAuthorized, getFieldBoardSheet } from "@/lib/field-board";
+import { getFieldBoardSheet } from "@/lib/field-board";
+import { fieldBoardCaller } from "@/lib/bot-keys";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  if (!fieldBoardAuthorized(request)) {
+  if (!(await fieldBoardCaller(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
