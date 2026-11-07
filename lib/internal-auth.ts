@@ -1,12 +1,9 @@
 /**
- * Shared credential check for the app's one internal login: proxy.ts's
- * Basic-Auth gate and the new OAuth /authorize login form both check the
- * same two env vars the same way, so there's exactly one place this logic
- * lives instead of two slightly-different copies.
+ * Credential check for the OAuth /authorize login form (connecting Claude or
+ * another MCP app). The CRM pages used to accept this same login as Basic
+ * auth in proxy.ts; that is retired, staff sign in with their own account.
  *
- * Web-standard primitives only (TextEncoder, no `crypto`/`Buffer`) so this
- * runs unchanged on proxy.ts's Edge runtime and the Node route handlers
- * under app/api/oauth/*.
+ * Web-standard primitives only (TextEncoder, no `crypto`/`Buffer`).
  */
 function constantTimeEqual(a: string, b: string): boolean {
   const enc = new TextEncoder();

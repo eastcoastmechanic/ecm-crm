@@ -19,8 +19,8 @@ export function runAsStaffRole<T>(role: StaffRole, fn: () => T): T {
  * Reads the signed-in staff role for the current request.
  *
  * The role comes from the `x-staff-role` request header. proxy.ts always
- * overwrites that header for every internal path (session login looks up the
- * `staff` table; the shared Basic-auth login is treated as owner) and drops
+ * overwrites that header for every internal path (from the signed-in user's
+ * `staff` row; there is no shared login any more) and drops
  * any value the client sent, so it can be trusted inside internal server
  * actions and route handlers. Do not use it on public (non-proxied) routes.
  */

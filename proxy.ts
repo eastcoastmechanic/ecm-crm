@@ -1,6 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { verifyInternalCredentials } from "@/lib/internal-auth";
 
 const PUBLIC_PORTAL_PATHS = ["/portal/login", "/portal/auth"];
 
@@ -51,7 +50,7 @@ function techMayAccess(pathname: string) {
   return TECH_ALLOWED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize", "/api/ingest/readings", "/api/ingest/quote"];
+const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize"];
 
 function isInternalPath(pathname: string) {
   if (INTERNAL_API_PATHS.includes(pathname)) return true;
@@ -63,22 +62,9 @@ function isPreviewPath(pathname: string) {
   return process.env.NODE_ENV === "development" && pathname === "/pm/preview";
 }
 
-
-function hasValidBasicAuth(request: NextRequest) {
-  const header = request.headers.get("authorization");
-  if (!header?.startsWith("Basic ")) return false;
-
-  let decoded: string;
-  try {
-    decoded = atob(header.slice(6));
-  } catch {
-    return false;
-  }
-  const sep = decoded.indexOf(":");
-  if (sep === -1) return false;
-
-  return verifyInternalCredentials(decoded.slice(0, sep), decoded.slice(sep + 1));
-}
+// No shared Basic-auth login: every internal page needs a staff sign-in, so
+// each person has their own password and role. Machine callers (ingest) use
+// their own bearer key inside the route, not this gate.
 
 async function checkStaffSession(
   request: NextRequest
@@ -125,15 +111,6 @@ export async function proxy(request: NextRequest) {
       previewHeaders.set("x-staff-role", "owner");
       return NextResponse.next({ request: { headers: previewHeaders } });
     }
-    if (hasValidBasicAuth(request)) {
-      // The shared Basic-auth login is treated as owner. Drop any client-sent
-      // x-staff-role first so it can never be spoofed on this path.
-      const basicHeaders = new Headers(request.headers);
-      basicHeaders.delete("x-staff-role");
-      basicHeaders.set("x-staff-role", "owner");
-      return NextResponse.next({ request: { headers: basicHeaders } });
-    }
-
     const { role, response } = await checkStaffSession(request);
     if (!role) {
       if (INTERNAL_API_PATHS.includes(request.nextUrl.pathname)) {
@@ -253,8 +230,6 @@ export const config = {
     "/pm",
     "/api/twilio/recordings/:path*",
     "/api/internal-chat",
-    "/api/ingest/readings",
-    "/api/ingest/quote",
     "/api/dispatch/optimize",
   ],
 };

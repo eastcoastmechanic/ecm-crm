@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { computeSuperheat, computeSubcooling, saturationTempF, REFRIGERANT_TYPES, type RefrigerantType } from "@/lib/refrigerant";
 import { syncJobToPlanner } from "@/lib/planner-connector";
+import { bearerAuthorized } from "@/lib/bearer-auth";
 
 /**
  * Machine ingest for diagnostic readings.
@@ -15,9 +16,8 @@ import { syncJobToPlanner } from "@/lib/planner-connector";
  * disagreeing with ECM's PT tables is how a report ends up contradicting the
  * app that produced it. Raw pressures and temps in, ECM's numbers out.
  *
- * Auth is the shared internal Basic-Auth gate, applied in proxy.ts — this path
- * is registered in INTERNAL_API_PATHS so an unauthenticated call gets a plain
- * 401 rather than an HTML login page, which a machine caller can't use.
+ * Auth: `Authorization: Bearer <INGEST_API_KEY>`, checked here. Fails closed
+ * when the key is not set. (The old shared Basic-auth login is retired.)
  */
 
 type Body = {
@@ -46,6 +46,9 @@ function num(v: unknown): number | null {
 }
 
 export async function POST(request: Request) {
+  if (!bearerAuthorized(request, process.env.INGEST_API_KEY)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const body = (await request.json().catch(() => null)) as Body | null;
   if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 

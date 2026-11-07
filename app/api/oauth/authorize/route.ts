@@ -6,9 +6,9 @@ import { clientIp, LOGIN_WINDOW_MINUTES, loginLocked, redirectHost } from "@/lib
 /**
  * Authorization endpoint (OAuth 2.1 + PKCE). This is the one piece of the
  * whole flow reachable by an unauthenticated stranger who finds the URL --
- * the login form here is the actual gate, backed by the same
- * INTERNAL_AUTH_USER/PASSWORD credential that already protects the rest of
- * the internal app (see lib/internal-auth.ts).
+ * the login form here is the actual gate, backed by the
+ * INTERNAL_AUTH_USER/PASSWORD credential (see lib/internal-auth.ts) and the
+ * lockout in lib/oauth-limits.ts. The CRM pages no longer accept it.
  *
  * redirect_uri is validated by exact string match against what the client
  * registered (app/api/oauth/register/route.ts) *before* it's ever used as a
