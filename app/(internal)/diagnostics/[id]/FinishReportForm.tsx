@@ -9,6 +9,8 @@ export default function FinishReportForm({ diagnosticId, canInvoice = true }: { 
   const [state, action] = useActionState<ReportState, FormData>(finishServiceReport, null);
   const [startedAt, setStartedAt] = useState("");
   const [endedAt, setEndedAt] = useState("");
+  // Controlled: React resets uncontrolled fields after an action, which would re-tick this box after an error.
+  const [createInvoice, setCreateInvoice] = useState(true);
 
   const hours = useMemo(() => {
     if (!startedAt || !endedAt) return null;
@@ -47,7 +49,13 @@ export default function FinishReportForm({ diagnosticId, canInvoice = true }: { 
 
       {canInvoice && (
       <label className="flex items-start gap-2 text-xs text-g300">
-        <input type="checkbox" name="create_invoice" defaultChecked className="mt-0.5" />
+        <input
+          type="checkbox"
+          name="create_invoice"
+          checked={createInvoice}
+          onChange={(e) => setCreateInvoice(e.target.checked)}
+          className="mt-0.5"
+        />
         <span>
           Create an invoice from the parts used above (and labor, if a shop hourly rate is configured) when I
           finish this report.
