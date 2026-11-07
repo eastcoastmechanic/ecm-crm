@@ -119,8 +119,16 @@ type JobRow = {
     | null;
 };
 
-async function pageFor(ids: Ids, job: JobRow): Promise<string> {
-  if (job.onenote_page_id) return job.onenote_page_id;
+type ClaimedNote = { id: string; body: string; author_name: string | null; created_at: string };
+
+const toPageNote = (n: ClaimedNote) => ({ authorName: n.author_name, createdAt: n.created_at, body: n.body });
+
+/**
+ * Make the job's page with these notes already on it. Returns false when
+ * another run saved a page for this job first: this run's copy is deleted and
+ * its notes go onto the saved page next time.
+ */
+async function createPageWithNotes(ids: Ids, job: JobRow, notes: ClaimedNote[]): Promise<boolean> {
   const property = one(job.properties);
   const sectionId = await sectionFor(ids, job.property_id, property?.address ?? null, property?.onenote_section_id ?? null);
   const html = pageHtml(
@@ -131,7 +139,8 @@ async function pageFor(ids: Ids, job: JobRow): Promise<string> {
       scheduledAt: job.scheduled_at,
       createdAt: job.created_at,
     },
-    `${APP_URL}/jobs`
+    `${APP_URL}/jobs`,
+    notes.map(toPageNote)
   );
   const created = await call(`/sites/${ids.siteId}/onenote/sections/${sectionId}/pages`, {
     method: "POST",
@@ -158,11 +167,16 @@ async function pageFor(ids: Ids, job: JobRow): Promise<string> {
     .eq("id", job.id)
     .is("onenote_page_id", null)
     .select("id");
-  if (won && won.length > 0) return page.id;
+  if (won && won.length > 0) return true;
 
   await call(`/sites/${ids.siteId}/onenote/pages/${page.id}`, { method: "DELETE" }).catch(() => null);
-  const { data: winner } = await supabase.from("jobs").select("onenote_page_id").eq("id", job.id).single();
-  return winner!.onenote_page_id as string;
+  return false;
+}
+
+/** True only when OneNote confirms the page no longer exists (not just "not ready yet"). */
+async function pageIsGone(ids: Ids, pageId: string): Promise<boolean> {
+  const res = await call(`/sites/${ids.siteId}/onenote/pages/${pageId}?$select=id`);
+  return res.status === 404;
 }
 
 /** A claim older than this is treated as abandoned (the run that made it stopped) and retried. */
@@ -188,19 +202,11 @@ export async function syncJobNotesToOneNote(jobId: string): Promise<void> {
     .limit(1);
   if (!pending || pending.length === 0) return;
 
-  let claimed: { id: string; body: string; author_name: string | null; created_at: string }[] = [];
+  let claimed: ClaimedNote[] = [];
   try {
     const ids = await notebookIds();
-    const { data: job, error } = await supabase
-      .from("jobs")
-      .select(
-        "id, job_type, scheduled_at, created_at, property_id, onenote_page_id, onenote_page_url, customers(name), properties(address, onenote_section_id)"
-      )
-      .eq("id", jobId)
-      .single();
-    if (error || !job) return;
-    const pageId = await pageFor(ids, job as unknown as JobRow);
 
+    // Claim first: only a run holding notes ever makes a page.
     const { data } = await supabase
       .from("job_notes")
       .update({ onenote_claimed_at: new Date().toISOString() })
@@ -208,25 +214,44 @@ export async function syncJobNotesToOneNote(jobId: string): Promise<void> {
       .is("onenote_synced_at", null)
       .or(unclaimed)
       .select("id, body, author_name, created_at");
-    claimed = (data ?? []).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+    claimed = ((data ?? []) as ClaimedNote[]).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
     if (claimed.length === 0) return;
 
-    const res = await call(`/sites/${ids.siteId}/onenote/pages/${pageId}/content`, {
-      method: "PATCH",
-      body: JSON.stringify(
-        claimed.map((n) => ({
-          target: "body",
-          action: "append",
-          content: noteHtml({ authorName: n.author_name, createdAt: n.created_at, body: n.body }),
-        }))
-      ),
-    });
-    if (res.status === 404) {
-      // Page deleted in OneNote: forget it so the next note makes a fresh one.
-      await supabase.from("jobs").update({ onenote_page_id: null, onenote_page_url: null }).eq("id", jobId);
-      throw new Error("page gone");
+    const { data: job, error } = await supabase
+      .from("jobs")
+      .select(
+        "id, job_type, scheduled_at, created_at, property_id, onenote_page_id, onenote_page_url, customers(name), properties(address, onenote_section_id)"
+      )
+      .eq("id", jobId)
+      .single();
+    if (error || !job) throw new Error("job not found");
+    const jobRow = job as unknown as JobRow;
+
+    if (!jobRow.onenote_page_id) {
+      // First copy for this job: the notes go in with the new page (no follow-up update to fail).
+      if (!(await createPageWithNotes(ids, jobRow, claimed))) throw new Error("another run made the page");
+    } else {
+      const pageId = jobRow.onenote_page_id;
+      const res = await call(`/sites/${ids.siteId}/onenote/pages/${pageId}/content`, {
+        method: "PATCH",
+        body: JSON.stringify(
+          claimed.map((n) => ({ target: "body", action: "append", content: noteHtml(toPageNote(n)) }))
+        ),
+      });
+      if (res.status === 404) {
+        // A new page can say 404 for a few seconds. Only forget it when OneNote confirms it was deleted.
+        if (await pageIsGone(ids, pageId)) {
+          await supabase
+            .from("jobs")
+            .update({ onenote_page_id: null, onenote_page_url: null })
+            .eq("id", jobId)
+            .eq("onenote_page_id", pageId);
+          throw new Error("page deleted in OneNote");
+        }
+        throw new Error("page not ready yet");
+      }
+      if (!res.ok) throw new Error(`page append: ${res.status}`);
     }
-    if (!res.ok) throw new Error(`page append: ${res.status}`);
 
     await supabase
       .from("job_notes")

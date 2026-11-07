@@ -55,6 +55,16 @@ describe("page and note HTML", () => {
     );
   });
 
+  it("puts the notes being copied on the new page, oldest first", () => {
+    const html = pageHtml(job, "https://x/jobs", [
+      { authorName: "Josh", createdAt: "2026-11-07T01:00:00Z", body: "first" },
+      { authorName: "Mike", createdAt: "2026-11-07T02:00:00Z", body: "second" },
+    ]);
+    expect(html.indexOf("first")).toBeGreaterThan(html.indexOf("Open this job in the CRM"));
+    expect(html.indexOf("first")).toBeLessThan(html.indexOf("second"));
+    expect(pageHtml(job, "https://x/jobs")).not.toContain("<b>");
+  });
+
   it("escapes customer text everywhere", () => {
     const html = pageHtml({ ...job, customerName: "<script>x</script>", address: "1 A & B St" }, "https://x/jobs");
     expect(html).not.toContain("<script>");
