@@ -1,6 +1,5 @@
-import { sendContactMessage } from "./actions";
-import SubmitButton from "../../(internal)/SubmitButton";
-import { inputClass, buttonClass, headingClass, subTextClass } from "../../(internal)/ui";
+import ContactForm from "./ContactForm";
+import { headingClass, subTextClass } from "../../(internal)/ui";
 
 export const metadata = {
   title: "Contact Us | East Coast Mechanical",
@@ -40,32 +39,7 @@ export default async function ContactPage({
             Thanks for reaching out — we&apos;ll get back to you shortly.
           </div>
         ) : (
-          <form
-            action={sendContactMessage}
-            className="flex flex-col gap-4 rounded-xl border border-white/8 bg-white/3 p-5"
-          >
-            <label className="flex flex-col gap-1 text-xs text-g300">
-              Name
-              <input name="name" required className={inputClass} placeholder="Your full name" />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-g300">
-              Email
-              <input name="email" type="email" required className={inputClass} placeholder="you@example.com" />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-g300">
-              Message
-              <textarea
-                name="message"
-                required
-                rows={5}
-                className={inputClass}
-                placeholder="How can we help?"
-              />
-            </label>
-            <SubmitButton className={`${buttonClass} w-fit`} pendingText="Sending…">
-              Send Message
-            </SubmitButton>
-          </form>
+          <ContactForm />
         )}
       </div>
     </div>

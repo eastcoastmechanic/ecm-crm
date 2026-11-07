@@ -2,26 +2,48 @@
 
 import { redirect } from "next/navigation";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
+import { COMPANY_PHONE_DISPLAY } from "@/lib/brand";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
-export async function sendContactMessage(formData: FormData) {
-  const name = (formData.get("name") as string)?.trim();
-  const email = (formData.get("email") as string)?.trim();
-  const message = (formData.get("message") as string)?.trim();
+export type ContactState = { error?: string } | null;
 
-  if (!name) throw new Error("Name is required");
-  if (!email) throw new Error("Email is required");
-  if (!message) throw new Error("Please include a message");
+const text = (formData: FormData, key: string, max: number) => String(formData.get(key) ?? "").trim().slice(0, max);
 
-  if (OWNER_EMAIL) {
-    await resend.emails.send({
+/** Website contact form. Returns { error } so the form keeps what was typed. */
+export async function sendContactMessage(_prev: ContactState, formData: FormData): Promise<ContactState> {
+  // Hidden field people never see. Bots fill every box; pretend it worked.
+  if (text(formData, "company_website", 200)) redirect("/contact?success=1");
+
+  const name = text(formData, "name", 200);
+  const email = text(formData, "email", 200);
+  const message = text(formData, "message", 5000);
+
+  if (!name) return { error: "Please enter your name." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Please enter a valid email address." };
+  if (!message) return { error: "Please include a message." };
+
+  const sorry = `Sorry, your message didn't go through. Please try again, or call us at ${COMPANY_PHONE_DISPLAY}.`;
+  // Before, a missing owner address or a failed send still said "thanks" and the message was lost.
+  if (!OWNER_EMAIL) {
+    console.error("sendContactMessage: OWNER_EMAIL is not set");
+    return { error: sorry };
+  }
+  try {
+    const { error } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
       to: OWNER_EMAIL,
       replyTo: email,
       subject: `Website contact form: ${name}`,
       text: `Name: ${name}\nEmail: ${email}\n\n${message}`,
     });
+    if (error) {
+      console.error("sendContactMessage: send failed", error.message);
+      return { error: sorry };
+    }
+  } catch (err) {
+    console.error("sendContactMessage failed", err instanceof Error ? err.message : err);
+    return { error: sorry };
   }
 
   redirect("/contact?success=1");
