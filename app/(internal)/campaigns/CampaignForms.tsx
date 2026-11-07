@@ -1,13 +1,14 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { saveTemplate, sendCampaignNow, type SendState, type TemplateState } from "./actions";
+import { saveTemplate, sendCampaignNow, sendTestToMe, type SendState, type TemplateState, type TestState } from "./actions";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass } from "../ui";
 
 type Template = { sms_text: string | null; email_subject: string | null; email_body: string | null };
 
 export function TemplateForm({ kind, initial, placeholders }: { kind: string; initial: Template; placeholders: string }) {
   const [state, action, pending] = useActionState<TemplateState, FormData>(saveTemplate, null);
+  const [testState, testAction, testing] = useActionState<TestState, FormData>(sendTestToMe, null);
   // Controlled, so a failed save keeps what was typed (React resets uncontrolled fields after an action).
   const [sms, setSms] = useState(initial.sms_text ?? "");
   const [subject, setSubject] = useState(initial.email_subject ?? "");
@@ -36,9 +37,14 @@ export function TemplateForm({ kind, initial, placeholders }: { kind: string; in
         <button type="submit" disabled={pending} className={`${buttonSecondaryClass} w-fit disabled:opacity-50`}>
           {pending ? "Saving…" : "Save wording"}
         </button>
+        <button type="submit" formAction={testAction} disabled={testing} className={`${buttonSecondaryClass} w-fit disabled:opacity-50`}>
+          {testing ? "Sending test…" : "Send a test to me"}
+        </button>
         {state?.saved && <span className={itemSubClass}>Saved.</span>}
         {state?.error && <span className={errorClass}>{state.error}</span>}
       </div>
+      {testState?.sentTo && <p className={itemSubClass}>Test sent to {testState.sentTo}. No customer got anything.</p>}
+      {testState?.error && <p className={errorClass}>{testState.error}</p>}
     </form>
   );
 }

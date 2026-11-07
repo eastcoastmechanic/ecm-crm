@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireOwner } from "@/lib/require-role";
 import { getMyStaffId } from "@/lib/job-access";
-import { parseKind, templateReady, type Template } from "@/lib/campaigns";
+import { emailBody, fill, parseKind, smsBody, templateReady, type Template } from "@/lib/campaigns";
+import { sendSMS } from "@/lib/sms";
+import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
+import { COMPANY_NAME } from "@/lib/brand";
+
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app").replace(/\/$/, "");
 import { sendCampaign, type SendResult } from "@/lib/campaign-send";
 
 export type TemplateState = { error?: string; saved?: boolean; values?: Template } | null;
@@ -74,4 +79,57 @@ export async function sendCampaignNow(_prev: SendState, formData: FormData): Pro
   } catch {
     return { error: "Sending stopped on an error. Check the list before sending again." };
   }
+}
+
+export type TestState = { error?: string; sentTo?: string } | null;
+
+/**
+ * Owner-only. Sends the wording as typed (saved or not) to the owner's own
+ * phone and email, filled in as if for "Josh". No customer gets anything and
+ * it isn't recorded, so it doesn't count toward anyone's 30 days.
+ */
+export async function sendTestToMe(_prev: TestState, formData: FormData): Promise<TestState> {
+  const denied = await ownerOnly();
+  if (denied) return { error: denied };
+  const kind = parseKind(formData.get("kind"));
+  if (!kind) return { error: "Pick a campaign." };
+  const sms = clean(formData.get("sms_text"), 640);
+  const subject = clean(formData.get("email_subject"), 200);
+  const body = clean(formData.get("email_body"), 5000);
+  if (!sms && !(subject && body)) return { error: "Write the text or the email first." };
+
+  const phone = process.env.OWNER_PHONE;
+  const email = process.env.OWNER_EMAIL;
+  const sentTo: string[] = [];
+  const problems: string[] = [];
+
+  if (sms) {
+    if (!phone) problems.push("OWNER_PHONE isn't set, so no test text");
+    else {
+      const res = await sendSMS(phone, `[TEST] ${smsBody(sms, "Josh")}`);
+      if (res.ok) sentTo.push("your phone");
+      else problems.push(`text failed (${res.error ?? "unknown"})`);
+    }
+  }
+  if (subject && body) {
+    if (!email) problems.push("OWNER_EMAIL isn't set, so no test email");
+    else {
+      try {
+        const { error } = await resend.emails.send({
+          from: `${COMPANY_NAME} <${RESEND_FROM_EMAIL}>`,
+          replyTo: RESEND_REPLY_TO,
+          to: email,
+          subject: `[TEST] ${fill(subject, "Josh")}`,
+          text: emailBody(body, "Josh", `${APP_URL}/unsubscribe/test-link-goes-here`),
+        });
+        if (error) problems.push(`email failed (${error.message})`);
+        else sentTo.push("your email");
+      } catch {
+        problems.push("email failed");
+      }
+    }
+  }
+
+  if (sentTo.length === 0) return { error: problems.join("; ") || "Nothing sent." };
+  return { sentTo: sentTo.join(" and ") + (problems.length ? `. Also: ${problems.join("; ")}` : "") };
 }
