@@ -9,20 +9,21 @@ import { syncLeadToGraph, deleteLeadFromGraph } from "@/lib/graph-connector";
 import { createPlannerTask } from "@/lib/planner-connector";
 import { requireOffice } from "@/lib/require-role";
 
-export async function updateLeadDraft(formData: FormData) {
+export async function updateLeadDraft(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
   const id = formData.get("id") as string;
   const draft_message = (formData.get("draft_message") as string) ?? "";
 
   const { error } = await supabase.from("leads").update({ draft_message }).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save. Try again." };
 
   await syncLeadToGraph(id);
 
   revalidatePath("/leads");
+  return {};
 }
 
-export async function markContacted(formData: FormData) {
+export async function markContacted(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
   const id = formData.get("id") as string;
 
@@ -30,14 +31,15 @@ export async function markContacted(formData: FormData) {
     .from("leads")
     .update({ status: "contacted", contacted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save. Try again." };
 
   await syncLeadToGraph(id);
 
   revalidatePath("/leads");
+  return {};
 }
 
-export async function dismissLead(formData: FormData) {
+export async function dismissLead(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
   const id = formData.get("id") as string;
 
@@ -45,14 +47,15 @@ export async function dismissLead(formData: FormData) {
     .from("leads")
     .update({ status: "dismissed", dismissed_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save. Try again." };
 
   await syncLeadToGraph(id);
 
   revalidatePath("/leads");
+  return {};
 }
 
-export async function addManualLead(formData: FormData) {
+export async function addManualLead(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
   const contact_name = (formData.get("contact_name") as string)?.trim();
   const phone_number = (formData.get("phone_number") as string)?.trim() || null;
@@ -62,7 +65,7 @@ export async function addManualLead(formData: FormData) {
   const summary = (formData.get("summary") as string)?.trim() || null;
   const urgency_score = Number(formData.get("urgency_score")) || 5;
 
-  if (!contact_name) throw new Error("Name is required");
+  if (!contact_name) return { error: "Name is required." };
 
   const { data: lead, error } = await supabase
     .from("leads")
@@ -81,7 +84,7 @@ export async function addManualLead(formData: FormData) {
     })
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save. Try again." };
 
   if (lead) {
     await syncLeadToGraph(lead.id);
@@ -97,6 +100,7 @@ export async function addManualLead(formData: FormData) {
   }
 
   revalidatePath("/leads");
+  return {};
 }
 
 const LEAD_STAGES = ["new", "contacted", "quoted", "won", "lost", "sent", "dismissed"];
@@ -160,10 +164,12 @@ export async function deleteLead(id: string): Promise<{ error?: string }> {
   return {};
 }
 
-export async function sendLeadOutreach(formData: FormData) {
+/** Send the lead's draft by text or email. Returns { error } so the card shows the reason. */
+export async function sendLeadOutreach(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
   const id = formData.get("id") as string;
   const draft_message = (formData.get("draft_message") as string) ?? "";
+  if (!draft_message.trim()) return { error: "Write the message first." };
 
   const { data: lead, error: fetchError } = await supabase
     .from("leads")
@@ -171,26 +177,27 @@ export async function sendLeadOutreach(formData: FormData) {
     .eq("id", id)
     .single();
 
-  if (fetchError || !lead) throw new Error(fetchError?.message ?? "Lead not found");
+  if (fetchError || !lead) return { error: "Couldn't load this lead. Refresh and try again." };
   if (!lead.auto_sendable || lead.status !== "new") {
-    throw new Error("This lead is not eligible for automatic sending");
+    return { error: "This lead can't be sent automatically (already handled, or not set up for it)." };
   }
 
   const customer = lead.customers as { name: string | null; phone: string | null; email: string | null } | null;
 
   if (lead.channel === "sms") {
     const to = lead.phone_number ?? customer?.phone;
-    if (!to) throw new Error("No phone number on file for this lead");
+    if (!to) return { error: "No phone number on file for this lead." };
     // A lead with no customer record needs an explicit opt-in on file.
     if (!(await canText(to))) {
-      throw new Error(
-        "Can't text this lead: no SMS consent on file (or they opted out). Email them instead."
-      );
+      return {
+        error:
+          "Can't text this lead: no texting consent on file (or they opted out). Email them instead.",
+      };
     }
     const sent = await sendSMS(to, draft_message);
-    if (!sent.ok) throw new Error(sent.error ?? "Text failed to send");
+    if (!sent.ok) return { error: `The text didn't go out (${sent.error ?? "unknown error"}).` };
   } else if (lead.channel === "email") {
-    if (!customer?.email) throw new Error("No email on file for this lead");
+    if (!customer?.email) return { error: "No email on file for this lead." };
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
       replyTo: RESEND_REPLY_TO,
@@ -198,18 +205,19 @@ export async function sendLeadOutreach(formData: FormData) {
       subject: "A note from East Coast Mechanical",
       text: draft_message,
     });
-    if (sendError) throw new Error(sendError.message);
+    if (sendError) return { error: `The email didn't go out (${sendError.message}).` };
   } else {
-    throw new Error(`Channel "${lead.channel}" cannot be auto-sent`);
+    return { error: `Leads from "${lead.channel}" can't be sent from here. Copy the draft instead.` };
   }
 
   const { error: updateError } = await supabase
     .from("leads")
     .update({ status: "sent", sent_at: new Date().toISOString(), draft_message })
     .eq("id", id);
-  if (updateError) throw new Error(updateError.message);
+  if (updateError) return { error: "The message went out, but the lead didn't save as sent. Don't resend; refresh the page." };
 
   await syncLeadToGraph(id);
 
   revalidatePath("/leads");
+  return {};
 }
