@@ -13,6 +13,7 @@ import {
   itemTitleClass,
   subTextClass,
 } from "../ui";
+import ResultForm from "../ResultForm";
 
 type Equipment = {
   id: string;
@@ -43,11 +44,9 @@ function EditEquipmentForm({
   onDone: () => void;
 }) {
   return (
-    <form
-      action={async (formData) => {
-        await updateEquipment(formData);
-        onDone();
-      }}
+    <ResultForm
+      submit={updateEquipment}
+      onDone={onDone}
       className="grid gap-3 rounded-xl border border-white/8 bg-white/3 p-4 sm:grid-cols-2"
     >
       <input type="hidden" name="id" value={item.id} />
@@ -103,7 +102,7 @@ function EditEquipmentForm({
           Cancel
         </button>
       </div>
-    </form>
+    </ResultForm>
   );
 }
 

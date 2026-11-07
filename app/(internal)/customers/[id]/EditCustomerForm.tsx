@@ -4,6 +4,7 @@ import { useState } from "react";
 import { updateCustomer } from "../actions";
 import SubmitButton from "../../SubmitButton";
 import { buttonClass, buttonSecondaryClass, inputClass, subTextClass } from "../../ui";
+import ResultForm from "../../ResultForm";
 
 type Customer = {
   id: string;
@@ -33,11 +34,9 @@ export default function EditCustomerForm({ customer }: { customer: Customer }) {
   }
 
   return (
-    <form
-      action={async (formData) => {
-        await updateCustomer(formData);
-        setEditing(false);
-      }}
+    <ResultForm
+      submit={updateCustomer}
+      onDone={() => setEditing(false)}
       className="mt-3 grid gap-3 rounded-xl border border-white/8 bg-white/3 p-4 sm:grid-cols-2"
     >
       <input type="hidden" name="id" value={customer.id} />
@@ -89,6 +88,6 @@ export default function EditCustomerForm({ customer }: { customer: Customer }) {
           Cancel
         </button>
       </div>
-    </form>
+    </ResultForm>
   );
 }

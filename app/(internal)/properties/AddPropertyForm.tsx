@@ -5,6 +5,7 @@ import { addProperty } from "./actions";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, cardClass, inputClass } from "../ui";
 import CustomerPicker from "../CustomerPicker";
+import ResultForm from "../ResultForm";
 
 type Customer = { id: string; name: string };
 
@@ -12,7 +13,7 @@ export default function AddPropertyForm({ customers }: { customers: Customer[] }
   const [customerId, setCustomerId] = useState("");
 
   return (
-    <form action={addProperty} className={cardClass}>
+    <ResultForm submit={addProperty} resetOnDone className={cardClass}>
       <CustomerPicker customers={customers} value={customerId} onChange={setCustomerId} />
       <label className="flex flex-col gap-1 text-xs text-g300">
         Property type
@@ -31,6 +32,6 @@ export default function AddPropertyForm({ customers }: { customers: Customer[] }
         <textarea name="access_notes" className={inputClass} />
       </label>
       <SubmitButton className={`${buttonClass} sm:col-span-2 sm:w-fit`}>Add Property</SubmitButton>
-    </form>
+    </ResultForm>
   );
 }

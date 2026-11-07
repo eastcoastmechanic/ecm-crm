@@ -150,7 +150,8 @@ const updateCustomerTool = betaZodTool({
     if (existing.sms_consent) fd.set("sms_consent", "on");
 
     try {
-      await updateCustomer(fd);
+      const result = await updateCustomer(fd);
+      if (result.error) return `Failed to update customer: ${result.error}`;
       return `Updated customer ${customerId}.`;
     } catch (err) {
       return `Failed to update customer: ${err instanceof Error ? err.message : "unknown error"}`;
@@ -202,7 +203,8 @@ const addPropertyTool = betaZodTool({
     fd.set("address", address);
     if (propertyType) fd.set("property_type", propertyType);
     try {
-      await addProperty(fd);
+      const result = await addProperty(fd);
+      if (result.error) return `Failed to add property: ${result.error}`;
       return `Added property "${address}".`;
     } catch (err) {
       return `Failed to add property: ${err instanceof Error ? err.message : "unknown error"}`;
@@ -233,7 +235,8 @@ const updatePropertyTool = betaZodTool({
     fd.set("property_type", propertyType ?? existing.property_type ?? "");
 
     try {
-      await updateProperty(fd);
+      const result = await updateProperty(fd);
+      if (result.error) return `Failed to update property: ${result.error}`;
       return `Updated property ${propertyId}.`;
     } catch (err) {
       return `Failed to update property: ${err instanceof Error ? err.message : "unknown error"}`;
@@ -304,7 +307,8 @@ const addEquipmentTool = betaZodTool({
     if (barcode) fd.set("barcode", barcode);
     if (nameplate) fd.set("nameplate", JSON.stringify(nameplate));
     try {
-      await addEquipment(fd);
+      const result = await addEquipment(fd);
+      if (result.error) return `Failed to add equipment: ${result.error}`;
       return `Added equipment "${type}${brand ? ` — ${brand}` : ""}".`;
     } catch (err) {
       return `Failed to add equipment: ${err instanceof Error ? err.message : "unknown error"}`;
@@ -357,7 +361,8 @@ const updateEquipmentTool = betaZodTool({
     fd.set("nameplate", Object.keys(mergedNameplate).length ? JSON.stringify(mergedNameplate) : "");
 
     try {
-      await updateEquipment(fd);
+      const result = await updateEquipment(fd);
+      if (result.error) return `Failed to update equipment: ${result.error}`;
       return `Updated equipment ${equipmentId}.`;
     } catch (err) {
       return `Failed to update equipment: ${err instanceof Error ? err.message : "unknown error"}`;
