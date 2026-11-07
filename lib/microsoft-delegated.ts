@@ -166,7 +166,7 @@ export async function disconnect(): Promise<void> {
  * refresh token) when needed. Null when nobody is connected or the sign-in
  * has expired; the reason is saved on the row for /account to show.
  */
-export async function getDelegatedToken(): Promise<string | null> {
+export async function getDelegatedToken(attempt = 0): Promise<string | null> {
   if (!delegatedConfigured()) return null;
 
   // Read the connection every time, even with a cached token: a disconnect or
@@ -207,18 +207,20 @@ export async function getDelegatedToken(): Promise<string | null> {
 
   const update: Record<string, unknown> = { last_error: null, updated_at: new Date().toISOString() };
   if (json.refresh_token) update.refresh_token_enc = encryptToken(json.refresh_token, sealSecret(), TOKEN_PURPOSE);
-  const { data: saved } = await supabase
+  const { data: saved, error: saveError } = await supabase
     .from("microsoft_connections")
     .update(update)
     .eq("id", CONNECTION_ID)
     .eq("connected_at", data.connected_at as string)
     .select("id");
-  if (!saved || saved.length === 0) {
+  if (!saveError && (!saved || saved.length === 0)) {
     // Reconnected or disconnected while this refresh ran: drop the old account's
-    // token and start over from whatever connection is saved now.
+    // token and start over (once) from whatever connection is saved now.
     cached = null;
-    return getDelegatedToken();
+    return attempt < 1 ? getDelegatedToken(attempt + 1) : null;
   }
+  // A database error here still leaves a good token for this run; the next
+  // refresh retries the save (Microsoft keeps the old refresh token valid).
 
   cached = { token: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000, connectedAtMs };
   return cached.token;
