@@ -107,7 +107,9 @@ export async function respondToInternalChat(
   const attachmentFiles = lastAttachments.length ? attachmentsToFiles(lastAttachments) : [];
 
   const apiMessages = messages.map((m, i) => {
-    if (i !== lastIndex || m.attachments === undefined || m.attachments.length === 0) {
+    // Attachments only ever go on the user's newest message: API version 2026-10-21
+    // (SDK 1.x) rejects a document block in an assistant message.
+    if (i !== lastIndex || m.role !== "user" || m.attachments === undefined || m.attachments.length === 0) {
       return { role: m.role, content: m.content };
     }
     const blocks = m.attachments.map((a) =>
