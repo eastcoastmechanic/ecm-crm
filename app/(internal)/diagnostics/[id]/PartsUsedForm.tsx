@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { recordPartsUsed } from "./actions";
+import { useActionState, useState } from "react";
+import { recordPartsUsed, type ReportState } from "./actions";
 import SubmitButton from "../../SubmitButton";
-import { buttonClass, buttonSecondaryClass, inputClass } from "../../ui";
+import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass } from "../../ui";
 
 type PriceBookOption = { id: string; name: string; category: string | null; unit_price: number | null };
 type Row = { name: string; qty: number; unitPrice: number | null };
@@ -22,6 +22,7 @@ export default function PartsUsedForm({
   showPrices?: boolean;
   initialRows: Row[];
 }) {
+  const [state, action, saving] = useActionState<ReportState, FormData>(recordPartsUsed, null);
   const [rows, setRows] = useState(() =>
     (initialRows.length ? initialRows : [{ name: "", qty: 1, unitPrice: null }]).map((r) => ({
       rowId: nextRowId++,
@@ -47,7 +48,7 @@ export default function PartsUsedForm({
   }
 
   return (
-    <form action={recordPartsUsed} className="flex flex-col gap-3">
+    <form action={action} className="flex flex-col gap-3">
       <input type="hidden" name="diagnostic_id" value={diagnosticId} />
       <input type="hidden" name="item_count" value={rows.length} />
 
@@ -103,6 +104,12 @@ export default function PartsUsedForm({
         <SubmitButton className={buttonClass} pendingText="Saving…">
           Save Parts Used
         </SubmitButton>
+        {state?.saved && !saving && <span className={itemSubClass}>Saved.</span>}
+        {state?.error && (
+          <span role="alert" className={errorClass}>
+            {state.error}
+          </span>
+        )}
       </div>
     </form>
   );

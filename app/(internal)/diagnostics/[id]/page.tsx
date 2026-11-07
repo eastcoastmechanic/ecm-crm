@@ -4,12 +4,11 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { signStoredPhotos } from "@/lib/photo-urls";
 import { fetchAllPriceBookItems } from "@/lib/price-book";
-import { createInvoiceForFinishedReport, sendServiceReportEmail } from "./actions";
+import { CreateReportInvoiceButton, SendReportButton } from "./ReportButtons";
 import AssignCustomerForm from "./AssignCustomerForm";
 import PartsUsedForm from "./PartsUsedForm";
 import FinishReportForm from "./FinishReportForm";
-import SubmitButton from "../../SubmitButton";
-import { headingClass, subTextClass, itemSubClass, buttonClass, buttonSecondaryClass } from "../../ui";
+import { headingClass, subTextClass, itemSubClass, buttonSecondaryClass } from "../../ui";
 
 type SuggestedLineItem = {
   price_book_item_name: string | null;
@@ -172,12 +171,7 @@ export default async function DiagnosticPage({
               Report sent {new Date(diagnostic.report_sent_at).toLocaleDateString()}
             </span>
           ) : (
-            <form action={sendServiceReportEmail}>
-              <input type="hidden" name="id" value={id} />
-              <SubmitButton className={buttonClass} disabled={!hasEmail} pendingText="Sending…">
-                Email to Customer
-              </SubmitButton>
-            </form>
+            <SendReportButton id={id} disabled={!hasEmail} />
           )}
             </>
           )}
@@ -300,12 +294,7 @@ export default async function DiagnosticPage({
             ) : (
               <div className="flex flex-col gap-2">
                 <p className={itemSubClass}>No invoice was created for this report.</p>
-                <form action={createInvoiceForFinishedReport}>
-                  <input type="hidden" name="diagnostic_id" value={id} />
-                  <SubmitButton className={buttonSecondaryClass} pendingText="Creating…">
-                    Create invoice from this report
-                  </SubmitButton>
-                </form>
+                <CreateReportInvoiceButton id={id} />
               </div>
             )}
           </div>

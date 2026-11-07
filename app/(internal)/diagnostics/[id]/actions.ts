@@ -8,8 +8,23 @@ import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createInvoiceDirect, type DirectLineItem } from "@/lib/document-generation";
 import { getStaffRole, requireOffice } from "@/lib/require-role";
+import { etLocalFromIso, parseEtLocal } from "@/lib/tz";
 
-export async function assignCustomer(formData: FormData) {
+export type ReportState = { error?: string; saved?: boolean } | null;
+
+async function notOffice(): Promise<boolean> {
+  try {
+    await requireOffice();
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** Attach a service report to a customer. Returns { error } so the form shows the reason. */
+export async function assignCustomer(_prev: ReportState, formData: FormData): Promise<ReportState> {
   const diagnosticId = formData.get("diagnostic_id") as string;
   const customerId = (formData.get("customer_id") as string) || null;
   const customerName = (formData.get("customer_name") as string)?.trim() || null;
@@ -23,25 +38,34 @@ export async function assignCustomer(formData: FormData) {
   const equipmentModel = (formData.get("equipment_model") as string)?.trim() || null;
   const equipmentRefrigerant = (formData.get("equipment_refrigerant") as string) || null;
 
-  const resolved = await resolveCustomerPropertyEquipment({
-    customerId,
-    customerName,
-    phone,
-    smsConsent,
-    propertyId,
-    address,
-    equipmentId,
-    equipment: equipmentType
-      ? { type: equipmentType, brand: equipmentBrand, model: equipmentModel, refrigerant_type: equipmentRefrigerant }
-      : null,
-  });
+  if (!diagnosticId) return { error: "Missing service report. Refresh and try again." };
+  if (!customerId && !customerName) return { error: "Pick a customer, or type the new customer's name." };
+
+  let resolved: Awaited<ReturnType<typeof resolveCustomerPropertyEquipment>>;
+  try {
+    resolved = await resolveCustomerPropertyEquipment({
+      customerId,
+      customerName,
+      phone,
+      smsConsent,
+      propertyId,
+      address,
+      equipmentId,
+      equipment: equipmentType
+        ? { type: equipmentType, brand: equipmentBrand, model: equipmentModel, refrigerant_type: equipmentRefrigerant }
+        : null,
+    });
+  } catch (err) {
+    console.error("assignCustomer: resolve failed", errText(err));
+    return { error: "Couldn't save the customer, property or equipment. Try again." };
+  }
 
   if (resolved.equipmentId) {
     const { error } = await supabase
       .from("diagnostics")
       .update({ equipment_id: resolved.equipmentId })
       .eq("id", diagnosticId);
-    if (error) throw new Error(error.message);
+    if (error) return { error: "Saved the customer, but couldn't link the equipment to this report. Try again." };
   }
 
   const { data: diagnostic } = await supabase
@@ -71,9 +95,10 @@ export async function assignCustomer(formData: FormData) {
   revalidatePath("/customers");
   revalidatePath("/properties");
   revalidatePath("/equipment");
+  return { saved: true };
 }
 
-export async function recordPartsUsed(formData: FormData) {
+export async function recordPartsUsed(_prev: ReportState, formData: FormData): Promise<ReportState> {
   const diagnosticId = formData.get("diagnostic_id") as string;
   const count = Number(formData.get("item_count")) || 0;
 
@@ -116,7 +141,7 @@ export async function recordPartsUsed(formData: FormData) {
     .maybeSingle();
   // Without the saved list we cannot tell what was already deducted, so stop
   // rather than take the whole list out of inventory again.
-  if (beforeError) throw new Error(beforeError.message);
+  if (beforeError) return { error: "Couldn't load the saved parts, so nothing was changed. Try again." };
   const previousQty = new Map<string, number>();
   for (const p of (before?.actual_parts_used ?? []) as { price_book_item_name?: string; qty?: number }[]) {
     if (!p?.price_book_item_name) continue;
@@ -129,7 +154,7 @@ export async function recordPartsUsed(formData: FormData) {
     .from("diagnostics")
     .update({ actual_parts_used: parts })
     .eq("id", diagnosticId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the parts. Try again." };
 
   // Best-effort inventory deduction -- matched by price book item name since
   // tiers (good/better/best) are separate rows for the same physical part,
@@ -164,12 +189,19 @@ export async function recordPartsUsed(formData: FormData) {
 
   revalidatePath(`/diagnostics/${diagnosticId}`);
   revalidatePath("/inventory");
+  return { saved: true };
 }
 
+/**
+ * The form's datetime-local value is New York wall time. The server runs in UTC,
+ * so new Date(value) used to store it 4 to 5 hours off. A value with a zone
+ * (from the assistant) is taken as given.
+ */
 function parseLocalDateTime(value: FormDataEntryValue | null): string | null {
   if (!value || typeof value !== "string") return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  const local = etLocalFromIso(value);
+  const when = local ? parseEtLocal(local) : null;
+  return when ? when.toISOString() : null;
 }
 
 type ReportForInvoice = {
@@ -183,7 +215,7 @@ async function createReportInvoice(
   customerId: string,
   propertyId: string | null,
   trackedHours: number | null
-) {
+): Promise<{ documentId: string; error?: undefined } | { error: string; documentId?: undefined }> {
   const actualPartsUsed = (diagnostic.actual_parts_used ?? []) as {
     price_book_item_name: string;
     qty: number;
@@ -216,34 +248,41 @@ async function createReportInvoice(
   }
 
   if (items.length === 0) {
-    throw new Error(
-      "Nothing to invoice yet — save parts used and/or track time (with an hourly rate configured) first"
-    );
+    return {
+      error:
+        "Nothing to invoice yet: save the parts used and/or enter the start and end time (labor needs HOURLY_LABOR_RATE set) first.",
+    };
   }
 
-  const result = await createInvoiceDirect({ customerId, propertyId, items, jobId: diagnostic.job_id ?? undefined });
-  return result;
+  try {
+    const result = await createInvoiceDirect({ customerId, propertyId, items, jobId: diagnostic.job_id ?? undefined });
+    return { documentId: result.documentId };
+  } catch (err) {
+    console.error("createReportInvoice failed", errText(err));
+    return { error: "Couldn't create the invoice. Try again." };
+  }
 }
 
 /** Office-only: invoice a report a tech already finished without one (techs can't create invoices). */
-export async function createInvoiceForFinishedReport(formData: FormData) {
-  await requireOffice();
-  const diagnosticId = formData.get("diagnostic_id") as string;
+export async function createInvoiceForFinishedReport(_prev: ReportState, formData: FormData): Promise<ReportState> {
+  if (await notOffice()) return { error: "Only the office or owner can create invoices." };
+  const diagnosticId = String(formData.get("diagnostic_id") ?? "");
 
   const { data: diagnostic, error } = await supabase
     .from("diagnostics")
     .select("*, equipment(properties(id, customer_id)), jobs(customer_id, property_id, document_id)")
     .eq("id", diagnosticId)
-    .single();
-  if (error || !diagnostic) throw new Error(error?.message ?? "Service report not found");
-  if (!diagnostic.completed_at) throw new Error("Finish the service report first");
-  if (diagnostic.invoice_document_id) throw new Error("This report already has an invoice");
+    .maybeSingle();
+  if (error || !diagnostic) return { error: "Couldn't load this service report. Refresh and try again." };
+  if (!diagnostic.completed_at) return { error: "Finish the service report first." };
+  if (diagnostic.invoice_document_id) return { error: "This report already has an invoice. Refresh the page." };
 
   const customerId = diagnostic.equipment?.properties?.customer_id ?? diagnostic.jobs?.customer_id ?? null;
   const propertyId = diagnostic.equipment?.properties?.id ?? diagnostic.jobs?.property_id ?? null;
-  if (!customerId) throw new Error("Assign a customer before creating an invoice");
+  if (!customerId) return { error: "Assign a customer before creating an invoice." };
 
   const result = await createReportInvoice(diagnostic, customerId, propertyId, diagnostic.tracked_hours ?? null);
+  if (result.error !== undefined) return { error: result.error };
 
   if (diagnostic.job_id && !diagnostic.jobs?.document_id) {
     await supabase.from("jobs").update({ document_id: result.documentId }).eq("id", diagnostic.job_id);
@@ -252,17 +291,28 @@ export async function createInvoiceForFinishedReport(formData: FormData) {
     .from("diagnostics")
     .update({ invoice_document_id: result.documentId })
     .eq("id", diagnosticId);
-  if (updateError) throw new Error(updateError.message);
-
   revalidatePath(`/diagnostics/${diagnosticId}`);
   revalidatePath("/documents");
   revalidatePath("/jobs");
+  if (updateError) {
+    console.error("createInvoiceForFinishedReport: link failed", updateError.message);
+    return { error: "The invoice was created (see Documents) but couldn't be linked to this report. Don't create another." };
+  }
+  return { saved: true };
 }
 
-export async function finishServiceReport(formData: FormData) {
-  const diagnosticId = formData.get("diagnostic_id") as string;
+/**
+ * Finish a service call: save the times, optionally raise the invoice, mark it
+ * complete. The invoice is made first, so if it can't be made the report is
+ * not marked finished and the typed times stay on the form.
+ */
+export async function finishServiceReport(_prev: ReportState, formData: FormData): Promise<ReportState> {
+  const diagnosticId = String(formData.get("diagnostic_id") ?? "");
   const timeStartedAt = parseLocalDateTime(formData.get("time_started_at"));
   const timeEndedAt = parseLocalDateTime(formData.get("time_ended_at"));
+  if (timeStartedAt && timeEndedAt && timeEndedAt < timeStartedAt) {
+    return { error: "The end time is before the start time." };
+  }
 
   const trackedHours =
     timeStartedAt && timeEndedAt
@@ -273,8 +323,8 @@ export async function finishServiceReport(formData: FormData) {
     .from("diagnostics")
     .select("*, equipment(properties(id, customer_id)), jobs(customer_id, property_id, document_id)")
     .eq("id", diagnosticId)
-    .single();
-  if (fetchError || !diagnostic) throw new Error(fetchError?.message ?? "Service report not found");
+    .maybeSingle();
+  if (fetchError || !diagnostic) return { error: "Couldn't load this service report. Refresh and try again." };
 
   const customerId = diagnostic.equipment?.properties?.customer_id ?? diagnostic.jobs?.customer_id ?? null;
   const propertyId = diagnostic.equipment?.properties?.id ?? diagnostic.jobs?.property_id ?? null;
@@ -283,10 +333,11 @@ export async function finishServiceReport(formData: FormData) {
   let invoiceDocumentId: string | null = diagnostic.invoice_document_id ?? null;
 
   if (createInvoice && !invoiceDocumentId) {
-    await requireOffice();
-    if (!customerId) throw new Error("Assign a customer before creating an invoice");
+    if (await notOffice()) return { error: "Only the office or owner can create invoices. Untick the invoice box." };
+    if (!customerId) return { error: "Assign a customer before creating an invoice, or untick the invoice box." };
 
     const result = await createReportInvoice(diagnostic, customerId, propertyId, trackedHours);
+    if (result.error !== undefined) return { error: `${result.error} Or untick the invoice box to finish without one.` };
     invoiceDocumentId = result.documentId;
 
     if (diagnostic.job_id && !diagnostic.jobs?.document_id) {
@@ -304,48 +355,74 @@ export async function finishServiceReport(formData: FormData) {
       invoice_document_id: invoiceDocumentId,
     })
     .eq("id", diagnosticId);
-  if (error) throw new Error(error.message);
-
   revalidatePath(`/diagnostics/${diagnosticId}`);
   revalidatePath("/diagnostics");
   revalidatePath("/documents");
   revalidatePath("/jobs");
+  if (error) {
+    console.error("finishServiceReport: update failed", error.message);
+    return {
+      error:
+        invoiceDocumentId && invoiceDocumentId !== diagnostic.invoice_document_id
+          ? "The invoice was created (see Documents) but the report didn't save as finished. Untick the invoice box and press Finish again."
+          : "Couldn't finish the report. Try again.",
+    };
+  }
+  return { saved: true };
 }
 
-export async function sendServiceReportEmail(formData: FormData) {
-  await requireOffice();
-  const id = formData.get("id") as string;
+/** Email the finished service report as a PDF. Returns { error } so the page shows the reason. */
+export async function sendServiceReportEmail(_prev: ReportState, formData: FormData): Promise<ReportState> {
+  if (await notOffice()) return { error: "Only the office or owner can send reports." };
+  const id = String(formData.get("id") ?? "");
 
-  const { data, customerEmail, error } = await getServiceReportForPdf(id);
-  if (error || !data) throw new Error(error ?? "Service report not found");
-  if (!customerEmail) throw new Error("Customer has no email on file");
-
-  const pdfBuffer = await renderServiceReportPdf(data);
-
-  const { error: sendError } = await resend.emails.send({
-    from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
-    replyTo: RESEND_REPLY_TO,
-    to: customerEmail,
-    subject: `Service Report ${data.doc_number ?? ""} from East Coast Mechanical`,
-    text: `Hi ${data.customer_name},\n\nAttached is the service report from your recent visit${
+  let pdfBuffer: Buffer;
+  let to: string;
+  let subject: string;
+  let text: string;
+  let filename: string;
+  try {
+    const { data, customerEmail, error } = await getServiceReportForPdf(id);
+    if (error || !data) return { error: "Couldn't load this service report. Refresh and try again." };
+    if (!customerEmail) return { error: "This customer has no email on file. Add one on the customer page." };
+    pdfBuffer = await renderServiceReportPdf(data);
+    to = customerEmail;
+    subject = `Service Report ${data.doc_number ?? ""} from East Coast Mechanical`;
+    text = `Hi ${data.customer_name},\n\nAttached is the service report from your recent visit${
       data.equipment_label ? ` for your ${data.equipment_label}` : ""
-    }.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
-    attachments: [
-      {
-        filename: `${data.doc_number ?? "service-report"}.pdf`,
-        content: pdfBuffer,
-      },
-    ],
-  });
+    }.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`;
+    filename = `${data.doc_number ?? "service-report"}.pdf`;
+  } catch (err) {
+    console.error("sendServiceReportEmail: PDF failed", errText(err));
+    return { error: "Couldn't build the PDF. Try again." };
+  }
 
-  if (sendError) throw new Error(sendError.message);
+  try {
+    const { error: sendError } = await resend.emails.send({
+      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
+      to,
+      subject,
+      text,
+      attachments: [{ filename, content: pdfBuffer }],
+    });
+    if (sendError) {
+      console.error("sendServiceReportEmail: send failed", sendError.message);
+      return { error: "The email didn't go out. Check the customer's address and try again." };
+    }
+  } catch (err) {
+    console.error("sendServiceReportEmail: send threw", errText(err));
+    return { error: "The email didn't go out. Try again." };
+  }
 
   const { error: updateError } = await supabase
     .from("diagnostics")
     .update({ report_sent_at: new Date().toISOString() })
     .eq("id", id);
-
-  if (updateError) throw new Error(updateError.message);
-
   revalidatePath(`/diagnostics/${id}`);
+  if (updateError) {
+    console.error("sendServiceReportEmail: status update failed", updateError.message);
+    return { error: "The email went out, but the sent date didn't save. Don't resend; refresh the page." };
+  }
+  return { saved: true };
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { finishServiceReport } from "./actions";
+import { useActionState, useMemo, useState } from "react";
+import { finishServiceReport, type ReportState } from "./actions";
 import SubmitButton from "../../SubmitButton";
-import { buttonClass, inputClass, itemSubClass } from "../../ui";
+import { buttonClass, errorClass, inputClass, itemSubClass } from "../../ui";
 
 export default function FinishReportForm({ diagnosticId, canInvoice = true }: { diagnosticId: string; canInvoice?: boolean }) {
+  const [state, action] = useActionState<ReportState, FormData>(finishServiceReport, null);
   const [startedAt, setStartedAt] = useState("");
   const [endedAt, setEndedAt] = useState("");
 
@@ -18,7 +19,7 @@ export default function FinishReportForm({ diagnosticId, canInvoice = true }: { 
   }, [startedAt, endedAt]);
 
   return (
-    <form action={finishServiceReport} className="flex flex-col gap-3">
+    <form action={action} className="flex flex-col gap-3">
       <input type="hidden" name="diagnostic_id" value={diagnosticId} />
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-xs text-g300">
@@ -52,6 +53,12 @@ export default function FinishReportForm({ diagnosticId, canInvoice = true }: { 
           finish this report.
         </span>
       </label>
+      )}
+
+      {state?.error && (
+        <p role="alert" className={errorClass}>
+          {state.error}
+        </p>
       )}
 
       <SubmitButton className={`${buttonClass} w-fit`} pendingText="Finishing…">

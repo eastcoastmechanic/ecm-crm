@@ -49,7 +49,8 @@ const assignServiceReportTool = betaZodTool({
     if (propertyId) fd.set("property_id", propertyId);
     if (equipmentId) fd.set("equipment_id", equipmentId);
     try {
-      await assignCustomer(fd);
+      const result = await assignCustomer(null, fd);
+      if (result?.error) return `Failed to assign: ${result.error}`;
       return `Service report ${diagnosticId} is now attached to customer ${customerId}.`;
     } catch (err) {
       return `Failed to assign: ${err instanceof Error ? err.message : "unknown error"}`;
@@ -74,7 +75,8 @@ const finishServiceReportTool = betaZodTool({
     if (timeEndedAt) fd.set("time_ended_at", timeEndedAt);
     if (createInvoice) fd.set("create_invoice", "on");
     try {
-      await finishServiceReport(fd);
+      const result = await finishServiceReport(null, fd);
+      if (result?.error) return `Failed to finish service report: ${result.error}`;
       return createInvoice
         ? `Finished service report ${diagnosticId} and raised a draft invoice. Review it before sending.`
         : `Finished service report ${diagnosticId}.`;
@@ -95,7 +97,8 @@ const sendServiceReportTool = betaZodTool({
     const fd = new FormData();
     fd.set("id", diagnosticId);
     try {
-      await sendServiceReportEmail(fd);
+      const result = await sendServiceReportEmail(null, fd);
+      if (result?.error) return `Failed to send service report: ${result.error}`;
       return `Sent service report ${diagnosticId} to the customer.`;
     } catch (err) {
       return `Failed to send service report: ${err instanceof Error ? err.message : "unknown error"}`;
