@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { signStoredPhotos } from "@/lib/photo-urls";
 import type { AssessmentItem } from "@/lib/assessment-report-pdf";
-import { sendDocumentEmail } from "./actions";
+import SendDocumentForm from "./SendDocumentForm";
 import PaymentLinkButton from "./PaymentLinkButton";
 import AssessmentDetail from "./AssessmentDetail";
 import WarrantyDetail from "./WarrantyDetail";
@@ -11,9 +11,8 @@ import MassSaveRebateDetail from "./MassSaveRebateDetail";
 import ContractDetail from "./ContractDetail";
 import LineItemsEditor from "./LineItemsEditor";
 import EditCustomerForm from "../../customers/[id]/EditCustomerForm";
-import SubmitButton from "../../SubmitButton";
 import DocumentDeleteButton from "../DocumentDeleteButton";
-import { headingClass, subTextClass, buttonClass, buttonSecondaryClass } from "../../ui";
+import { headingClass, subTextClass, buttonSecondaryClass } from "../../ui";
 import { selectedTier, TIER_LABEL } from "@/lib/estimate-tier";
 
 type LineItem = {
@@ -230,12 +229,7 @@ export default async function DocumentPage({
           {doc.type === "invoice" && doc.status !== "paid" && <PaymentLinkButton id={doc.id} />}
           <DocumentDeleteButton id={doc.id} label={typeLabel[doc.type] ?? "Document"} />
           {doc.customers?.email ? (
-            <form action={sendDocumentEmail}>
-              <input type="hidden" name="id" value={doc.id} />
-              <SubmitButton className={buttonClass} pendingText="Sending…">
-                Send to Customer
-              </SubmitButton>
-            </form>
+            <SendDocumentForm id={doc.id} label="Send to Customer" />
           ) : (
             <span className={subTextClass}>
               No customer email on file — use Edit to add one

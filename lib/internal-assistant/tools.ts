@@ -489,7 +489,8 @@ const updateWarrantyTool = betaZodTool({
     });
 
     try {
-      await updateWarranty(fd);
+      const result = await updateWarranty(null, fd);
+      if (result?.error) return `Failed to update warranty: ${result.error}`;
       return `Updated warranty document ${documentId}.`;
     } catch (err) {
       return `Failed to update warranty: ${err instanceof Error ? err.message : "unknown error"}`;

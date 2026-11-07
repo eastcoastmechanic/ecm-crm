@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { updateWarranty } from "./actions";
-import SubmitButton from "../../SubmitButton";
-import { buttonClass, inputClass } from "../../ui";
+import { startTransition, useActionState, useState } from "react";
+import { updateWarranty, type FormState } from "./actions";
+import { buttonClass, errorClass, inputClass, subTextClass } from "../../ui";
 import type { WarrantyItem } from "./WarrantyDetail";
 
 export default function WarrantyItemsEditor({
@@ -15,12 +14,20 @@ export default function WarrantyItemsEditor({
   technicianName: string | null;
   items: WarrantyItem[];
 }) {
+  const [state, save, saving] = useActionState<FormState, FormData>(updateWarranty, null);
   const [registeredByRow, setRegisteredByRow] = useState<Record<number, boolean>>(() =>
     Object.fromEntries(items.map((item, i) => [i, item.manufacturer.registered]))
   );
 
+  // Submitted by hand (not the action prop) so React does not clear the typed values when a save fails.
   return (
-    <form action={updateWarranty} className="flex flex-col gap-4 rounded-xl border border-white/8 p-4">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => save(data));
+      }}
+      className="flex flex-col gap-4 rounded-xl border border-white/8 p-4">
       <input type="hidden" name="id" value={documentId} />
       <input type="hidden" name="item_count" value={items.length} />
 
@@ -101,9 +108,17 @@ export default function WarrantyItemsEditor({
         </section>
       ))}
 
-      <SubmitButton className={`${buttonClass} w-fit`} pendingText="Saving…">
-        Save Changes
-      </SubmitButton>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="submit" disabled={saving} className={`${buttonClass} w-fit disabled:opacity-50`}>
+          {saving ? "Saving…" : "Save Changes"}
+        </button>
+        {state?.saved && !saving && <span className={subTextClass}>Saved.</span>}
+        {state?.error && (
+          <span role="alert" className={errorClass}>
+            {state.error}
+          </span>
+        )}
+      </div>
     </form>
   );
 }

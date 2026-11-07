@@ -310,7 +310,8 @@ const executors: Record<string, ActionExecutor> = {
     const { documentId } = input as { documentId: string };
     const fd = new FormData();
     fd.set("id", documentId);
-    await sendDocumentEmail(fd);
+    const result = await sendDocumentEmail(null, fd);
+    if (result?.error) throw new Error(result.error);
     return `Sent document ${documentId}.`;
   },
   send_service_report: async (input) => {
