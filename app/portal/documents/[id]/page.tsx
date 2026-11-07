@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
-import { createCheckoutSession } from "./actions";
+import PayNowForm from "./PayNowForm";
 import SignaturePad from "./SignaturePad";
 import ContractView from "./ContractView";
-import SubmitButton from "../../../(internal)/SubmitButton";
-import { buttonClass, headingClass, subTextClass } from "../../../(internal)/ui";
+import { headingClass, subTextClass } from "../../../(internal)/ui";
 import { availableTiers, selectedTier, TIER_LABEL } from "@/lib/estimate-tier";
 
 // Illustrative only — no real lender is wired up yet (see Phase 1 plan notes).
@@ -223,15 +222,7 @@ export default async function PortalDocumentPage({
       </div>
 
       {doc.type === "invoice" && doc.status !== "paid" && (
-        <form action={createCheckoutSession} className="rounded-xl border border-white/8 bg-white/3 p-4">
-          <input type="hidden" name="document_id" value={doc.id} />
-          <p className={subTextClass}>
-            Amount due: <span className="text-white">{formatPrice(doc.total)}</span>
-          </p>
-          <SubmitButton className={`${buttonClass} mt-3 w-fit`} pendingText="Redirecting…">
-            Pay Now
-          </SubmitButton>
-        </form>
+        <PayNowForm documentId={doc.id} amount={formatPrice(doc.total)} />
       )}
       {doc.status === "paid" && (
         <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">

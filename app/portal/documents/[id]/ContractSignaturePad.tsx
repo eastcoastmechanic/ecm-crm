@@ -64,10 +64,14 @@ export default function ContractSignaturePad({
       formData.set("signature_data", dataUrl);
       formData.set("agreed", "on");
       if (offersAutoRenew && autoRenew) formData.set("auto_renew", "on");
-      await signContract(formData);
+      const result = await signContract(formData);
+      if (result?.error) {
+        setError(result.error);
+        setPending(false);
+      }
     } catch (err) {
       if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) throw err;
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError("Couldn't save your signature. Please try again, or call us.");
       setPending(false);
     }
   }

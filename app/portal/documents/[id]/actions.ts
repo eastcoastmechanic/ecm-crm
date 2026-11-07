@@ -11,7 +11,10 @@ import { etDateKey } from "@/lib/tz";
 import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 import { approvalChoice, type TierTotals } from "@/lib/estimate-tier";
 
-export async function createCheckoutSession(formData: FormData) {
+export type PayState = { error?: string } | null;
+
+/** Pay Now on an invoice. Returns { error } (production builds hide a thrown message from the customer). */
+export async function createCheckoutSession(_prev: PayState, formData: FormData): Promise<PayState> {
   const documentId = formData.get("document_id") as string;
   const supabase = await createPortalServerClient();
 
@@ -26,43 +29,49 @@ export async function createCheckoutSession(formData: FormData) {
     .eq("id", documentId)
     .single();
 
-  if (error || !doc) throw new Error("Invoice not found");
-  if (doc.type !== "invoice") throw new Error("Only invoices can be paid online");
-  if (doc.status === "paid") throw new Error("This invoice is already paid");
-  if (!doc.total || doc.total <= 0) throw new Error("This invoice has no amount due");
+  if (error || !doc) return { error: "We couldn't find this invoice. Refresh the page and try again." };
+  if (doc.type !== "invoice") return { error: "Only invoices can be paid online." };
+  if (doc.status === "paid") return { error: "This invoice is already paid." };
+  if (!doc.total || doc.total <= 0) return { error: "This invoice has no amount due." };
 
-  const origin = (await headers()).get("origin");
+  // Some browsers send no Origin header; fall back to the app address so Stripe gets a real return link.
+  const origin = (await headers()).get("origin") ?? (process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app").replace(/\/$/, "");
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          unit_amount: Math.round(doc.total * 100),
-          product_data: {
-            name: `Invoice ${doc.doc_number ?? doc.id} — East Coast Mechanical`,
+  let checkoutUrl: string | null = null;
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            unit_amount: Math.round(doc.total * 100),
+            product_data: {
+              name: `Invoice ${doc.doc_number ?? doc.id} — East Coast Mechanical`,
+            },
           },
+          quantity: 1,
         },
-        quantity: 1,
+      ],
+      // Saves the card against a Stripe customer so future maintenance-plan
+      // renewals can be charged off-session without asking again.
+      customer_creation: "always",
+      payment_intent_data: {
+        setup_future_usage: "off_session",
       },
-    ],
-    // Saves the card against a Stripe customer so future maintenance-plan
-    // renewals can be charged off-session without asking again.
-    customer_creation: "always",
-    payment_intent_data: {
-      setup_future_usage: "off_session",
-    },
-    metadata: {
-      document_id: doc.id,
-      customer_id: doc.customer_id,
-    },
-    success_url: `${origin}/portal/documents/${doc.id}?paid=1`,
-    cancel_url: `${origin}/portal/documents/${doc.id}`,
-  });
-
-  if (!session.url) throw new Error("Could not start checkout session");
-  redirect(session.url);
+      metadata: {
+        document_id: doc.id,
+        customer_id: doc.customer_id,
+      },
+      success_url: `${origin}/portal/documents/${doc.id}?paid=1`,
+      cancel_url: `${origin}/portal/documents/${doc.id}`,
+    });
+    checkoutUrl = session.url;
+  } catch (err) {
+    console.error("createCheckoutSession: Stripe failed", err instanceof Error ? err.message : err);
+  }
+  if (!checkoutUrl) return { error: "We couldn't open the payment page. Please try again in a minute, or call us." };
+  redirect(checkoutUrl);
 }
 
 /**
@@ -128,7 +137,8 @@ export async function approveEstimate(formData: FormData): Promise<{ error?: str
   redirect(`/portal/documents/${documentId}?approved=1`);
 }
 
-export async function signContract(formData: FormData) {
+/** Customer signs a contract. Returns { error } so the message reaches them (a thrown one is hidden in production). */
+export async function signContract(formData: FormData): Promise<{ error?: string }> {
   const documentId = formData.get("document_id") as string;
   const signatureData = formData.get("signature_data") as string;
   const agreed = formData.get("agreed") === "on";
@@ -139,8 +149,8 @@ export async function signContract(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/portal/login");
 
-  if (!signatureData) throw new Error("A signature is required to sign this contract");
-  if (!agreed) throw new Error("You must confirm you've read and agree to the contract terms");
+  if (!signatureData) return { error: "A signature is required to sign this contract." };
+  if (!agreed) return { error: "Please tick the box to confirm you've read and agree to the contract terms." };
 
   const { data: doc, error } = await supabase
     .from("documents")
@@ -148,9 +158,9 @@ export async function signContract(formData: FormData) {
     .eq("id", documentId)
     .single();
 
-  if (error || !doc) throw new Error("Contract not found");
-  if (doc.type !== "contract") throw new Error("Only contracts can be signed here");
-  if (doc.status !== "sent") throw new Error("This contract can't be signed right now");
+  if (error || !doc) return { error: "We couldn't find this contract. Refresh the page and try again." };
+  if (doc.type !== "contract") return { error: "Only contracts can be signed here." };
+  if (doc.status !== "sent") return { error: "This contract can't be signed right now. Refresh the page to see its status." };
 
   const requestHeaders = await headers();
   const signerIp = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
@@ -176,8 +186,11 @@ export async function signContract(formData: FormData) {
     .eq("status", "sent")
     .select("id");
 
-  if (updateError) throw new Error(updateError.message);
-  if (!signed || signed.length === 0) throw new Error("This contract can't be signed right now");
+  if (updateError) {
+    console.error("signContract: update failed", updateError.message);
+    return { error: "Couldn't save your signature. Please try again." };
+  }
+  if (!signed || signed.length === 0) return { error: "This contract can't be signed right now. Refresh the page to see its status." };
 
   await notifyOwnerOfEvent("contract_signed", documentId);
 
