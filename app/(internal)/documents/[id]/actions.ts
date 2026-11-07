@@ -352,14 +352,17 @@ export async function sendDocumentEmail(_prev: SendDocumentState, formData: Form
   if (!docType) return { error: "Couldn't find this document. Refresh and try again." };
 
   if (docType.type === "pm_report") {
+    let pm: { statusSaved: boolean };
     try {
-      await sendPmReportToCustomer(id);
+      // Throws only when nothing went out, so "try again" can't send a duplicate.
+      pm = await sendPmReportToCustomer(id);
     } catch (err) {
       console.error("sendDocumentEmail: PM report failed", err instanceof Error ? err.message : err);
       return { error: err instanceof Error && /no email on file/i.test(err.message) ? NO_EMAIL : "Couldn't send the report. Try again." };
     }
     revalidatePath(`/documents/${id}`);
     revalidatePath("/documents");
+    if (!pm.statusSaved) return { error: "The email went out, but the status didn't save. Don't resend; refresh the page." };
     return { sent: true };
   }
 

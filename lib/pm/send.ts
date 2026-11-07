@@ -10,7 +10,12 @@ function relatedEmail(value: { email: string | null; name: string | null } | { e
 }
 
 /** Emails the filed PM report. Marks the document sent so it matches the other document send paths. */
-export async function sendPmReportToCustomer(documentId: string) {
+/**
+ * Emails the PM report. Throws if nothing went out. Once the email is sent it
+ * never throws: it returns statusSaved=false if marking it sent failed, so the
+ * caller can say "don't resend" instead of inviting a duplicate email.
+ */
+export async function sendPmReportToCustomer(documentId: string): Promise<{ statusSaved: boolean }> {
   const checklistId = await getChecklistIdForDocument(documentId);
   if (!checklistId) throw new Error("That PM report is not linked to a checklist.");
 
@@ -42,5 +47,6 @@ export async function sendPmReportToCustomer(documentId: string) {
     .from("documents")
     .update({ status: "sent", sent_at: new Date().toISOString() })
     .eq("id", documentId);
-  if (updateError) throw new Error(updateError.message);
+  if (updateError) console.error(`PM report ${documentId} emailed but status not saved: ${updateError.message}`);
+  return { statusSaved: !updateError };
 }
