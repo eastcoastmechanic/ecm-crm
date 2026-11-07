@@ -138,6 +138,17 @@ async function pageFor(ids: Ids, job: JobRow): Promise<string> {
     headers: { "Content-Type": "text/html" },
     body: html,
   });
+  if (created.status === 404) {
+    // Section deleted in OneNote: forget it so the next run makes a fresh one at this address.
+    if (job.property_id) {
+      await supabase
+        .from("properties")
+        .update({ onenote_section_id: null })
+        .eq("id", job.property_id)
+        .eq("onenote_section_id", sectionId);
+    }
+    throw new Error("section gone");
+  }
   const page = await okJson<{ id: string; links?: { oneNoteWebUrl?: { href?: string } } }>(created, "page create");
 
   // Only the first request to finish keeps its page; a racing second one deletes its own copy.
@@ -154,18 +165,26 @@ async function pageFor(ids: Ids, job: JobRow): Promise<string> {
   return winner!.onenote_page_id as string;
 }
 
+/** A claim older than this is treated as abandoned (the run that made it stopped) and retried. */
+export const CLAIM_STALE_MINUTES = 10;
+
 /**
  * Append this job's not-yet-copied notes to its OneNote page (making the
- * section and page the first time). Notes are claimed before sending so two
- * runs never copy the same note twice; a failed send releases them for the
- * next run.
+ * section and page the first time). Notes are claimed (onenote_claimed_at)
+ * before sending so two runs never copy the same note at once, and marked
+ * copied (onenote_synced_at) only after OneNote accepts them. A failed send
+ * releases the claim; a run that dies mid-way leaves a claim that goes stale
+ * after CLAIM_STALE_MINUTES and is picked up again, so no note is lost.
  */
 export async function syncJobNotesToOneNote(jobId: string): Promise<void> {
+  const staleBefore = new Date(Date.now() - CLAIM_STALE_MINUTES * 60_000).toISOString();
+  const unclaimed = `onenote_claimed_at.is.null,onenote_claimed_at.lt.${staleBefore}`;
   const { data: pending } = await supabase
     .from("job_notes")
     .select("id")
     .eq("job_id", jobId)
     .is("onenote_synced_at", null)
+    .or(unclaimed)
     .limit(1);
   if (!pending || pending.length === 0) return;
 
@@ -184,9 +203,10 @@ export async function syncJobNotesToOneNote(jobId: string): Promise<void> {
 
     const { data } = await supabase
       .from("job_notes")
-      .update({ onenote_synced_at: new Date().toISOString() })
+      .update({ onenote_claimed_at: new Date().toISOString() })
       .eq("job_id", jobId)
       .is("onenote_synced_at", null)
+      .or(unclaimed)
       .select("id, body, author_name, created_at");
     claimed = (data ?? []).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
     if (claimed.length === 0) return;
@@ -207,11 +227,20 @@ export async function syncJobNotesToOneNote(jobId: string): Promise<void> {
       throw new Error("page gone");
     }
     if (!res.ok) throw new Error(`page append: ${res.status}`);
+
+    await supabase
+      .from("job_notes")
+      .update({ onenote_synced_at: new Date().toISOString() })
+      .in(
+        "id",
+        claimed.map((n) => n.id)
+      );
   } catch (err) {
     if (claimed.length > 0) {
       await supabase
         .from("job_notes")
-        .update({ onenote_synced_at: null })
+        .update({ onenote_claimed_at: null })
+        .is("onenote_synced_at", null)
         .in(
           "id",
           claimed.map((n) => n.id)

@@ -183,12 +183,15 @@ export async function getDelegatedToken(): Promise<string | null> {
   const connectedAtMs = new Date(data.connected_at as string).getTime();
   if (cached && cached.connectedAtMs === connectedAtMs && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
+  // Every write below only lands on the same connection this refresh started from
+  // (matching connected_at). If the owner reconnected meanwhile, the new sign-in wins.
   const refreshToken = decryptToken(data.refresh_token_enc as string, sealSecret(), TOKEN_PURPOSE);
   if (!refreshToken) {
     await supabase
       .from("microsoft_connections")
       .update({ last_error: "Stored sign-in can't be read (certificate changed?). Reconnect.", updated_at: new Date().toISOString() })
-      .eq("id", CONNECTION_ID);
+      .eq("id", CONNECTION_ID)
+      .eq("connected_at", data.connected_at as string);
     return null;
   }
 
@@ -197,13 +200,25 @@ export async function getDelegatedToken(): Promise<string | null> {
     await supabase
       .from("microsoft_connections")
       .update({ last_error: `Microsoft refused the saved sign-in (${json.error ?? "unknown"}). Reconnect.`, updated_at: new Date().toISOString() })
-      .eq("id", CONNECTION_ID);
+      .eq("id", CONNECTION_ID)
+      .eq("connected_at", data.connected_at as string);
     return null;
   }
 
   const update: Record<string, unknown> = { last_error: null, updated_at: new Date().toISOString() };
   if (json.refresh_token) update.refresh_token_enc = encryptToken(json.refresh_token, sealSecret(), TOKEN_PURPOSE);
-  await supabase.from("microsoft_connections").update(update).eq("id", CONNECTION_ID);
+  const { data: saved } = await supabase
+    .from("microsoft_connections")
+    .update(update)
+    .eq("id", CONNECTION_ID)
+    .eq("connected_at", data.connected_at as string)
+    .select("id");
+  if (!saved || saved.length === 0) {
+    // Reconnected or disconnected while this refresh ran: drop the old account's
+    // token and start over from whatever connection is saved now.
+    cached = null;
+    return getDelegatedToken();
+  }
 
   cached = { token: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000, connectedAtMs };
   return cached.token;
