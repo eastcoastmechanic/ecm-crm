@@ -331,7 +331,8 @@ const sendDocumentTool = betaZodTool({
     const fd = new FormData();
     fd.set("id", documentId);
     try {
-      await sendDocumentEmail(fd);
+      const result = await sendDocumentEmail(null, fd);
+      if (result?.error) return `Failed to send: ${result.error}`;
       return `Sent document ${documentId} to the customer.`;
     } catch (err) {
       return `Failed to send: ${err instanceof Error ? err.message : "unknown error"}`;

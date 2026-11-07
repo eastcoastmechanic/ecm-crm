@@ -37,6 +37,15 @@ function parseNullableNumber(value: FormDataEntryValue | null): number | null {
 
 const CRAFTSMANSHIP_WARRANTY_YEARS = 1;
 
+async function notOffice(): Promise<boolean> {
+  try {
+    await requireOffice();
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 function addYears(dateStr: string, years: number): string {
   const d = new Date(`${dateStr}T00:00:00`);
   d.setFullYear(d.getFullYear() + years);
@@ -62,8 +71,11 @@ type WarrantyActionItem = {
   };
 };
 
-export async function updateWarranty(formData: FormData) {
-  await requireOffice();
+export type FormState = { error?: string; saved?: boolean } | null;
+
+/** Save the warranty editor. Returns { error } so the page shows the reason. */
+export async function updateWarranty(_prev: FormState, formData: FormData): Promise<FormState> {
+  if (await notOffice()) return { error: "Only the office or owner can do this." };
   const id = formData.get("id") as string;
   const technician_name = (formData.get("technician_name") as string)?.trim() || null;
   const itemCount = Number(formData.get("item_count") ?? 0);
@@ -73,7 +85,7 @@ export async function updateWarranty(formData: FormData) {
     .select("line_items")
     .eq("id", id)
     .single();
-  if (fetchError) throw new Error(fetchError.message);
+  if (fetchError || !existing) return { error: "Couldn't load this warranty. Refresh and try again." };
 
   const existingItems =
     (existing.line_items as { items?: WarrantyActionItem[] } | null)?.items ?? [];
@@ -141,10 +153,11 @@ export async function updateWarranty(formData: FormData) {
     .update({ line_items: { technician_name, items } })
     .eq("id", id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save the warranty. Try again." };
 
   revalidatePath(`/documents/${id}`);
   revalidatePath("/documents");
+  return { saved: true };
 }
 
 export type UpdateDocumentState = { error?: string; saved?: boolean } | null;
@@ -252,141 +265,142 @@ function formatPrice(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-export async function sendDocumentEmail(formData: FormData) {
-  await requireOffice();
-  const id = formData.get("id") as string;
+export type SendDocumentState = { error?: string; sent?: boolean } | null;
 
-  const { data: docType } = await supabase.from("documents").select("type").eq("id", id).single();
+type OutgoingEmail = {
+  to: string;
+  subject: string;
+  text: string;
+  filename: string;
+  pdf: Buffer;
+  extraUpdate?: Record<string, unknown>;
+};
 
-  if (docType?.type === "assessment") {
+const NO_EMAIL = "This customer has no email on file. Use Edit to add one.";
+
+/** Builds the email for one document, or says why it can't be sent. */
+async function buildDocumentEmail(id: string, type: string | undefined): Promise<OutgoingEmail | { error: string }> {
+  if (type === "assessment") {
     const { data, customerEmail, error } = await getAssessmentReportForPdf(id);
-    if (error || !data) throw new Error(error ?? "Assessment not found");
-    if (!customerEmail) throw new Error("Customer has no email on file");
-
-    const pdfBuffer = await renderAssessmentReportPdf(data);
-
-    const { error: sendError } = await resend.emails.send({
-      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
-      replyTo: RESEND_REPLY_TO,
+    if (error || !data) return { error: "Couldn't load this assessment. Refresh and try again." };
+    if (!customerEmail) return { error: NO_EMAIL };
+    return {
       to: customerEmail,
       subject: `Condition Assessment ${data.doc_number ?? ""} from East Coast Mechanical`,
       text: `Hi ${data.customer_name},\n\nAttached is the equipment condition assessment from your recent visit.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
-      attachments: [{ filename: `${data.doc_number ?? "assessment"}.pdf`, content: pdfBuffer }],
-    });
-    if (sendError) throw new Error(sendError.message);
-
-    const { error: updateError } = await supabase
-      .from("documents")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
-      .eq("id", id);
-    if (updateError) throw new Error(updateError.message);
-
-    revalidatePath(`/documents/${id}`);
-    revalidatePath("/documents");
-    return;
+      filename: `${data.doc_number ?? "assessment"}.pdf`,
+      pdf: await renderAssessmentReportPdf(data),
+    };
   }
 
-  if (docType?.type === "warranty") {
+  if (type === "warranty") {
     const { data, customerEmail, error } = await getWarrantyReportForPdf(id);
-    if (error || !data) throw new Error(error ?? "Warranty not found");
-    if (!customerEmail) throw new Error("Customer has no email on file");
-
-    const pdfBuffer = await renderWarrantyReportPdf(data);
-
-    const { error: sendError } = await resend.emails.send({
-      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
-      replyTo: RESEND_REPLY_TO,
+    if (error || !data) return { error: "Couldn't load this warranty. Refresh and try again." };
+    if (!customerEmail) return { error: NO_EMAIL };
+    return {
       to: customerEmail,
       subject: `Warranty Registration ${data.doc_number ?? ""} from East Coast Mechanical`,
       text: `Hi ${data.customer_name},\n\nAttached is your warranty registration, including our standard 1-year craftsmanship warranty on the install.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
-      attachments: [{ filename: `${data.doc_number ?? "warranty"}.pdf`, content: pdfBuffer }],
-    });
-    if (sendError) throw new Error(sendError.message);
-
-    const { error: updateError } = await supabase
-      .from("documents")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
-      .eq("id", id);
-    if (updateError) throw new Error(updateError.message);
-
-    revalidatePath(`/documents/${id}`);
-    revalidatePath("/documents");
-    return;
+      filename: `${data.doc_number ?? "warranty"}.pdf`,
+      pdf: await renderWarrantyReportPdf(data),
+    };
   }
 
-  if (docType?.type === "pm_report") {
-    await sendPmReportToCustomer(id);
-    revalidatePath(`/documents/${id}`);
-    revalidatePath("/documents");
-    return;
-  }
-
-  if (docType?.type === "contract") {
+  if (type === "contract") {
     const { data, customerEmail, error } = await getContractForPdf(id);
-    if (error || !data) throw new Error(error ?? "Contract not found");
-    if (!customerEmail) throw new Error("Customer has no email on file");
-
-    const pdfBuffer = await renderContractPdf(data);
-
-    const { error: sendError } = await resend.emails.send({
-      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
-      replyTo: RESEND_REPLY_TO,
+    if (error || !data) return { error: "Couldn't load this contract. Refresh and try again." };
+    if (!customerEmail) return { error: NO_EMAIL };
+    return {
       to: customerEmail,
       subject: `Contract ${data.doc_number ?? ""} from East Coast Mechanical — signature needed`,
       text: `Hi ${data.customer_name},\n\nAttached is your service contract ${data.doc_number ?? ""} (${formatPrice(data.total ?? 0)}). Please log in to your customer portal to review and sign it before work begins.\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
-      attachments: [{ filename: `${data.doc_number ?? "contract"}.pdf`, content: pdfBuffer }],
-    });
-    if (sendError) throw new Error(sendError.message);
-
-    const { error: updateError } = await supabase
-      .from("documents")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
-      .eq("id", id);
-    if (updateError) throw new Error(updateError.message);
-
-    revalidatePath(`/documents/${id}`);
-    revalidatePath("/documents");
-    return;
+      filename: `${data.doc_number ?? "contract"}.pdf`,
+      pdf: await renderContractPdf(data),
+    };
   }
 
   const { data, customerEmail, dueDate, error } = await getDocumentForPdf(id);
-  if (error || !data) throw new Error(error ?? "Document not found");
-  if (!customerEmail) throw new Error("Customer has no email on file");
-
-  const pdfBuffer = await renderDocumentPdf(data);
+  if (error || !data) return { error: "Couldn't load this document. Refresh and try again." };
+  if (!customerEmail) return { error: NO_EMAIL };
   const label = typeLabel[data.type] ?? "Document";
-
-  const { error: sendError } = await resend.emails.send({
-    from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
-    replyTo: RESEND_REPLY_TO,
+  return {
     to: customerEmail,
     subject: `${label} ${data.doc_number ?? ""} from East Coast Mechanical`,
     text: `Hi ${data.customer_name},\n\nAttached is your ${label.toLowerCase()} ${data.doc_number ?? ""} (${
       data.chosen_option ? `${data.chosen_option} option total` : data.pricing_mode === "flat" ? "Total" : "Better tier total"
     }: ${formatPrice(data.totals.better)}).\n\nLet us know if you have any questions.\n\nEast Coast Mechanical`,
-    attachments: [
-      {
-        filename: `${data.doc_number ?? label}.pdf`,
-        content: pdfBuffer,
-      },
-    ],
-  });
+    filename: `${data.doc_number ?? label}.pdf`,
+    pdf: await renderDocumentPdf(data),
+    extraUpdate: { due_date: dueDateForSend(data.type, dueDate) },
+  };
+}
 
-  if (sendError) throw new Error(sendError.message);
+/**
+ * Email a document to the customer as a PDF and mark it sent. Returns { error }
+ * so the page shows the reason (a thrown message is hidden in production).
+ */
+export async function sendDocumentEmail(_prev: SendDocumentState, formData: FormData): Promise<SendDocumentState> {
+  try {
+    await requireOffice();
+  } catch {
+    return { error: "Only the office or owner can send documents." };
+  }
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Missing document. Refresh and try again." };
+
+  const { data: docType } = await supabase.from("documents").select("type").eq("id", id).maybeSingle();
+  if (!docType) return { error: "Couldn't find this document. Refresh and try again." };
+
+  if (docType.type === "pm_report") {
+    try {
+      await sendPmReportToCustomer(id);
+    } catch (err) {
+      console.error("sendDocumentEmail: PM report failed", err instanceof Error ? err.message : err);
+      return { error: err instanceof Error && /no email on file/i.test(err.message) ? NO_EMAIL : "Couldn't send the report. Try again." };
+    }
+    revalidatePath(`/documents/${id}`);
+    revalidatePath("/documents");
+    return { sent: true };
+  }
+
+  let email: OutgoingEmail | { error: string };
+  try {
+    email = await buildDocumentEmail(id, docType.type);
+  } catch (err) {
+    console.error("sendDocumentEmail: building the PDF failed", err instanceof Error ? err.message : err);
+    return { error: "Couldn't build the PDF. Try again." };
+  }
+  if ("error" in email) return { error: email.error };
+
+  try {
+    const { error: sendError } = await resend.emails.send({
+      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+      replyTo: RESEND_REPLY_TO,
+      to: email.to,
+      subject: email.subject,
+      text: email.text,
+      attachments: [{ filename: email.filename, content: email.pdf }],
+    });
+    if (sendError) {
+      console.error("sendDocumentEmail: send failed", sendError.message);
+      return { error: "The email didn't go out. Check the customer's address and try again." };
+    }
+  } catch (err) {
+    console.error("sendDocumentEmail: send threw", err instanceof Error ? err.message : err);
+    return { error: "The email didn't go out. Try again." };
+  }
 
   const { error: updateError } = await supabase
     .from("documents")
-    .update({
-      status: "sent",
-      sent_at: new Date().toISOString(),
-      due_date: dueDateForSend(data.type, dueDate),
-    })
+    .update({ status: "sent", sent_at: new Date().toISOString(), ...(email.extraUpdate ?? {}) })
     .eq("id", id);
-
-  if (updateError) throw new Error(updateError.message);
-
   revalidatePath(`/documents/${id}`);
   revalidatePath("/documents");
+  if (updateError) {
+    console.error("sendDocumentEmail: status update failed", updateError.message);
+    return { error: "The email went out, but the status didn't save. Don't resend; refresh the page." };
+  }
+  return { sent: true };
 }
 
 /** Office-only: builds a Stripe checkout link for an unpaid invoice so it can be texted or emailed. */
@@ -406,13 +420,13 @@ export async function getInvoicePaymentLink(
 const DEPOSIT_METHODS = ["card", "square", "check", "cash", "other"];
 
 /** Office-only: record (or clear, with an empty amount) the deposit received on a contract. */
-export async function recordContractDeposit(formData: FormData) {
-  await requireOffice();
+export async function recordContractDeposit(_prev: FormState, formData: FormData): Promise<FormState> {
+  if (await notOffice()) return { error: "Only the office or owner can do this." };
   const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("Missing contract id");
+  if (!id) return { error: "Missing contract. Refresh and try again." };
 
   const { data: doc } = await supabase.from("documents").select("id, type, total").eq("id", id).single();
-  if (!doc || doc.type !== "contract") throw new Error("Deposits can only be recorded on contracts");
+  if (!doc || doc.type !== "contract") return { error: "Deposits can only be recorded on contracts." };
 
   const raw = String(formData.get("amount") ?? "").trim();
   if (!raw) {
@@ -420,11 +434,11 @@ export async function recordContractDeposit(formData: FormData) {
       .from("documents")
       .update({ deposit_received_cents: null, deposit_received_at: null, deposit_method: null })
       .eq("id", id);
-    if (clearError) throw new Error(clearError.message);
+    if (clearError) return { error: "Couldn't clear the deposit. Try again." };
   } else {
     const amount = Number(raw.replace(/[$,]/g, ""));
-    if (!Number.isFinite(amount) || amount < 0) throw new Error("Enter a valid deposit amount");
-    if (doc.total != null && amount > Number(doc.total)) throw new Error("Deposit can't be more than the contract total");
+    if (!Number.isFinite(amount) || amount < 0) return { error: "Enter a valid deposit amount, like 1500 or 1,500.00." };
+    if (doc.total != null && amount > Number(doc.total)) return { error: "The deposit can't be more than the contract total." };
     const method = String(formData.get("method") ?? "other");
     const date = String(formData.get("received_at") ?? "").trim();
     const { error } = await supabase
@@ -435,7 +449,8 @@ export async function recordContractDeposit(formData: FormData) {
         deposit_method: DEPOSIT_METHODS.includes(method) ? method : "other",
       })
       .eq("id", id);
-    if (error) throw new Error(error.message);
+    if (error) return { error: "Couldn't save the deposit. Try again." };
   }
   revalidatePath(`/documents/${id}`);
+  return { saved: true };
 }

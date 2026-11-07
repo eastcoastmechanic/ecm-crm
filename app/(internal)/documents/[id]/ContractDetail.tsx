@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { sendDocumentEmail } from "./actions";
-import SubmitButton from "../../SubmitButton";
+import SendDocumentForm from "./SendDocumentForm";
 import ScheduleJobForm from "./ScheduleJobForm";
-import { buttonClass, buttonSecondaryClass, subTextClass } from "../../ui";
+import { buttonSecondaryClass, subTextClass } from "../../ui";
 import DocumentDeleteButton from "../DocumentDeleteButton";
 import DepositPanel from "./DepositPanel";
 import { BrandedFormShell } from "@/lib/branded-form-shell";
@@ -70,12 +69,7 @@ export default function ContractDetail({
         <DocumentDeleteButton id={doc.id} label="Contract" />
         {doc.status !== "signed" &&
           (hasEmail ? (
-            <form action={sendDocumentEmail} className="flex items-center gap-2">
-              <input type="hidden" name="id" value={doc.id} />
-              <SubmitButton className={buttonClass} pendingText="Sending…">
-                {doc.status === "sent" ? "Resend" : "Send to Customer"}
-              </SubmitButton>
-            </form>
+            <SendDocumentForm id={doc.id} label={doc.status === "sent" ? "Resend" : "Send to Customer"} />
           ) : (
             <span className={subTextClass}>No customer email on file — use Edit to add one</span>
           ))}

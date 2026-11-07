@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { sendDocumentEmail } from "./actions";
-import SubmitButton from "../../SubmitButton";
-import { headingClass, subTextClass, buttonClass, buttonSecondaryClass, itemSubClass } from "../../ui";
+import SendDocumentForm from "./SendDocumentForm";
+import { headingClass, subTextClass, buttonSecondaryClass, itemSubClass } from "../../ui";
 import DocumentDeleteButton from "../DocumentDeleteButton";
 
 type AssessmentItem = {
@@ -78,17 +77,7 @@ export default function AssessmentDetail({
           </a>
           <DocumentDeleteButton id={doc.id} label="Assessment" />
           {hasEmail ? (
-            <form action={sendDocumentEmail} className="flex items-center gap-2">
-              {doc.sent_at && (
-                <span className={subTextClass}>
-                  Last sent {new Date(doc.sent_at).toLocaleDateString()}
-                </span>
-              )}
-              <input type="hidden" name="id" value={doc.id} />
-              <SubmitButton className={buttonClass} pendingText="Sending…">
-                Email to Customer
-              </SubmitButton>
-            </form>
+            <SendDocumentForm id={doc.id} label="Email to Customer" lastSent={doc.sent_at ? new Date(doc.sent_at).toLocaleDateString("en-US", { timeZone: "America/New_York" }) : null} />
           ) : (
             <span className={subTextClass} title="Add an email to this customer to send documents">
               No customer email on file
