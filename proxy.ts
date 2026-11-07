@@ -50,7 +50,7 @@ function techMayAccess(pathname: string) {
   return TECH_ALLOWED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize"];
+const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize", "/api/microsoft/connect", "/api/microsoft/callback"];
 
 function isInternalPath(pathname: string) {
   if (INTERNAL_API_PATHS.includes(pathname)) return true;
@@ -231,5 +231,7 @@ export const config = {
     "/api/twilio/recordings/:path*",
     "/api/internal-chat",
     "/api/dispatch/optimize",
+    "/api/microsoft/connect",
+    "/api/microsoft/callback",
   ],
 };

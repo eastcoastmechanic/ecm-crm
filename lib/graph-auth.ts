@@ -23,7 +23,7 @@ function base64url(input: Buffer): string {
   return input.toString("base64url");
 }
 
-function buildClientAssertion(tenantId: string, clientId: string): string {
+export function buildClientAssertion(tenantId: string, clientId: string): string {
   const privateKeyPem = process.env.MS_GRAPH_CERT_PRIVATE_KEY!.replace(/\\n/g, "\n");
   const thumbprint = process.env.MS_GRAPH_CERT_THUMBPRINT!;
 

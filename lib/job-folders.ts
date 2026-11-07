@@ -16,7 +16,7 @@ import { one } from "@/lib/appointment-reminder";
 // Drive id of the ecmjobs "Shared Documents" library. Not a secret (it needs a token to use).
 const DEFAULT_DRIVE_ID = "b!KrU7O_CAqEyz8z4_XapXMKYJ4aCbNDBEjMXF7JiHendt6H_Hg0SKTKCuQWwSfurL";
 
-function driveId(): string {
+export function jobsDriveId(): string {
   return process.env.SHAREPOINT_JOBS_DRIVE_ID?.trim() || DEFAULT_DRIVE_ID;
 }
 
@@ -37,7 +37,7 @@ type DriveItem = { id?: string; webUrl?: string; name?: string };
 
 async function getFolder(name: string): Promise<{ status: number; item: DriveItem | null }> {
   const res = await graphFetch(
-    `/drives/${driveId()}/root:/${encodePath(`${parentFolder()}/${name}`)}?$select=id,webUrl,name`
+    `/drives/${jobsDriveId()}/root:/${encodePath(`${parentFolder()}/${name}`)}?$select=id,webUrl,name`
   );
   if (!res.ok) return { status: res.status, item: null };
   return { status: res.status, item: (await res.json()) as DriveItem };
@@ -48,7 +48,7 @@ async function findOrCreateFolder(name: string): Promise<DriveItem> {
   if (existing.item?.webUrl) return existing.item;
   if (existing.status !== 404) throw new Error(`folder lookup failed: ${existing.status}`);
 
-  const created = await graphFetch(`/drives/${driveId()}/root:/${encodePath(parentFolder())}:/children`, {
+  const created = await graphFetch(`/drives/${jobsDriveId()}/root:/${encodePath(parentFolder())}:/children`, {
     method: "POST",
     body: JSON.stringify({ name, folder: {}, "@microsoft.graph.conflictBehavior": "fail" }),
   });

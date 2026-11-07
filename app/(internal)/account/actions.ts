@@ -3,6 +3,8 @@
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { requireOwner } from "@/lib/require-role";
 import { postToTeams, teamsConfigured, type TeamsChannel } from "@/lib/teams";
+import { disconnect } from "@/lib/microsoft-delegated";
+import { revalidatePath } from "next/cache";
 
 export async function updatePassword(formData: FormData) {
   const password = formData.get("password") as string;
@@ -60,4 +62,16 @@ export async function sendTeamsTest() {
     results.push({ label, status: ok ? "sent" : "failed" });
   }
   return { results };
+}
+
+/** Owner-only. Forgets the saved Microsoft sign-in for OneNote. Notes keep saving in the CRM. */
+export async function disconnectOneNote(): Promise<{ error?: string }> {
+  try {
+    await requireOwner();
+  } catch {
+    return { error: "Only the owner can do this." };
+  }
+  await disconnect();
+  revalidatePath("/account");
+  return {};
 }
