@@ -57,6 +57,7 @@ export default function JobNotebook({
         folderUrl: null,
         folderName: null,
         folderNote: null,
+        oneNoteUrl: null,
         ...prev,
         error: undefined,
         notes: [note, ...(prev?.notes ?? [])],
@@ -85,6 +86,11 @@ export default function JobNotebook({
                 state.folderNote && <p className={itemSubClass}>{state.folderNote}</p>
               )}
               {state.folderUrl && state.folderName && <span className={itemSubClass}>{state.folderName}</span>}
+              {state.oneNoteUrl && (
+                <a href={state.oneNoteUrl} target="_blank" rel="noreferrer" className={buttonSecondaryClass}>
+                  Open in OneNote
+                </a>
+              )}
             </div>
           )}
 
