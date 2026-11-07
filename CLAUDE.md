@@ -62,6 +62,8 @@ Order, one PR each:
 3. (#60) Recurring maintenance visits from plans: add `visits_per_year` and `visit_months` (contract, copied to plan on signing), `maintenance_visits` table (SQL for Josh), daily cron creates the next due visit as an unscheduled maintenance job, "Needs scheduling" list, customer reminder to book plus follow-up, PM checklist starts from the right template, overdue plan visits show on dashboard.
 4. (#61) Optional: customer self-confirm link, lands as an owner alert.
 
+Decided by Josh (2026-11-06), campaigns (issue #65): who = customers with no finished job in 12+ months, plus a seasonal tune-up push (spring AC, fall heating) to everyone without an active plan; both skip anyone with an open job or active plan. Channel = text if allowed (`sms_consent` and `canText`), otherwise email. Josh writes the wording (a campaign can't send until he saves it). At most one campaign message per customer every 30 days. Owner presses Send; nothing is automatic. Retired the shared Basic-auth login (#143). `sms_consent` defaults to false (#144).
+
 Decided by Josh (2026-11-05): Wisetack financing is a yes. Offer "Pay monthly" on estimates and contracts (Phase 4, after Stage 1 security fixes). Fees and terms not checked yet.
 
 Decided by Josh (2026-10-25):
