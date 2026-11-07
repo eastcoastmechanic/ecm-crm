@@ -7,6 +7,7 @@ import { etDateKey } from "@/lib/tz";
 import {
   CAMPAIGN_GAP_DAYS,
   decide,
+  fill,
   emailBody,
   MAX_PER_SEND,
   smsBody,
@@ -42,23 +43,51 @@ type CustomerRow = {
   unsubscribe_token: string;
 };
 
+const PAGE = 1000;
+
+/**
+ * Every row, page by page. Supabase returns at most 1000 rows per request, and
+ * a cut-off list here could miss someone's open job or plan and message them
+ * anyway. Throws on any error so a partial list never sends.
+ */
+async function allRows<T>(
+  query: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await query(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    rows.push(...((data ?? []) as T[]));
+    if (!data || data.length < PAGE) return rows;
+  }
+}
+
 async function loadFacts() {
   const today = etDateKey();
-  const [customersRes, jobsRes, plansRes, sendsRes] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id, name, phone, email, sms_consent, email_opt_out_at, unsubscribe_token")
-      .order("name"),
-    supabase.from("jobs").select("customer_id, status, completed_at").not("customer_id", "is", null),
-    supabase.from("service_contracts").select("customer_id, status, end_date").eq("status", "active"),
-    supabase
-      .from("campaign_sends")
-      .select("customer_id, sent_at")
-      .is("error", null)
-      .gte("sent_at", new Date(Date.now() - CAMPAIGN_GAP_DAYS * 86_400_000).toISOString()),
+  const since = new Date(Date.now() - CAMPAIGN_GAP_DAYS * 86_400_000).toISOString();
+  const [customers, jobs, plans, sends] = await Promise.all([
+    allRows<CustomerRow>((a, b) =>
+      supabase
+        .from("customers")
+        .select("id, name, phone, email, sms_consent, email_opt_out_at, unsubscribe_token")
+        .order("id")
+        .range(a, b)
+    ),
+    allRows<{ customer_id: string; status: string; completed_at: string | null }>((a, b) =>
+      supabase.from("jobs").select("customer_id, status, completed_at").not("customer_id", "is", null).order("id").range(a, b)
+    ),
+    allRows<{ customer_id: string; end_date: string | null }>((a, b) =>
+      supabase.from("service_contracts").select("customer_id, end_date").eq("status", "active").order("id").range(a, b)
+    ),
+    allRows<{ customer_id: string; sent_at: string }>((a, b) =>
+      supabase.from("campaign_sends").select("customer_id, sent_at").is("error", null).gte("sent_at", since).order("id").range(a, b)
+    ),
   ]);
-  const error = customersRes.error ?? jobsRes.error ?? plansRes.error ?? sendsRes.error;
-  if (error) throw new Error(error.message);
+  customers.sort((x, y) => (x.name ?? "").localeCompare(y.name ?? ""));
+  const jobsRes = { data: jobs };
+  const plansRes = { data: plans };
+  const sendsRes = { data: sends };
+  const customersRes = { data: customers };
 
   const lastDone = new Map<string, string>();
   const open = new Set<string>();
@@ -178,6 +207,7 @@ export async function sendCampaign(kind: CampaignKind, template: Template): Prom
     }
 
     let error: string | null = null;
+    let emailTo: string | null = null;
     if (row.channel === "sms") {
       // Re-check consent right before sending (a STOP may have just come in).
       if (!(await textable(c))) error = "texting not allowed any more";
@@ -186,12 +216,24 @@ export async function sendCampaign(kind: CampaignKind, template: Template): Prom
         if (!sent.ok) error = sent.error ?? "text failed";
       }
     } else {
+      // Re-check right before sending: they may have unsubscribed (or changed email) since the list was built.
+      const { data: fresh, error: freshError } = await supabase
+        .from("customers")
+        .select("email, email_opt_out_at")
+        .eq("id", c.id)
+        .maybeSingle();
+      if (freshError || !fresh) error = "couldn't re-check their email settings";
+      else if (fresh.email_opt_out_at) error = "unsubscribed since the list was built";
+      else if (!fresh.email?.trim()) error = "no email any more";
+      else emailTo = fresh.email.trim();
+    }
+    if (row.channel === "email" && !error && emailTo) {
       try {
         const { error: mailError } = await resend.emails.send({
           from: `${COMPANY_NAME} <${RESEND_FROM_EMAIL}>`,
           replyTo: RESEND_REPLY_TO,
-          to: c.email!,
-          subject: template.email_subject!.trim(),
+          to: emailTo,
+          subject: fill(template.email_subject!, c.name).trim(),
           text: emailBody(template.email_body!, c.name, `${APP_URL}/unsubscribe/${c.unsubscribe_token}`),
           headers: { "List-Unsubscribe": `<${APP_URL}/unsubscribe/${c.unsubscribe_token}>` },
         });
