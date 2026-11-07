@@ -8,6 +8,7 @@ import FinishForm from "./FinishForm";
 import { formatEtTime } from "@/lib/tz";
 import OnSiteLine from "./OnSiteLine";
 import { jobFilesUrl } from "@/lib/job-files";
+import JobNotebook from "../jobs/JobNotebook";
 
 export function OnSite({ job }: { job: TruckJob }) {
   if (!job.arrived_at || (job.status !== "in_progress" && job.status !== "complete")) return null;
@@ -223,6 +224,10 @@ export default function TruckJobCard({
       {filesUrl && job.address && (
         <p className="mt-1 text-xs text-g300">Job files opens Teams. Folder is named {job.address}.</p>
       )}
+
+      <div className="mt-3">
+        <JobNotebook jobId={job.id} buttonClassName={linkButton} />
+      </div>
 
       {(primary || job.status === "in_progress") && (
         <div className="mt-3 flex gap-2">

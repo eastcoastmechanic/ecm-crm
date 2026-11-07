@@ -20,6 +20,7 @@
  */
 import { supabase } from "@/lib/supabase";
 import { graphConfigured, graphFetchWithRetry } from "@/lib/graph-auth";
+import { ensureJobFolder } from "@/lib/job-folders";
 
 const SITE_ORIGIN = "https://eastcoastmechanical.org";
 export const CONNECTION_ID = process.env.MS_GRAPH_CONNECTION_ID || "ecmcrm";
@@ -107,6 +108,14 @@ export async function deleteCustomerFromGraph(customerId: string): Promise<boole
 }
 
 export async function syncJobToGraph(jobId: string): Promise<boolean> {
+  // Job folder for this address: created the first time a job at it is synced, no-op after.
+  // Runs alongside the index sync, not before it, so the I'm here / Finish buttons do not
+  // wait on two SharePoint round trips. ensureJobFolder never throws.
+  const [, synced] = await Promise.all([ensureJobFolder(jobId), syncJobItem(jobId)]);
+  return synced;
+}
+
+async function syncJobItem(jobId: string): Promise<boolean> {
   try {
     const { data: job } = await supabase
       .from("jobs")

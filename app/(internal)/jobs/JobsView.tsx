@@ -8,6 +8,7 @@ import { addTask, completeTask } from "../tasks/actions";
 import SubmitButton from "../SubmitButton";
 import CreateInvoiceForm from "./CreateInvoiceForm";
 import AssignJobForm from "./AssignJobForm";
+import JobNotebook from "./JobNotebook";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 
 const statusOptions = ["requested", "scheduled", "in_progress", "complete", "cancelled"];
@@ -526,6 +527,8 @@ export default function JobsView({
             </form>
 
               <AssignJobForm jobId={job.id} assignedStaffId={job.assigned_staff_id ?? null} staff={staff} />
+
+              <JobNotebook jobId={job.id} />
 
               {job.photos && job.photos.length > 0 && (
                 <div className="flex flex-wrap gap-2">
