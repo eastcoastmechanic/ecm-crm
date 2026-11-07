@@ -25,4 +25,5 @@ The short version:
 - Customer texts only go out through `canText` and only to customers with `sms_consent`.
 - Times use America/New_York (`lib/tz.ts`), not UTC.
 - Job status changes go through `updateJobStatus` / job-lifecycle, so notifications and syncs keep firing.
+- Use your own folder: a separate clone or a `git worktree`, never a folder another agent is working in. Switching branches in a shared folder switches them for every agent in it.
 - Before you start, run `gh pr list` and look at recent commits. Another agent may already be working on the same thing.
