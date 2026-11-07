@@ -13,6 +13,7 @@ import {
   itemTitleClass,
   subTextClass,
 } from "../../ui";
+import ResultForm from "../../ResultForm";
 
 type Property = {
   id: string;
@@ -40,11 +41,9 @@ function EditPropertyForm({
   onDone: () => void;
 }) {
   return (
-    <form
-      action={async (formData) => {
-        await updateProperty(formData);
-        onDone();
-      }}
+    <ResultForm
+      submit={updateProperty}
+      onDone={onDone}
       className="grid gap-3 sm:grid-cols-2"
     >
       <input type="hidden" name="id" value={property.id} />
@@ -73,7 +72,7 @@ function EditPropertyForm({
           Cancel
         </button>
       </div>
-    </form>
+    </ResultForm>
   );
 }
 
@@ -87,11 +86,9 @@ function EditEquipmentForm({
   onDone: () => void;
 }) {
   return (
-    <form
-      action={async (formData) => {
-        await updateEquipment(formData);
-        onDone();
-      }}
+    <ResultForm
+      submit={updateEquipment}
+      onDone={onDone}
       className="grid gap-2 sm:grid-cols-2"
     >
       <input type="hidden" name="id" value={item.id} />
@@ -129,7 +126,7 @@ function EditEquipmentForm({
           Cancel
         </button>
       </div>
-    </form>
+    </ResultForm>
   );
 }
 

@@ -7,7 +7,7 @@ import { idsWhere, cascadeUnlinkEquipment, cascadeUnlinkJobs, cascadeUnlinkDocum
 import { NEW_CUSTOMER_VALUE } from "../intake-constants";
 import { requireOffice } from "@/lib/require-role";
 
-export async function addProperty(formData: FormData) {
+export async function addProperty(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
   let customer_id = formData.get("customer_id") as string;
   const address = (formData.get("address") as string)?.trim();
@@ -15,15 +15,15 @@ export async function addProperty(formData: FormData) {
   const access_notes = (formData.get("access_notes") as string)?.trim();
 
   if (!customer_id) {
-    throw new Error("Customer is required");
+    return { error: "Customer is required" };
   }
   if (!address) {
-    throw new Error("Address is required");
+    return { error: "Address is required" };
   }
 
   if (customer_id === NEW_CUSTOMER_VALUE) {
     const newCustomerName = (formData.get("new_customer_name") as string)?.trim();
-    if (!newCustomerName) throw new Error("New customer name is required");
+    if (!newCustomerName) return { error: "New customer name is required" };
     const resolved = await resolveCustomerPropertyEquipment({
       customerName: newCustomerName,
       phone: (formData.get("new_customer_phone") as string)?.trim() || null,
@@ -41,14 +41,15 @@ export async function addProperty(formData: FormData) {
   });
 
   if (error) {
-    throw new Error(error.message);
+    return { error: "Couldn't save. Try again." };
   }
 
   revalidatePath("/properties");
   revalidatePath("/customers");
+  return {};
 }
 
-export async function updateProperty(formData: FormData) {
+export async function updateProperty(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
   const id = formData.get("id") as string;
   const customer_id = formData.get("customer_id") as string;
@@ -56,9 +57,9 @@ export async function updateProperty(formData: FormData) {
   const property_type = formData.get("property_type") as string;
   const access_notes = (formData.get("access_notes") as string)?.trim();
 
-  if (!id) throw new Error("Missing property id");
-  if (!customer_id) throw new Error("Customer is required");
-  if (!address) throw new Error("Address is required");
+  if (!id) return { error: "Missing property id" };
+  if (!customer_id) return { error: "Customer is required" };
+  if (!address) return { error: "Address is required" };
 
   const { error } = await supabase
     .from("properties")
@@ -70,10 +71,11 @@ export async function updateProperty(formData: FormData) {
     })
     .eq("id", id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save. Try again." };
 
   revalidatePath("/properties");
   revalidatePath("/customers");
+  return {};
 }
 
 // Deletes a property and everything hanging off it — equipment, jobs,

@@ -5,6 +5,7 @@ import { addEquipment, scanNameplate, type ScannedNameplate } from "./actions";
 import { decodeManufactureDate } from "@/lib/pm/nameplate";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, buttonSecondaryClass, cardClass, errorClass, inputClass } from "../ui";
+import ResultForm from "../ResultForm";
 
 type Property = {
   id: string;
@@ -36,7 +37,7 @@ export default function EquipmentForm({ properties }: { properties: Property[] }
   }
 
   return (
-    <form key={JSON.stringify(extracted)} action={addEquipment} className={cardClass}>
+    <ResultForm key={JSON.stringify(extracted)} submit={addEquipment} resetOnDone className={cardClass}>
       <div className="flex flex-col gap-2 rounded-lg border border-white/8 bg-white/3 p-3 sm:col-span-2">
         <label className="text-xs font-bold uppercase tracking-wide text-g300">
           Scan Nameplate Photo (optional)
@@ -141,6 +142,6 @@ export default function EquipmentForm({ properties }: { properties: Property[] }
           Clear Scanned Fields
         </button>
       )}
-    </form>
+    </ResultForm>
   );
 }

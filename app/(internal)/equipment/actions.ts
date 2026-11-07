@@ -68,7 +68,7 @@ Read only what is legibly printed. Leave any field null if it isn't shown or you
   );
 }
 
-export async function addEquipment(formData: FormData) {
+export async function addEquipment(formData: FormData): Promise<{ error?: string }> {
   const property_id = formData.get("property_id") as string;
   const type = (formData.get("type") as string)?.trim();
   const brand = (formData.get("brand") as string)?.trim();
@@ -83,10 +83,10 @@ export async function addEquipment(formData: FormData) {
   const manufactureDate = blankToNull(formData.get("manufacture_date") as string);
 
   if (!property_id) {
-    throw new Error("Property is required");
+    return { error: "Property is required" };
   }
   if (!type) {
-    throw new Error("Equipment type is required");
+    return { error: "Equipment type is required" };
   }
 
   let nameplate: NameplateExtras | null = nameplateRaw ? JSON.parse(nameplateRaw) : null;
@@ -106,19 +106,20 @@ export async function addEquipment(formData: FormData) {
   });
 
   if (error) {
-    throw new Error(error.message);
+    return { error: "Couldn't save. Try again." };
   }
 
   revalidatePath("/equipment");
+  return {};
 }
 
-export async function updateEquipment(formData: FormData) {
+export async function updateEquipment(formData: FormData): Promise<{ error?: string }> {
   const id = formData.get("id") as string;
   const property_id = formData.get("property_id") as string;
   const type = (formData.get("type") as string)?.trim();
-  if (!id) throw new Error("Missing equipment id");
-  if (!property_id) throw new Error("Property is required");
-  if (!type) throw new Error("Equipment type is required");
+  if (!id) return { error: "Missing equipment id" };
+  if (!property_id) return { error: "Property is required" };
+  if (!type) return { error: "Equipment type is required" };
 
   // Only columns present on the form are written. The edit form does not send
   // refrigerant, barcode, or nameplate, and clearing those here would wipe a
@@ -132,9 +133,10 @@ export async function updateEquipment(formData: FormData) {
 
   const { error } = await supabase.from("equipment").update(patch).eq("id", id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save. Try again." };
 
   revalidatePath("/equipment");
+  return {};
 }
 
 // Deletes equipment and its diagnostics; unlinks any leads that reference it.
