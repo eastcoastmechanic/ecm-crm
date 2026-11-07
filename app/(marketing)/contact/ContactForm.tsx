@@ -38,6 +38,7 @@ export default function ContactForm() {
           name="message"
           required
           rows={5}
+          maxLength={5000}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           className={inputClass}

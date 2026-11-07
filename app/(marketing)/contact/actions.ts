@@ -17,11 +17,12 @@ export async function sendContactMessage(_prev: ContactState, formData: FormData
 
   const name = text(formData, "name", 200);
   const email = text(formData, "email", 200);
-  const message = text(formData, "message", 5000);
+  const message = String(formData.get("message") ?? "").trim();
 
   if (!name) return { error: "Please enter your name." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Please enter a valid email address." };
   if (!message) return { error: "Please include a message." };
+  if (message.length > 5000) return { error: "Please keep the message under 5,000 characters, or call us." };
 
   const sorry = `Sorry, your message didn't go through. Please try again, or call us at ${COMPANY_PHONE_DISPLAY}.`;
   // Before, a missing owner address or a failed send still said "thanks" and the message was lost.
