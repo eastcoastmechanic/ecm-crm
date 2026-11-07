@@ -60,8 +60,12 @@ export function pageTitle(job: PageJob): string {
   return [job.customerName?.trim() || "No customer", type, etDate(job.scheduledAt ?? job.createdAt)].join(" · ");
 }
 
-/** The page as first created: title, address and a link back to the job in the CRM. Notes are appended after. */
-export function pageHtml(job: PageJob, crmJobUrl: string): string {
+/**
+ * The page as first created: title, address, a link back to the CRM, and the
+ * notes being copied now. Notes go in with the page because a brand-new
+ * OneNote page can answer 404 to an update for a few seconds. Later notes are appended.
+ */
+export function pageHtml(job: PageJob, crmJobUrl: string, notes: PageNote[] = []): string {
   const title = escapeHtml(pageTitle(job));
   return [
     "<!DOCTYPE html><html><head>",
@@ -70,6 +74,7 @@ export function pageHtml(job: PageJob, crmJobUrl: string): string {
     "</head><body>",
     `<p>${escapeHtml(job.address?.trim() || "No address on file")}</p>`,
     `<p><a href="${escapeHtml(crmJobUrl)}">Open this job in the CRM</a></p>`,
+    ...notes.map(noteHtml),
     "</body></html>",
   ].join("");
 }
