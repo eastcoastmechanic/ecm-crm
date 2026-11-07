@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
-import { bearerToken, tokenMatches } from "@/lib/bearer-auth";
+import { bearerToken } from "@/lib/bearer-auth";
+import { sharedFieldBoardKeyMatches } from "@/lib/bot-keys";
 import { CRM_HUB_URL, FIELD_BOARD_URL } from "@/lib/field-board-links";
 import { applyJobStatus } from "@/lib/job-lifecycle";
 import { listOpenPlannerTasks } from "@/lib/planner-connector";
@@ -16,7 +17,7 @@ Do not invent customers, prices, or job details.
 If a CRM job id is known, include it. If it is not known, still log the field note — do not create a fake customer.
 CRM sheet (read): ${CRM_HUB_URL}/api/field-board/sheet
 CRM events (write): ${CRM_HUB_URL}/api/field-board/events
-Auth: Authorization: Bearer <FIELD_BOARD_SECRET>
+Auth: Authorization: Bearer <this bot's own key from CRM Account → Bot keys>
 On site / Active → crm_status in_progress, board_status active
 Done / Finished → crm_status complete, board_status finished
 `;
@@ -35,10 +36,8 @@ export function fieldBoardAuthorized(request: Request) {
   if (!token) return false;
   // Only the Field Board's own keys. CRON_SECRET and MCP_API_KEY used to work here
   // too, so a leak of either opened the field API. One secret per surface.
-  const secrets = [process.env.FIELD_BOARD_SECRET, process.env.FIELD_BOARD_APP_KEY];
-  // Check every secret (no early exit) so timing does not reveal which matched.
-  // tokenMatches fails closed on unset/empty values.
-  return secrets.reduce((ok, secret) => tokenMatches(token, secret) || ok, false);
+  // tokenMatches fails closed on unset/empty values. Per-bot keys: fieldBoardCaller in lib/bot-keys.ts.
+  return sharedFieldBoardKeyMatches(token);
 }
 
 type RelatedName = { name: string | null } | { name: string | null }[] | null;

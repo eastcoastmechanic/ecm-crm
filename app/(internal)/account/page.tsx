@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import ChangePasswordForm from "./ChangePasswordForm";
 import TeamsTestButton from "./TeamsTestButton";
 import OneNoteCard from "./OneNoteCard";
+import BotKeysCard, { type BotKeyRow } from "./BotKeysCard";
+import { supabase as db } from "@/lib/supabase";
 import { connectionStatus } from "@/lib/microsoft-delegated";
 import { headingClass, subTextClass, buttonClass } from "../ui";
 
@@ -16,6 +18,13 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const isOwner = (await headers()).get("x-staff-role") === "owner";
   const oneNote = isOwner ? await connectionStatus() : null;
   const oneNoteResult = isOwner ? ((await searchParams).onenote ?? null) : null;
+  const botKeys = isOwner
+    ? await db
+        .from("bot_keys")
+        .select("id, name, token_hint, created_at, last_used_at, revoked_at")
+        .order("created_at", { ascending: false })
+        .limit(50)
+    : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -57,6 +66,13 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             appear in.
           </p>
           <TeamsTestButton />
+        </div>
+      )}
+
+      {isOwner && botKeys && (
+        <div className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Bot keys</h2>
+          <BotKeysCard keys={(botKeys.data ?? []) as BotKeyRow[]} tableMissing={Boolean(botKeys.error)} />
         </div>
       )}
 

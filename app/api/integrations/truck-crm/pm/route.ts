@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fieldBoardAuthorized } from "@/lib/field-board";
+import { fieldBoardCaller } from "@/lib/bot-keys";
 import { isUuid, truckChecklists } from "@/lib/pm/db";
 import { truckPmPayload } from "@/lib/pm/truck-hook";
 
@@ -9,14 +9,14 @@ export const dynamic = "force-dynamic";
  * Read hook for the Truck CRM at ecm-field.grok.me.
  *
  * The truck is not called from this route. A later integration can GET this
- * with the same bearer the field board already uses (FIELD_BOARD_SECRET or
- * FIELD_BOARD_APP_KEY) and render the payload.
+ * with the same bearer the field board already uses (a bot key, or the old
+ * shared FIELD_BOARD_SECRET / FIELD_BOARD_APP_KEY) and render the payload.
  *
  *   GET /api/integrations/truck-crm/pm?job_id=<uuid>
- *   Authorization: Bearer <field board secret>
+ *   Authorization: Bearer <field board key>
  */
 export async function GET(request: Request) {
-  if (!fieldBoardAuthorized(request)) {
+  if (!(await fieldBoardCaller(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
