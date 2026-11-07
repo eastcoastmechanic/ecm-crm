@@ -99,7 +99,8 @@ const addCustomerTool = betaZodTool({
   run: async ({ name, phone, email, notes }) => {
     const { data, error } = await supabase
       .from("customers")
-      .insert({ name, phone: phone || null, email: email || null, notes: notes || null })
+      // No consent box here, so texting stays off until someone records consent.
+      .insert({ name, phone: phone || null, email: email || null, notes: notes || null, sms_consent: false })
       .select("id")
       .single();
     if (error) return `Failed to add customer: ${error.message}`;
