@@ -10,7 +10,6 @@ import {
   setLeadStage,
   deleteLead,
 } from "./actions";
-import SubmitButton from "../SubmitButton";
 import LeadBoard, { type BoardLead } from "./LeadBoard";
 import {
   inputClass,
@@ -95,17 +94,25 @@ function leadAddress(lead: Lead) {
 
 function AddLeadModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <form
-        action={async (formData) => {
+        // Submitted by hand (not the action prop) so a failed save keeps what was typed.
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
           setError("");
+          setSaving(true);
           try {
-            await addManualLead(formData);
-            onClose();
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to save lead");
+            const result = await addManualLead(formData);
+            if (result.error) setError(result.error);
+            else onClose();
+          } catch {
+            setError("Couldn't save the lead. Try again.");
+          } finally {
+            setSaving(false);
           }
         }}
         className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-white/8 bg-navy p-5"
@@ -150,9 +157,9 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 
         {error && <p className={errorClass}>{error}</p>}
 
-        <SubmitButton className={buttonClass} pendingText="Saving…">
-          Save lead
-        </SubmitButton>
+        <button type="submit" disabled={saving} className={`${buttonClass} disabled:opacity-50`}>
+          {saving ? "Saving…" : "Save lead"}
+        </button>
       </form>
     </div>
   );
@@ -215,9 +222,27 @@ function LeadCard({
       const fd = new FormData();
       fd.set("id", lead.id);
       fd.set("draft_message", draftValue);
-      await updateLeadDraft(fd);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to save draft");
+      const result = await updateLeadDraft(fd);
+      if (result.error) setSaveError(`Draft not saved: ${result.error}`);
+    } catch {
+      setSaveError("Draft not saved. Try again.");
+    }
+  }
+
+  // Mark Contacted / Dismiss / Send: show the reason on the card instead of a blank error page.
+  const [busy, setBusy] = useState<string | null>(null);
+  async function runAction(name: string, action: (fd: FormData) => Promise<{ error?: string }>, fields: Record<string, string>) {
+    setSaveError("");
+    setBusy(name);
+    try {
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(fields)) fd.set(k, v);
+      const result = await action(fd);
+      if (result.error) setSaveError(result.error);
+    } catch {
+      setSaveError("Something went wrong. Try again.");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -327,27 +352,31 @@ function LeadCard({
 
             {lead.status === "new" && (
               <>
-                <form action={markContacted}>
-                  <input type="hidden" name="id" value={lead.id} />
-                  <SubmitButton className={buttonSecondaryClass}>Mark Contacted</SubmitButton>
-                </form>
-                <form action={dismissLead}>
-                  <input type="hidden" name="id" value={lead.id} />
-                  <SubmitButton className={buttonSecondaryClass}>Dismiss</SubmitButton>
-                </form>
+                <button
+                  type="button"
+                  disabled={!!busy}
+                  onClick={() => runAction("contacted", markContacted, { id: lead.id })}
+                  className={`${buttonSecondaryClass} disabled:opacity-50`}
+                >
+                  {busy === "contacted" ? "Saving…" : "Mark Contacted"}
+                </button>
+                <button
+                  type="button"
+                  disabled={!!busy}
+                  onClick={() => runAction("dismiss", dismissLead, { id: lead.id })}
+                  className={`${buttonSecondaryClass} disabled:opacity-50`}
+                >
+                  {busy === "dismiss" ? "Saving…" : "Dismiss"}
+                </button>
                 {lead.auto_sendable && (
-                  <form
-                    action={async () => {
-                      const fd = new FormData();
-                      fd.set("id", lead.id);
-                      fd.set("draft_message", draftValue);
-                      await sendLeadOutreach(fd);
-                    }}
+                  <button
+                    type="button"
+                    disabled={!!busy}
+                    onClick={() => runAction("send", sendLeadOutreach, { id: lead.id, draft_message: draftValue })}
+                    className={`${buttonClass} disabled:opacity-50`}
                   >
-                    <SubmitButton className={buttonClass} pendingText="Sending…">
-                      Send via {lead.channel === "sms" ? "Text" : "Email"}
-                    </SubmitButton>
-                  </form>
+                    {busy === "send" ? "Sending…" : `Send via ${lead.channel === "sms" ? "Text" : "Email"}`}
+                  </button>
                 )}
               </>
             )}
