@@ -79,6 +79,20 @@ export async function updateCustomer(formData: FormData) {
   if (!id) throw new Error("Missing customer id");
   if (!name) throw new Error("Name is required");
 
+  // Stamp the consent time only when the box goes from off to on. Saving a
+  // customer who was on with no time (old default, see SQL 0064) leaves the
+  // time empty, so they stay visibly unconfirmed. Turning it off clears it.
+  const { data: current } = await supabase
+    .from("customers")
+    .select("sms_consent, sms_consent_at")
+    .eq("id", id)
+    .single();
+  const sms_consent_at = !sms_consent
+    ? null
+    : current?.sms_consent
+      ? (current.sms_consent_at ?? null)
+      : new Date().toISOString();
+
   const { error } = await supabase
     .from("customers")
     .update({
@@ -90,6 +104,7 @@ export async function updateCustomer(formData: FormData) {
       alt_phone: alt_phone || null,
       notes: notes || null,
       sms_consent,
+      sms_consent_at,
     })
     .eq("id", id);
 
