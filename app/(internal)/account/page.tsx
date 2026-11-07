@@ -3,15 +3,19 @@ import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { headers } from "next/headers";
 import ChangePasswordForm from "./ChangePasswordForm";
 import TeamsTestButton from "./TeamsTestButton";
+import OneNoteCard from "./OneNoteCard";
+import { connectionStatus } from "@/lib/microsoft-delegated";
 import { headingClass, subTextClass, buttonClass } from "../ui";
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ onenote?: string }> }) {
   const supabase = await createPortalServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const isOwner = (await headers()).get("x-staff-role") === "owner";
+  const oneNote = isOwner ? await connectionStatus() : null;
+  const oneNoteResult = isOwner ? ((await searchParams).onenote ?? null) : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -23,9 +27,7 @@ export default async function AccountPage() {
       {!user ? (
         <div className="flex flex-col gap-3 rounded-xl border border-white/8 bg-white/3 p-4">
           <p className={subTextClass}>
-            You&apos;re viewing this through the shared access password, not a personal sign-in, so
-            there&apos;s no account here to manage yet. Sign in with your email once to set up a
-            personal password.
+            You&apos;re not signed in. Sign in with your email to manage your password.
           </p>
           <Link href="/login" className={`${buttonClass} w-fit`}>
             Sign In
@@ -55,6 +57,19 @@ export default async function AccountPage() {
             appear in.
           </p>
           <TeamsTestButton />
+        </div>
+      )}
+
+      {isOwner && oneNote && (
+        <div className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-g300">OneNote</h2>
+          <OneNoteCard
+            connected={oneNote.connected}
+            account={oneNote.account}
+            connectedAt={oneNote.connectedAt}
+            lastError={oneNote.lastError}
+            result={oneNoteResult}
+          />
         </div>
       )}
     </div>
