@@ -10,7 +10,7 @@ import {
   leadSources,
   LEAD_REPORT_STAGES,
   NOT_LINKED,
-  partsCost,
+  partsCostFromDocs,
   revenueByType,
   type CostLine,
 } from "@/lib/reports";
@@ -59,7 +59,7 @@ type DocRow = {
   paid_at: string | null;
   job_id: string | null;
   balance_for_job_id: string | null;
-  line_items: { items?: CostLine[] } | null;
+  line_items: { items?: CostLine[]; fromDocumentId?: string | null } | null;
 };
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
@@ -119,29 +119,54 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     supabase.from("jobs").select("id, job_type, document_id"),
     supabase.from("staff").select("id, name, email"),
   ]);
-  const loadError = [jobsRes, paidRes, leadsRes, entriesRes, allJobsRes, staffRes].find((r) => r.error)?.error;
+  let loadError = [jobsRes, paidRes, leadsRes, entriesRes, allJobsRes, staffRes].some((r) => r.error);
 
   const jobs = ((jobsRes.data ?? []) as JobRow[]).filter((j) => inPeriod(j.completed_at));
   const jobIds = jobs.map((j) => j.id);
   const priceDocIds = jobs.map((j) => j.document_id).filter((id): id is string => !!id);
 
   // Documents that price these jobs: the linked contract/estimate, or invoices made for the job.
+  // Also every clocked minute on these jobs, whenever it was worked (not just inside the period).
   const linkedDocs: DocRow[] = [];
+  const sourceItems = new Map<string, CostLine[] | null>();
+  let jobEntries: { job_id: string; started_at: string; ended_at: string | null }[] = [];
   if (jobIds.length > 0) {
     const ids = jobIds.join(",");
     const filters = [`job_id.in.(${ids})`, `balance_for_job_id.in.(${ids})`];
     if (priceDocIds.length > 0) filters.push(`id.in.(${priceDocIds.join(",")})`);
-    const { data } = await supabase
-      .from("documents")
-      .select("id, type, status, total, paid_at, job_id, balance_for_job_id, line_items")
-      .or(filters.join(","))
-      .neq("status", "void");
-    linkedDocs.push(...((data ?? []) as DocRow[]));
+    const [docsRes, timeRes] = await Promise.all([
+      supabase
+        .from("documents")
+        .select("id, type, status, total, paid_at, job_id, balance_for_job_id, line_items")
+        .or(filters.join(","))
+        .neq("status", "void"),
+      supabase.from("job_time_entries").select("job_id, started_at, ended_at").in("job_id", jobIds).not("ended_at", "is", null),
+    ]);
+    if (docsRes.error || timeRes.error) loadError = true;
+    linkedDocs.push(...((docsRes.data ?? []) as DocRow[]));
+    jobEntries = timeRes.data ?? [];
+
+    // A contract keeps no line items; its parts list is on the estimate it was made from.
+    const fromIds = linkedDocs
+      .map((d) => d.line_items?.fromDocumentId)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+    if (fromIds.length > 0) {
+      const { data, error } = await supabase.from("documents").select("id, line_items").in("id", fromIds);
+      if (error) loadError = true;
+      for (const d of (data ?? []) as Pick<DocRow, "id" | "line_items">[]) {
+        sourceItems.set(d.id, Array.isArray(d.line_items?.items) ? d.line_items.items : null);
+      }
+    }
   }
   const docById = new Map(linkedDocs.map((d) => [d.id, d]));
+  const itemsFor = (d: DocRow): CostLine[] | null => {
+    if (Array.isArray(d.line_items?.items)) return d.line_items.items;
+    const from = d.line_items?.fromDocumentId;
+    return from ? (sourceItems.get(from) ?? null) : null;
+  };
 
   const hourlyRate = Number(process.env.HOURLY_LABOR_RATE) || null;
-  const clocked = hoursByJob(entriesRes.data ?? []);
+  const clocked = hoursByJob(jobEntries);
 
   // ---- Profit per job ----
   const profitRows = jobs.map((job) => {
@@ -153,8 +178,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     );
     const pricedBy = priceDoc ? [priceDoc] : invoices;
     const price = pricedBy.length > 0 ? pricedBy.reduce((s, d) => s + (d.total ?? 0), 0) : null;
-    const lines = pricedBy.flatMap((d) => d.line_items?.items ?? []);
-    const parts = pricedBy.length > 0 ? partsCost(lines) : null;
+    const parts = partsCostFromDocs(pricedBy.map(itemsFor));
     const hours = clocked.get(job.id) ?? (job.tracked_hours && job.tracked_hours > 0 ? job.tracked_hours : null);
     const collected = invoices.filter((d) => d.status === "paid").reduce((s, d) => s + (d.total ?? 0), 0);
     return { job, hours, collected, ...jobProfit({ price, parts, hours, hourlyRate }) };

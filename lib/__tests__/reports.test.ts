@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { etMonthKey, hoursByJob, jobProfit, leadSources, NOT_LINKED, partsCost, revenueByType } from "../reports";
+import {
+  etMonthKey,
+  hoursByJob,
+  jobProfit,
+  leadSources,
+  NOT_LINKED,
+  partsCost,
+  partsCostFromDocs,
+  revenueByType,
+} from "../reports";
 
 describe("etMonthKey", () => {
   it("uses the New York month, not UTC", () => {
@@ -26,6 +35,22 @@ describe("partsCost", () => {
 
   it("ignores unpriced lines with no cost (notes, headings)", () => {
     expect(partsCost([{ qty: 1, better: null, cost: null }]).incomplete).toBe(false);
+  });
+});
+
+describe("partsCostFromDocs", () => {
+  it("is null when no document has line items (contract with no estimate)", () => {
+    expect(partsCostFromDocs([null])).toBeNull();
+  });
+
+  it("marks the cost incomplete when one pricing document has no items", () => {
+    expect(partsCostFromDocs([[{ qty: 1, better: 100, cost: 30 }], null])).toEqual({ cost: 30, incomplete: true });
+  });
+
+  it("adds across documents", () => {
+    expect(
+      partsCostFromDocs([[{ qty: 1, better: 100, cost: 30 }], [{ qty: 2, better: 50, cost: 5 }]])
+    ).toEqual({ cost: 40, incomplete: false });
   });
 });
 

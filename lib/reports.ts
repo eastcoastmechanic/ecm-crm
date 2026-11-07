@@ -41,7 +41,20 @@ export function partsCost(items: CostLine[]): { cost: number; incomplete: boolea
   return { cost: r2(cost), incomplete };
 }
 
-export type TimeEntry = { job_id: string; started_at: string; ended_at: string | null };
+/**
+ * Parts cost across the documents that price a job. Each entry is that
+ * document's line items, or null when it has none (a contract made without an
+ * estimate). No lists at all gives null ("no parts list"); some missing marks
+ * the total incomplete.
+ */
+export function partsCostFromDocs(lists: (CostLine[] | null)[]): { cost: number; incomplete: boolean } | null {
+  const known = lists.filter((l): l is CostLine[] => Array.isArray(l));
+  if (known.length === 0) return null;
+  const sum = partsCost(known.flat());
+  return { cost: sum.cost, incomplete: sum.incomplete || known.length < lists.length };
+}
+
+export type TimeEntry ={ job_id: string; started_at: string; ended_at: string | null };
 
 /** Clocked hours per job from finished job timer entries (work and drive). Open entries are skipped. */
 export function hoursByJob(entries: TimeEntry[]): Map<string, number> {
