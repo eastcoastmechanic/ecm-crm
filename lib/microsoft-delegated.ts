@@ -17,7 +17,8 @@ import { decryptToken, encryptToken } from "@/lib/token-crypto";
 export const CONNECTION_ID = "onenote";
 /** Short-lived httpOnly cookie holding the sign-in state and PKCE verifier (/api/microsoft only). */
 export const OAUTH_COOKIE = "ms_onenote_oauth";
-const SCOPES = "openid profile offline_access User.Read Notes.ReadWrite.All";
+// Sites.Read.All (read only) finds the ecmjobs site from its document library; Notes.ReadWrite.All writes the pages.
+const SCOPES = "openid profile offline_access User.Read Sites.Read.All Notes.ReadWrite.All";
 const TOKEN_PURPOSE = "ecm-crm microsoft refresh token v1";
 
 function tenantId() {
@@ -94,7 +95,8 @@ function accountFromIdToken(idToken: string | undefined): string | null {
   }
 }
 
-let cached: { token: string; expiresAt: number } | null = null;
+// Tied to the connection it came from (connected_at), so a reconnect or disconnect drops it.
+let cached: { token: string; expiresAt: number; connectedAtMs: number } | null = null;
 
 /** Finish the sign-in: trade the code for tokens and store the refresh token, encrypted. */
 export async function completeSignIn(input: {
@@ -114,17 +116,22 @@ export async function completeSignIn(input: {
     return { ok: false, error: json.error ?? "no_refresh_token" };
   }
   const account = accountFromIdToken(json.id_token);
+  const connectedAt = new Date();
   const { error } = await supabase.from("microsoft_connections").upsert({
     id: CONNECTION_ID,
     account,
     refresh_token_enc: encryptToken(json.refresh_token, sealSecret(), TOKEN_PURPOSE),
     connected_by: input.staffId,
-    connected_at: new Date().toISOString(),
+    connected_at: connectedAt.toISOString(),
     last_error: null,
-    updated_at: new Date().toISOString(),
+    updated_at: connectedAt.toISOString(),
   });
   if (error) return { ok: false, error: "save_failed" };
-  cached = { token: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000 };
+  cached = {
+    token: json.access_token,
+    expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000,
+    connectedAtMs: connectedAt.getTime(),
+  };
   return { ok: true, account };
 }
 
@@ -160,15 +167,21 @@ export async function disconnect(): Promise<void> {
  * has expired; the reason is saved on the row for /account to show.
  */
 export async function getDelegatedToken(): Promise<string | null> {
-  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
   if (!delegatedConfigured()) return null;
 
+  // Read the connection every time, even with a cached token: a disconnect or
+  // reconnect on another server instance must take effect here at once.
   const { data } = await supabase
     .from("microsoft_connections")
-    .select("refresh_token_enc")
+    .select("refresh_token_enc, connected_at")
     .eq("id", CONNECTION_ID)
     .maybeSingle();
-  if (!data?.refresh_token_enc) return null;
+  if (!data?.refresh_token_enc) {
+    cached = null;
+    return null;
+  }
+  const connectedAtMs = new Date(data.connected_at as string).getTime();
+  if (cached && cached.connectedAtMs === connectedAtMs && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
   const refreshToken = decryptToken(data.refresh_token_enc as string, sealSecret(), TOKEN_PURPOSE);
   if (!refreshToken) {
@@ -192,7 +205,7 @@ export async function getDelegatedToken(): Promise<string | null> {
   if (json.refresh_token) update.refresh_token_enc = encryptToken(json.refresh_token, sealSecret(), TOKEN_PURPOSE);
   await supabase.from("microsoft_connections").update(update).eq("id", CONNECTION_ID);
 
-  cached = { token: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000 };
+  cached = { token: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000, connectedAtMs };
   return cached.token;
 }
 
