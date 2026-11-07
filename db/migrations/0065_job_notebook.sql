@@ -1,4 +1,4 @@
--- Job notebook (PR: feat/job-notebook).
+-- 0065: job notebook (was 0060 in the first draft of #118; 0060 went to review requests).
 --
 --   job_notes                 : dated notes on one job, with who wrote them. Shown in the Notebook
 --                               panel on the Jobs page and on the truck card.
@@ -26,3 +26,9 @@ create index if not exists job_notes_job_id_created_at_idx
   on job_notes (job_id, created_at desc);
 
 alter table job_notes enable row level security;
+revoke all on job_notes from anon, authenticated;
+
+-- Check: should list job_notes, files_folder_url and files_folder_id.
+select table_name, column_name from information_schema.columns
+where (table_name = 'job_notes' and column_name = 'body')
+   or (table_name = 'properties' and column_name in ('files_folder_url', 'files_folder_id'));

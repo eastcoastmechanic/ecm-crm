@@ -21,11 +21,11 @@ const FOLDER_NOTES: Record<string, string> = {
   no_property: "This job has no property yet, so there is no address to name a folder after.",
   no_address: "This property has no usable address for a folder name.",
   not_configured: "SharePoint is not connected here yet.",
-  needs_migration: "Run db/migrations/0060_job_notebook.sql in Supabase to turn on job folders.",
+  needs_migration: "Run db/migrations/0065_job_notebook.sql in Supabase to turn on job folders.",
   graph_error: "Could not reach the SharePoint folder. Notes still save here.",
 };
 
-const MIGRATION_MESSAGE = "Run db/migrations/0060_job_notebook.sql in Supabase to turn on the notebook.";
+const MIGRATION_MESSAGE = "Run db/migrations/0065_job_notebook.sql in Supabase to turn on the notebook.";
 const MAX_NOTE_LENGTH = 4000;
 
 function folderFields(folder: FolderResult) {
