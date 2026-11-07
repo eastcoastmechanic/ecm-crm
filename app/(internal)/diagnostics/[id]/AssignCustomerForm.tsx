@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { startTransition, useActionState, useMemo, useState } from "react";
 import { REFRIGERANT_TYPES } from "@/lib/refrigerant";
-import { assignCustomer } from "./actions";
-import SubmitButton from "../../SubmitButton";
-import { buttonClass, buttonSecondaryClass, inputClass } from "../../ui";
+import { assignCustomer, type ReportState } from "./actions";
+import { buttonClass, buttonSecondaryClass, errorClass, inputClass } from "../../ui";
 
 type Customer = { id: string; name: string };
 type Property = { id: string; address: string; customer_id: string | null };
@@ -21,6 +20,7 @@ export default function AssignCustomerForm({
   properties: Property[];
   equipment: Equipment[];
 }) {
+  const [state, save, saving] = useActionState<ReportState, FormData>(assignCustomer, null);
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [customerId, setCustomerId] = useState("");
   const [propertyId, setPropertyId] = useState("");
@@ -60,7 +60,15 @@ export default function AssignCustomerForm({
         </button>
       </div>
 
-      <form action={assignCustomer} className="mt-4 flex flex-col gap-3">
+      {/* Submitted by hand (not the action prop) so React does not clear what was typed when a save fails. */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const data = new FormData(e.currentTarget);
+          startTransition(() => save(data));
+        }}
+        className="mt-4 flex flex-col gap-3"
+      >
         <input type="hidden" name="diagnostic_id" value={diagnosticId} />
 
         {mode === "existing" ? (
@@ -177,7 +185,14 @@ export default function AssignCustomerForm({
           </label>
         </div>
 
-        <SubmitButton className={`${buttonClass} w-fit`}>Assign Customer</SubmitButton>
+        {state?.error && (
+          <p role="alert" className={errorClass}>
+            {state.error}
+          </p>
+        )}
+        <button type="submit" disabled={saving} className={`${buttonClass} w-fit disabled:opacity-50`}>
+          {saving ? "Saving…" : "Assign Customer"}
+        </button>
       </form>
     </section>
   );

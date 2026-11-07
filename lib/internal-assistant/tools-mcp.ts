@@ -318,7 +318,8 @@ const executors: Record<string, ActionExecutor> = {
     const { diagnosticId } = input as { diagnosticId: string };
     const fd = new FormData();
     fd.set("id", diagnosticId);
-    await sendServiceReportEmail(fd);
+    const result = await sendServiceReportEmail(null, fd);
+    if (result?.error) throw new Error(result.error);
     return `Sent service report ${diagnosticId}.`;
   },
   charge_customer: async (input) => {
