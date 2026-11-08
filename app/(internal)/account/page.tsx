@@ -9,6 +9,29 @@ import { supabase as db } from "@/lib/supabase";
 import { connectionStatus } from "@/lib/microsoft-delegated";
 import { headingClass, subTextClass, buttonClass } from "../ui";
 
+const BOT_KEY_COLUMNS = "id, name, token_hint, created_at, last_used_at, revoked_at";
+const REVOKED_KEYS_SHOWN = 20;
+
+async function loadBotKeys(): Promise<{ keys: BotKeyRow[]; tableMissing: boolean }> {
+  const [live, revoked] = await Promise.all([
+    db
+      .from("bot_keys")
+      .select(BOT_KEY_COLUMNS)
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false }),
+    db
+      .from("bot_keys")
+      .select(BOT_KEY_COLUMNS)
+      .not("revoked_at", "is", null)
+      .order("revoked_at", { ascending: false })
+      .limit(REVOKED_KEYS_SHOWN),
+  ]);
+  return {
+    keys: [...(live.data ?? []), ...(revoked.data ?? [])] as BotKeyRow[],
+    tableMissing: Boolean(live.error || revoked.error),
+  };
+}
+
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ onenote?: string }> }) {
   const supabase = await createPortalServerClient();
   const {
@@ -18,13 +41,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const isOwner = (await headers()).get("x-staff-role") === "owner";
   const oneNote = isOwner ? await connectionStatus() : null;
   const oneNoteResult = isOwner ? ((await searchParams).onenote ?? null) : null;
-  const botKeys = isOwner
-    ? await db
-        .from("bot_keys")
-        .select("id, name, token_hint, created_at, last_used_at, revoked_at")
-        .order("created_at", { ascending: false })
-        .limit(50)
-    : null;
+  // Every live key is listed (no cap) so each one keeps its Revoke button.
+  // Only the revoked history is capped.
+  const botKeys = isOwner ? await loadBotKeys() : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -72,7 +91,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       {isOwner && botKeys && (
         <div className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
           <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Bot keys</h2>
-          <BotKeysCard keys={(botKeys.data ?? []) as BotKeyRow[]} tableMissing={Boolean(botKeys.error)} />
+          <BotKeysCard keys={botKeys.keys} tableMissing={botKeys.tableMissing} />
         </div>
       )}
 
