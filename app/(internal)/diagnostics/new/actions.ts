@@ -244,7 +244,10 @@ ${priceBookText}`;
 
   const equipmentLabel = equipment
     ? `${equipment.type}${equipment.brand ? ` — ${equipment.brand}` : ""}${equipment.model ? ` ${equipment.model}` : ""}`
-    : newEquipmentType ?? "unknown (not yet on file)";
+    : newEquipmentType
+      ? // A new unit typed on the form (saved below for a walk-in): same label as one on file.
+        `${newEquipmentType}${newEquipmentBrand ? ` — ${newEquipmentBrand}` : ""}${newEquipmentModel ? ` ${newEquipmentModel}` : ""}`
+      : "unknown (not yet on file)";
 
   const userMessage = `Equipment: ${equipmentLabel}
 Refrigerant: ${refrigerant ?? "unknown"}
