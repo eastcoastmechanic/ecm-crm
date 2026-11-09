@@ -7,13 +7,23 @@ import PropertiesEquipmentSection from "./PropertiesEquipmentSection";
 import DeleteRecordButton from "../../DeleteRecordButton";
 import { deleteCustomer } from "../actions";
 import { formatEtDate, formatEtShortDateTime } from "@/lib/tz";
+import { getStaffRole } from "@/lib/require-role";
+import { pageLimit } from "@/lib/fetch-all";
+import { buildCustomerTimeline, parseTimelineFilter, TIMELINE_PAGE_MAX, TIMELINE_PAGE_STEP } from "@/lib/customer-timeline";
+import CustomerTimeline from "./CustomerTimeline";
+import { loadCustomerTimeline } from "./timeline-data";
 
 export default async function CustomerProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ timeline?: string; show?: string }>;
 }) {
   const { id } = await params;
+  const query = await searchParams;
+  const timelineFilter = parseTimelineFilter(query.timeline);
+  const timelineLimit = pageLimit(query.show, TIMELINE_PAGE_STEP, TIMELINE_PAGE_MAX);
 
   const { data: customer, error } = await supabase
     .from("customers")
@@ -54,7 +64,7 @@ export default async function CustomerProfilePage({
     property_id: string;
   };
 
-  const [{ data: equipment }, { data: jobs }, { data: documents }, { data: diagnostics }] =
+  const [{ data: equipment }, { data: jobs }, { data: documents }, { data: diagnostics }, timeline, role] =
     await Promise.all([
       propertyIds.length
         ? supabase
@@ -80,6 +90,8 @@ export default async function CustomerProfilePage({
             .order("created_at", { ascending: false })
             .returns<CustomerDiagnostic[]>()
         : Promise.resolve({ data: [] as CustomerDiagnostic[] }),
+      loadCustomerTimeline(id),
+      getStaffRole(),
     ]);
 
   const equipmentByProperty: Record<string, CustomerEquipment[]> = {};
@@ -92,6 +104,9 @@ export default async function CustomerProfilePage({
   const customerDiagnostics = (diagnostics ?? []).filter((d) =>
     d.equipment?.property_id ? propertyIds.includes(d.equipment.property_id) : false
   );
+
+  // /customers is owner/office only (proxy.ts); amounts are still dropped on the server for any other role.
+  const timelineItems = buildCustomerTimeline(timeline.sources, { showMoney: role === "owner" || role === "office" });
 
   return (
     <div className="flex flex-col gap-8">
@@ -162,6 +177,14 @@ export default async function CustomerProfilePage({
         customerId={id}
         properties={properties ?? []}
         equipmentByProperty={equipmentByProperty}
+      />
+
+      <CustomerTimeline
+        customerId={id}
+        items={timelineItems}
+        filter={timelineFilter}
+        limit={timelineLimit}
+        failed={timeline.failed}
       />
 
       <section className="flex flex-col gap-2">
