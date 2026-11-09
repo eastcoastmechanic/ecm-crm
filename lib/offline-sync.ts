@@ -5,6 +5,7 @@ import { checkJobAccess, getMyStaffId } from "@/lib/job-access";
 import { getFinishBlockers } from "@/lib/job-checklist";
 import { startJobEntry } from "@/lib/time-clock";
 import { sendOnWayNotice } from "@/lib/on-way-notice";
+import { noteJobStep } from "@/lib/planner-connector";
 import { syncJobNotesToOneNote } from "@/lib/onenote-sync";
 import {
   clampTapTime,
@@ -95,6 +96,8 @@ async function onMyWay(req: SyncRequest, now: Date): Promise<SyncResult> {
     }
   }
   await startTimer(req.jobId, "drive", at, now);
+  // Logged at the tap time on the job's Planner card. Best effort.
+  await noteJobStep(req.jobId, "on_way", { at });
   return { ok: true };
 }
 
