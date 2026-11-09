@@ -27,6 +27,7 @@ const INTERNAL_PATH_PREFIXES = [
   "/tech-hub",
   "/procurement",
   "/campaigns",
+  "/log",
   "/pm",
   "/api/twilio/recordings",
 ];

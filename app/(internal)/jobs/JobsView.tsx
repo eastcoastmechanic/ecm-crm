@@ -128,14 +128,17 @@ export default function JobsView({
   tasks,
   staff,
   hourlyRate,
+  initialView = "calendar",
 }: {
   jobs: Job[];
   tasks: Task[];
   staff: { id: string; name: string }[];
   hourlyRate: number | null;
+  /** "list" when a link points at one job (/jobs?view=list#job-<id>, from the Log). */
+  initialView?: "calendar" | "list";
 }) {
   const router = useRouter();
-  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [view, setView] = useState<"calendar" | "list">(initialView);
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -433,7 +436,7 @@ export default function JobsView({
         <div className="flex flex-col divide-y divide-white/8">
           {filteredJobs.length === 0 && <p className={subTextClass}>No jobs match.</p>}
           {filteredJobs.map((job) => (
-            <div key={job.id} className="flex flex-col gap-2 py-3">
+            <div key={job.id} id={`job-${job.id}`} className="flex scroll-mt-20 flex-col gap-2 py-3">
             <form
               action={handleStatusSave}
               className="flex flex-wrap items-center justify-between gap-3"

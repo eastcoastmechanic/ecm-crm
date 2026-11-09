@@ -17,6 +17,7 @@ import type { StaffRole } from "@/lib/require-role";
 import { opsTools, buildJobPhotoTools } from "./tools-ops";
 import { fieldTools } from "./tools-field";
 import { referenceTools } from "./tools-reference";
+import { buildLogTools, LOG_TOOL_NAMES } from "./tools-log";
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -771,8 +772,16 @@ const completeTaskTool = betaZodTool({
 // Tools that delete, send to customers, or move money. Only the owner gets
 // them in the internal chat; other roles can still read and do routine edits.
 const OWNER_ONLY_TOOL = /^(delete_|send_|propose_|confirm_action$|create_payment_link$)/;
+// Owner and office only: the running log.
+const OFFICE_ONLY_TOOL = new RegExp(`^(${LOG_TOOL_NAMES.join("|")})$`);
 
-export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?: File[]; staffRole?: StaffRole }) {
+export function buildInternalTools(options?: {
+  fast?: boolean;
+  attachmentFiles?: File[];
+  staffRole?: StaffRole;
+  /** Who is acting when nobody is signed in, shown on log entries (e.g. "Teams agent"). */
+  via?: string;
+}) {
   const fast = options?.fast;
   const attachmentFiles = options?.attachmentFiles;
   const tools = [
@@ -811,7 +820,13 @@ export function buildInternalTools(options?: { fast?: boolean; attachmentFiles?:
     ...fieldTools,
     // PT charts, superheat/subcooling, ECM's diagnostic guide -- tools-reference.ts.
     ...referenceTools,
+    // Running log (/log) -- tools-log.ts. Owner and office only.
+    ...buildLogTools(options?.via ?? "assistant"),
   ];
+  // The log is office work; a tech never gets it (the store checks the role too).
+  if (options?.staffRole === "tech") {
+    return tools.filter((t) => !OWNER_ONLY_TOOL.test(t.name) && !OFFICE_ONLY_TOOL.test(t.name));
+  }
   // Callers that pass no staffRole (bearer-key bridges for the owner) keep the full set.
   if (options?.staffRole && options.staffRole !== "owner") {
     return tools.filter((t) => !OWNER_ONLY_TOOL.test(t.name));

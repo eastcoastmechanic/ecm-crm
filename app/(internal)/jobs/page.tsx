@@ -29,9 +29,10 @@ function byScheduledDesc(a: JobRow, b: JobRow) {
 export default async function JobsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ finished?: string }>;
+  searchParams: Promise<{ finished?: string; view?: string }>;
 }) {
-  const finishedLimit = pageLimit((await searchParams).finished, FINISHED_STEP, FINISHED_MAX);
+  const params = await searchParams;
+  const finishedLimit = pageLimit(params.finished, FINISHED_STEP, FINISHED_MAX);
 
   // Supabase stops at 1000 rows without saying so. Open jobs are paged so none
   // is ever dropped; finished and cancelled jobs show the newest few hundred,
@@ -165,6 +166,7 @@ export default async function JobsPage({
         tasks={tasks ?? []}
         staff={staff}
         hourlyRate={Number(process.env.HOURLY_LABOR_RATE) || null}
+        initialView={params.view === "list" ? "list" : "calendar"}
       />
 
       {finishedTotal > finishedJobs.length && (
