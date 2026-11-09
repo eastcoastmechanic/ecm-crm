@@ -105,9 +105,10 @@ async function uploadPhotos(files: File[]) {
 export async function generateDiagnosis(formData: FormData) {
   const submittedEquipmentId = (formData.get("equipment_id") as string) || null;
   const job_id = (formData.get("job_id") as string) || null;
-  // Techs can run a diagnosis only on a job they may work. Office and owner are not limited.
-  if (job_id) await requireJobAccess(job_id, { allowClosedJob: true });
-  else await requireRole(["owner", "office", "tech"]);
+  // Techs can run a diagnosis only on a job they may work, and always need a job:
+  // a report with no job is office and owner only (a tech couldn't open it after).
+  // Office and owner are not limited.
+  await requireJobAccess(job_id, { allowClosedJob: true });
   const symptoms = (formData.get("symptoms") as string)?.trim();
   const refrigerantOverride = formData.get("refrigerant") as string;
   const photoFiles = formData.getAll("photos") as File[];

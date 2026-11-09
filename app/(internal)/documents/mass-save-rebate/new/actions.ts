@@ -20,6 +20,10 @@ const LabelSchema = z.object({
 export type ScannedEquipmentLabel = z.infer<typeof LabelSchema>;
 
 export async function scanEquipmentLabel(formData: FormData): Promise<ScannedEquipmentLabel> {
+  // Office and owner only, like the rest of this form: each scan is a paid Claude
+  // vision call. Only someone outside the page (no form to show it on) hits this,
+  // so it throws like the other scan action instead of returning { error }.
+  await requireOffice();
   const photo = formData.get("photo") as File;
   if (!photo || photo.size === 0) throw new Error("No photo provided");
 

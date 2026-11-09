@@ -1,9 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
 import { requireRole, type StaffRole } from "@/lib/require-role";
-import { jobAccessError } from "@/lib/job-access-rules";
+import { jobAccessError, jobAccessMessage } from "@/lib/job-access-rules";
 
-export { TECH_STATUSES, jobAccessError } from "@/lib/job-access-rules";
+export { TECH_STATUSES, jobAccessError, jobAccessMessage } from "@/lib/job-access-rules";
 
 /** The signed-in staff member's id, or null (shared Basic-auth login, no staff row, signed out). */
 export async function getMyStaffId(): Promise<string | null> {
@@ -45,4 +45,23 @@ export async function requireJobAccess(
   });
   if (error) throw new Error(error);
   return role;
+}
+
+export type JobAccessResult = { role: StaffRole; error?: undefined } | { error: string; role?: undefined };
+
+/**
+ * Same rule as requireJobAccess, but returns { error } instead of throwing, for
+ * server actions that show the reason on the page and for pages that decide
+ * whether to show a report. With no job, only office and owner pass (a tech
+ * always needs a job that is theirs or not yet assigned).
+ */
+export async function checkJobAccess(
+  jobId: string | null | undefined,
+  opts: { nextStatus?: string | null; allowClosedJob?: boolean } = {}
+): Promise<JobAccessResult> {
+  try {
+    return { role: await requireJobAccess(jobId, opts) };
+  } catch (err) {
+    return { error: jobAccessMessage(err) };
+  }
 }
