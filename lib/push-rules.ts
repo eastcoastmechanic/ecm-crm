@@ -18,6 +18,36 @@ export function isGoneStatus(statusCode: number | undefined): boolean {
   return statusCode === 404 || statusCode === 410;
 }
 
+/**
+ * web-push only takes a VAPID subject that is a `mailto:` or `https:` URL. A bare
+ * email ("josh@example.com") or a bare host ("example.com") is a common way to set
+ * the env var, so fix those up. Returns null when the value still is not usable,
+ * so push turns off instead of throwing on every send.
+ */
+export function normalizeVapidSubject(raw: string | null | undefined): string | null {
+  let value = (raw ?? "").trim().replace(/^["']+|["']+$/g, "").trim();
+  if (!value || /\s/.test(value)) return null;
+
+  // "host:port" has a colon but no scheme, so a scheme needs letters then ":" and not a digit after.
+  const hasScheme = /^[a-z][a-z0-9+.-]*:(?!\d)/i.test(value);
+  if (!hasScheme) value = value.includes("@") ? `mailto:${value}` : `https://${value}`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol === "mailto:") {
+    // Needs name@domain.tld after the scheme.
+    return /^[^@\s/]+@[^@\s/]+\.[^@\s/]+$/.test(value.slice("mailto:".length)) ? value : null;
+  }
+  if (parsed.protocol === "https:") {
+    return parsed.hostname.includes(".") ? value : null;
+  }
+  return null;
+}
+
 export type PushSubscriptionInput = { endpoint: string; p256dh: string; auth: string };
 
 // Browsers hand out endpoints on their own push service. Because the server will POST to whatever

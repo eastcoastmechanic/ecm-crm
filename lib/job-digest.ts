@@ -35,6 +35,24 @@ function countLabel(n: number): string {
 }
 
 /**
+ * Resend idempotency key for one person's digest on one New York day. Resend
+ * keeps a key for 24 hours, so a cron retry (or the second of the 11/12 UTC runs
+ * if both ever pass the hour check) cannot send the same digest twice.
+ */
+export function digestIdempotencyKey(dateKey: string, to: string): string {
+  return `job-digest/${dateKey}/${to.trim().toLowerCase()}`;
+}
+
+/**
+ * Resend's answer when that key was already used today: a same-day repeat,
+ * either while the first is still in flight or with a changed job list.
+ * The digest already went (or is going), so it is not an error.
+ */
+export function isDuplicateDigestError(err: { name?: string | null } | null | undefined): boolean {
+  return err?.name === "invalid_idempotent_request" || err?.name === "concurrent_idempotent_requests";
+}
+
+/**
  * One email per tech with jobs today, plus one for the owner listing all jobs.
  * Nobody gets an email on a day with nothing scheduled for them. A staff row
  * with the owner's email is folded into the owner's email, not sent twice.

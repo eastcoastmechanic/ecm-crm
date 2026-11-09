@@ -7,6 +7,13 @@ import { sendWarrantyAlerts } from "@/lib/warranty-alerts";
 import { sendMaintenancePlanCharges } from "@/lib/plan-renewal";
 import { canText } from "@/lib/sms-consent";
 import { shouldSendJobFollowUpEmail, skipsPostJobFollowUps } from "@/lib/post-job-followups";
+import {
+  FIRST_FOLLOW_UP_DAY,
+  LAST_FOLLOW_UP_DAY,
+  estimateFollowUp,
+  estimateFollowUpEmailBlocked,
+  isTieredEstimate,
+} from "@/lib/estimate-follow-up";
 
 function todayISODate() {
   return new Date().toISOString().slice(0, 10);
@@ -184,14 +191,20 @@ async function sendJobFollowUps() {
   return { sent, errors };
 }
 
+// At most two follow-ups per sending (about day 3 and day 10 after sent_at, New
+// York days), none after day 16. The rule lives in lib/estimate-follow-up.ts.
 async function sendStaleEstimateFollowUps() {
   const { data: estimates, error } = await supabase
     .from("documents")
-    .select("id, doc_number, total, last_reminder_sent_at, customers(name, email)")
+    .select(
+      "id, doc_number, total, sent_at, last_reminder_sent_at, line_items, customers(name, email, email_opt_out_at, no_followups)"
+    )
     .eq("type", "estimate")
     .eq("status", "sent")
-    .lte("created_at", daysAgoISO(5))
-    .or(`last_reminder_sent_at.is.null,last_reminder_sent_at.lte.${daysAgoISO(7)}`);
+    .not("sent_at", "is", null)
+    // Wider than the rule's window by a day each side; estimateFollowUp decides.
+    .gte("sent_at", daysAgoISO(LAST_FOLLOW_UP_DAY + 1))
+    .lte("sent_at", daysAgoISO(FIRST_FOLLOW_UP_DAY - 1));
 
   if (error) return { sent: 0, errors: [error.message] };
 
@@ -199,9 +212,20 @@ async function sendStaleEstimateFollowUps() {
   let sent = 0;
 
   for (const estimate of estimates ?? []) {
-    const customer = estimate.customers as unknown as CustomerContact;
-    const isFirstReminder = !estimate.last_reminder_sent_at;
-    const email = customer?.email;
+    const decision = estimateFollowUp({
+      sentAt: (estimate.sent_at as string | null) ?? null,
+      lastReminderAt: (estimate.last_reminder_sent_at as string | null) ?? null,
+    });
+    if (!decision.send) continue;
+
+    const customer = estimate.customers as unknown as
+      | (CustomerContact & { email_opt_out_at?: string | null })
+      | null;
+    const email = estimateFollowUpEmailBlocked(customer) ? null : customer?.email;
+    const tiered = isTieredEstimate(estimate.line_items as Parameters<typeof isTieredEstimate>[0]);
+    const what = tiered
+      ? `estimate ${estimate.doc_number ?? ""} and your options`
+      : `estimate ${estimate.doc_number ?? ""} for ${formatPrice(estimate.total ?? 0)}`;
 
     if (email) {
       const { error: sendError } = await resend.emails.send({
@@ -209,9 +233,7 @@ async function sendStaleEstimateFollowUps() {
         replyTo: RESEND_REPLY_TO,
         to: email,
         subject: `Following up on estimate ${estimate.doc_number ?? ""}`,
-        text: `Hi ${customer?.name ?? ""},\n\nJust checking in on estimate ${estimate.doc_number ?? ""} for ${formatPrice(
-          estimate.total ?? 0
-        )}. Let us know if you have any questions or would like to move forward — happy to help either way.\n\nEast Coast Mechanical`,
+        text: `Hi ${customer?.name ?? ""},\n\nJust checking in on ${what}. Let us know if you have any questions or would like to move forward — happy to help either way.\n\nEast Coast Mechanical`,
       });
 
       if (sendError) {
@@ -233,14 +255,13 @@ async function sendStaleEstimateFollowUps() {
     }
     if (email) sent++;
 
-    // First time this estimate shows up stale, flag it for staff too --
-    // the customer email repeats every 7 days, but one Planner card
-    // per estimate is enough; it isn't going anywhere until someone acts on it.
-    if (isFirstReminder) {
+    // First follow-up for this sending also flags it for staff. One Planner
+    // card per sending is enough; it isn't going anywhere until someone acts on it.
+    if (decision.first) {
       try {
         await createPlannerTask({
           title: `Follow up: ${customer?.name ?? "Customer"} — estimate ${estimate.doc_number ?? ""}`,
-          notes: `Sitting at "sent" with no response for 5+ days.`,
+          notes: `Sitting at "sent" with no response for ${FIRST_FOLLOW_UP_DAY}+ days.`,
           bucket: "tasks",
         });
       } catch (err) {

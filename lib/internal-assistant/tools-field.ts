@@ -4,6 +4,12 @@ import { supabase } from "@/lib/supabase";
 import { createInvoicePaymentLink } from "@/lib/payment-links";
 import { finishServiceReport, sendServiceReportEmail, assignCustomer } from "@/app/(internal)/diagnostics/[id]/actions";
 import { fieldBoardTools } from "./tools-field-board";
+import {
+  SERVICE_REPORT_LIST_SELECT,
+  clampReportLimit,
+  filterServiceReports,
+  type ServiceReportRow,
+} from "@/lib/service-report-list";
 
 const listServiceReportsTool = betaZodTool({
   name: "list_service_reports",
@@ -15,20 +21,57 @@ const listServiceReportsTool = betaZodTool({
     limit: z.number().optional().describe("Default 20"),
   }),
   run: async ({ customerId, unassignedOnly, limit }) => {
-    let q = supabase
-      .from("diagnostics")
-      .select(
-        "id, created_at, technician_name, symptom, diagnosis, invoice_document_id, customer_id, equipment(type, brand, model)"
-      )
-      .order("created_at", { ascending: false })
-      .limit(limit ?? 20);
-    if (customerId) q = q.eq("customer_id", customerId);
-    if (unassignedOnly) q = q.is("customer_id", null);
+    const max = clampReportLimit(limit);
+    // diagnostics has no customer_id: a report reaches its customer through its
+    // equipment's property or its job. See lib/service-report-list.ts.
+    let rows: ServiceReportRow[];
+    if (customerId) {
+      const [jobsRes, propsRes] = await Promise.all([
+        supabase.from("jobs").select("id").eq("customer_id", customerId).limit(500),
+        supabase.from("properties").select("id").eq("customer_id", customerId).limit(200),
+      ]);
+      if (jobsRes.error || propsRes.error) {
+        return `Failed to list service reports: ${(jobsRes.error ?? propsRes.error)?.message}`;
+      }
+      const jobIds = (jobsRes.data ?? []).map((j) => j.id as string);
+      const propertyIds = (propsRes.data ?? []).map((p) => p.id as string);
+      let equipmentIds: string[] = [];
+      if (propertyIds.length > 0) {
+        const eqRes = await supabase.from("equipment").select("id").in("property_id", propertyIds).limit(500);
+        if (eqRes.error) return `Failed to list service reports: ${eqRes.error.message}`;
+        equipmentIds = (eqRes.data ?? []).map((e) => e.id as string);
+      }
+      if (jobIds.length === 0 && equipmentIds.length === 0) return "No service reports match that.";
 
-    const { data, error } = await q;
-    if (error) return `Failed to list service reports: ${error.message}`;
-    if (!data || data.length === 0) return "No service reports match that.";
-    return JSON.stringify(data);
+      const queries = [];
+      if (jobIds.length > 0) {
+        queries.push(supabase.from("diagnostics").select(SERVICE_REPORT_LIST_SELECT).in("job_id", jobIds).order("created_at", { ascending: false }).limit(max));
+      }
+      if (equipmentIds.length > 0) {
+        queries.push(
+          supabase.from("diagnostics").select(SERVICE_REPORT_LIST_SELECT).in("equipment_id", equipmentIds).order("created_at", { ascending: false }).limit(max)
+        );
+      }
+      const results = await Promise.all(queries);
+      const failed = results.find((r) => r.error);
+      if (failed?.error) return `Failed to list service reports: ${failed.error.message}`;
+      const byId = new Map<string, ServiceReportRow>();
+      for (const r of results) for (const row of (r.data ?? []) as unknown as ServiceReportRow[]) byId.set(row.id, row);
+      rows = [...byId.values()].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    } else {
+      // Unassigned is worked out per row, so read a wider window and filter.
+      const { data, error } = await supabase
+        .from("diagnostics")
+        .select(SERVICE_REPORT_LIST_SELECT)
+        .order("created_at", { ascending: false })
+        .limit(unassignedOnly ? 200 : max);
+      if (error) return `Failed to list service reports: ${error.message}`;
+      rows = (data ?? []) as unknown as ServiceReportRow[];
+    }
+
+    const listed = filterServiceReports(rows, { customerId, unassignedOnly, limit: max });
+    if (listed.length === 0) return "No service reports match that.";
+    return JSON.stringify(listed);
   },
 });
 

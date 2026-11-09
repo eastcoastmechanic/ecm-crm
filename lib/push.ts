@@ -1,19 +1,34 @@
 import webpush from "web-push";
 import { supabase } from "@/lib/supabase";
-import { buildPushPayload, isGoneStatus, type PushPayload } from "@/lib/push-rules";
+import { buildPushPayload, isGoneStatus, normalizeVapidSubject, type PushPayload } from "@/lib/push-rules";
 
 let configured: boolean | null = null;
 
+// Decided once per server instance. A bad setting logs one line (never the value)
+// and turns push off, instead of throwing on every send.
 function configure(): boolean {
   if (configured !== null) return configured;
   const pub = process.env.VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT;
-  if (!pub || !priv || !subject) {
+  const rawSubject = process.env.VAPID_SUBJECT;
+  if (!pub || !priv || !rawSubject) {
     configured = false;
     return false;
   }
-  webpush.setVapidDetails(subject, pub, priv);
+  const subject = normalizeVapidSubject(rawSubject);
+  if (!subject) {
+    console.error("[push] VAPID_SUBJECT is not a mailto: address or https: URL; push is off");
+    configured = false;
+    return false;
+  }
+  try {
+    webpush.setVapidDetails(subject, pub, priv);
+  } catch {
+    // web-push puts the bad value in its message, so don't log it.
+    console.error("[push] VAPID keys were rejected; push is off");
+    configured = false;
+    return false;
+  }
   configured = true;
   return true;
 }
