@@ -13,6 +13,7 @@ type Customer = {
   billing_address: string | null;
   notes: string | null;
   sms_consent: boolean | null;
+  no_followups?: boolean | null;
   company_name?: string | null;
   alt_phone?: string | null;
 };
@@ -76,6 +77,20 @@ export default function EditCustomerForm({ customer }: { customer: Customer }) {
       <label className="flex items-center gap-2 text-xs text-g300 sm:col-span-2">
         <input type="checkbox" name="sms_consent" defaultChecked={!!customer.sms_consent} />
         Customer has agreed to receive text messages
+      </label>
+      <label className="flex items-start gap-2 text-xs text-g300 sm:col-span-2">
+        <input
+          type="checkbox"
+          name="no_followups"
+          defaultChecked={!!customer.no_followups}
+          className="mt-0.5"
+        />
+        <span>
+          Don&apos;t send follow-up / review requests
+          <span className="mt-0.5 block text-g500">
+            Stops the survey text and the follow-up email after a job. Appointment and scheduling texts still go out.
+          </span>
+        </span>
       </label>
       <div className="flex items-center gap-2 sm:col-span-2">
         <SubmitButton className={`${buttonClass} w-fit`} pendingText="Saving…">

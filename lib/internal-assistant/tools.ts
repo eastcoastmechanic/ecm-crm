@@ -135,7 +135,7 @@ const updateCustomerTool = betaZodTool({
   run: async ({ customerId, name, phone, email, billingAddress, notes }) => {
     const { data: existing, error: fetchError } = await supabase
       .from("customers")
-      .select("name, phone, email, billing_address, notes, sms_consent")
+      .select("name, phone, email, billing_address, notes, sms_consent, no_followups")
       .eq("id", customerId)
       .single();
     if (fetchError || !existing) return `Customer not found: ${fetchError?.message ?? customerId}`;
@@ -148,6 +148,7 @@ const updateCustomerTool = betaZodTool({
     fd.set("billing_address", billingAddress ?? existing.billing_address ?? "");
     fd.set("notes", notes ?? existing.notes ?? "");
     if (existing.sms_consent) fd.set("sms_consent", "on");
+    if (existing.no_followups) fd.set("no_followups", "on");
 
     try {
       await updateCustomer(fd);

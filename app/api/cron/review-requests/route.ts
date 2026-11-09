@@ -5,11 +5,17 @@ import { sendSMS } from "@/lib/sms";
 import { canText } from "@/lib/sms-consent";
 import { one } from "@/lib/appointment-reminder";
 import { nextReviewText, reviewTextCopy, reviewTriggerAt, LOOKBACK_DAYS, type InvoiceRow } from "@/lib/review-requests";
+import { skipsPostJobFollowUps } from "@/lib/post-job-followups";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app";
 const CHUNK = 100;
 
-type Customer = { name: string | null; phone: string | null; sms_consent: boolean | null };
+type Customer = {
+  name: string | null;
+  phone: string | null;
+  sms_consent: boolean | null;
+  no_followups: boolean | null;
+};
 
 async function inChunks<T>(ids: string[], load: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
   const out: T[] = [];
@@ -20,6 +26,7 @@ async function inChunks<T>(ids: string[], load: (chunk: string[]) => Promise<T[]
 // Daily, midday New York time (see vercel.json). Texts a finished job's customer a link to the survey
 // page once the invoice is paid (or a day after finishing, if nothing was invoiced in the CRM), then one
 // reminder 5 days later. Stops once they answer. Text only, and only to customers with sms_consent.
+// customers.no_followups skips both the ask and the reminder. Scheduling texts are a different cron.
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,7 +39,7 @@ export async function GET(request: Request) {
   const { data: jobs, error } = await supabase
     .from("jobs")
     .select(
-      "id, completed_at, follow_up_sent_at, review_request_sent_at, review_reminder_sent_at, customers(name, phone, sms_consent)"
+      "id, completed_at, follow_up_sent_at, review_request_sent_at, review_reminder_sent_at, customers(name, phone, sms_consent, no_followups)"
     )
     .in("status", ["complete", "completed"])
     .gte("completed_at", since)
@@ -92,6 +99,12 @@ export async function GET(request: Request) {
     if (!kind) continue;
 
     const customer = one(job.customers as unknown as Customer | Customer[] | null);
+    // Opt-out before canText. Nothing is stamped, so turning the flag off later can still
+    // send a text inside the normal window.
+    if (skipsPostJobFollowUps(customer)) {
+      skipped++;
+      continue;
+    }
     if (!customer?.phone || customer.sms_consent !== true || !(await canText(customer.phone))) {
       skipped++;
       continue;

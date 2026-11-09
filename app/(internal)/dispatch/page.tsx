@@ -32,7 +32,7 @@ type JobRow = {
   status: string;
   job_type: string | null;
   assigned_staff_id: string | null;
-  customers: Rel<{ name: string | null }>;
+  customers: Rel<{ name: string | null; no_followups?: boolean | null }>;
   properties: Rel<{ address: string | null }>;
 };
 
@@ -69,6 +69,9 @@ function JobBlock({ job, staff, planNote }: { job: JobRow; staff: StaffOption[];
         <div className={itemSubClass}>
           {property?.address ?? "No address"}
         </div>
+        {customer?.no_followups && (
+          <div className="text-xs font-semibold text-gold">No follow-up / review requests</div>
+        )}
         {planNote && (
           <div className={`text-xs font-semibold ${planNote.overdue ? "text-accent" : "text-gold"}`}>
             {planNote.overdue ? "Overdue plan visit" : "Plan visit"}: {planNote.text}
@@ -113,14 +116,14 @@ export default async function DispatchPage({
   const [{ data: jobRows, error }, { data: unscheduledRows, error: unscheduledError }, { data: staffRows, error: staffError }, { data: visitRows }] = await Promise.all([
     supabase
       .from("jobs")
-      .select("id, scheduled_at, status, job_type, assigned_staff_id, customers(name), properties(address)")
+      .select("id, scheduled_at, status, job_type, assigned_staff_id, customers(name, no_followups), properties(address)")
       .neq("status", "cancelled")
       .gte("scheduled_at", rangeStart.toISOString())
       .lt("scheduled_at", rangeEnd.toISOString())
       .order("scheduled_at", { ascending: true }),
     supabase
       .from("jobs")
-      .select("id, scheduled_at, status, job_type, assigned_staff_id, customers(name), properties(address)")
+      .select("id, scheduled_at, status, job_type, assigned_staff_id, customers(name, no_followups), properties(address)")
       .is("scheduled_at", null)
       .not("status", "in", "(complete,completed,cancelled)")
       .limit(50),

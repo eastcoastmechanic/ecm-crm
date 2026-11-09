@@ -112,6 +112,11 @@ export default async function CustomerProfilePage({
             </Link>
           </div>
           {customer.notes && <p className={`${subTextClass} mt-1`}>{customer.notes}</p>}
+          {customer.no_followups && (
+            <p className="mt-2 text-sm font-semibold text-gold">
+              Don&apos;t send follow-up / review requests is on. Scheduling texts still go out.
+            </p>
+          )}
           {referredBy && (
             <p className={`${subTextClass} mt-1`}>
               Referred by{" "}
