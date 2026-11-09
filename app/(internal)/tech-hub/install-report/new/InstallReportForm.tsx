@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { startTransition, useActionState, useMemo, useState } from "react";
 import { REFRIGERANT_TYPES } from "@/lib/refrigerant";
-import { createInstallReport } from "../actions";
+import { createInstallReport, type InstallReportState } from "../actions";
 import { STARTUP_CHECKLIST_ITEMS } from "../constants";
-import SubmitButton from "../../../SubmitButton";
-import { buttonClass, inputClass } from "../../../ui";
+import { buttonClass, errorClass, inputClass } from "../../../ui";
 
 type Equipment = {
   id: string;
@@ -51,6 +50,7 @@ export default function InstallReportForm({
   jobId?: string;
 }) {
   const [equipmentId, setEquipmentId] = useState("");
+  const [state, save, saving] = useActionState<InstallReportState, FormData>(createInstallReport, null);
 
   // One entry per unit installed. Unit 1 starts from the equipment on file, if one is picked.
   const [units, setUnits] = useState<UnitDraft[]>(() => [blankUnit()]);
@@ -111,7 +111,15 @@ export default function InstallReportForm({
   }, [decayStart, decayEnd]);
 
   return (
-    <form action={createInstallReport} className="flex flex-col gap-6">
+    // Submitted by hand (not the action prop) so React does not clear the units and readings when a save fails.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => save(data));
+      }}
+      className="flex flex-col gap-6"
+    >
       {jobId && <input type="hidden" name="job_id" value={jobId} />}
 
       <section className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
@@ -467,9 +475,14 @@ export default function InstallReportForm({
         </div>
       </section>
 
-      <SubmitButton className={`${buttonClass} w-fit`} pendingText="Saving…">
-        Save Install Report
-      </SubmitButton>
+      {state?.error && !saving && (
+        <p role="alert" className={errorClass}>
+          {state.error}
+        </p>
+      )}
+      <button type="submit" disabled={saving} className={`${buttonClass} w-fit disabled:opacity-50`}>
+        {saving ? "Saving…" : "Save Install Report"}
+      </button>
     </form>
   );
 }

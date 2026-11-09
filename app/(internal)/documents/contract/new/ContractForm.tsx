@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { submitContract } from "./actions";
-import SubmitButton from "../../../SubmitButton";
-import { buttonClass, inputClass, subTextClass } from "../../../ui";
+import { startTransition, useActionState, useState } from "react";
+import { submitContract, type ContractFormState } from "./actions";
+import { buttonClass, errorClass, inputClass, subTextClass } from "../../../ui";
 import CustomerPicker from "../../../CustomerPicker";
 import PropertyPicker from "../../../PropertyPicker";
 
@@ -34,9 +33,27 @@ export default function ContractForm({
 }) {
   const [customerId, setCustomerId] = useState(prefill?.customerId ?? defaultCustomerId);
   const [propertyId, setPropertyId] = useState(prefill?.propertyId ?? "");
+  const [state, save, saving] = useActionState<ContractFormState, FormData>(submitContract, null);
+
+  // A new customer/property saved before a later step failed: point the pickers at
+  // them so pressing Save again does not create a second copy.
+  const [seenState, setSeenState] = useState(state);
+  if (state !== seenState) {
+    setSeenState(state);
+    if (state?.customerId) setCustomerId(state.customerId);
+    if (state?.propertyId) setPropertyId(state.propertyId);
+  }
 
   return (
-    <form action={submitContract} className="flex flex-col gap-4">
+    // Submitted by hand (not the action prop) so React does not clear what was typed when a save fails.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => save(data));
+      }}
+      className="flex flex-col gap-4"
+    >
       {prefill?.fromDocumentId && (
         <input type="hidden" name="from_document_id" value={prefill.fromDocumentId} />
       )}
@@ -130,9 +147,14 @@ export default function ContractForm({
         <p className={subTextClass}>Add a customer first before creating a contract.</p>
       )}
 
-      <SubmitButton className={`${buttonClass} w-fit`} pendingText="Saving…">
-        Save Contract
-      </SubmitButton>
+      {state?.error && !saving && (
+        <p role="alert" className={errorClass}>
+          {state.error}
+        </p>
+      )}
+      <button type="submit" disabled={saving} className={`${buttonClass} w-fit disabled:opacity-50`}>
+        {saving ? "Saving…" : "Save Contract"}
+      </button>
     </form>
   );
 }

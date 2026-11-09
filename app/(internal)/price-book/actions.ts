@@ -5,8 +5,29 @@ import { supabase } from "@/lib/supabase";
 import { syncPriceBookItemToGraph, deletePriceBookItemFromGraph } from "@/lib/graph-connector";
 import { requireOffice } from "@/lib/require-role";
 
-export async function addPriceBookItem(formData: FormData) {
-  await requireOffice();
+const NOT_ALLOWED = { error: "Only the office or owner can change the price book." };
+
+async function notOffice(): Promise<boolean> {
+  try {
+    await requireOffice();
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/** The item is already saved; a Copilot index hiccup is logged, not shown as a failed save. */
+async function syncToGraph(id: string) {
+  try {
+    await syncPriceBookItemToGraph(id);
+  } catch (err) {
+    console.error("price book Graph sync failed", err instanceof Error ? err.message : err);
+  }
+}
+
+/** Add a price book item. Returns { error } (never throws) so the form keeps what was typed. */
+export async function addPriceBookItem(formData: FormData): Promise<{ error?: string }> {
+  if (await notOffice()) return NOT_ALLOWED;
   const category = (formData.get("category") as string)?.trim();
   const tier = formData.get("tier") as string;
   const name = (formData.get("name") as string)?.trim();
@@ -15,9 +36,7 @@ export async function addPriceBookItem(formData: FormData) {
   const labor_hours = formData.get("labor_hours") as string;
   const unit_cost = formData.get("unit_cost") as string;
 
-  if (!name) {
-    throw new Error("Name is required");
-  }
+  if (!name) return { error: "Name is required." };
 
   const { data: item, error } = await supabase
     .from("price_book_items")
@@ -37,16 +56,19 @@ export async function addPriceBookItem(formData: FormData) {
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    console.error("addPriceBookItem failed", error.message);
+    return { error: "Couldn't add the item. Try again." };
   }
 
-  if (item) await syncPriceBookItemToGraph(item.id);
+  if (item) await syncToGraph(item.id);
 
   revalidatePath("/price-book");
+  return {};
 }
 
-export async function updatePriceBookItem(formData: FormData) {
-  await requireOffice();
+/** Edit a price book item. Returns { error } (never throws) so the form keeps what was typed. */
+export async function updatePriceBookItem(formData: FormData): Promise<{ error?: string }> {
+  if (await notOffice()) return NOT_ALLOWED;
   const id = formData.get("id") as string;
   const category = (formData.get("category") as string)?.trim();
   const tier = formData.get("tier") as string;
@@ -55,8 +77,8 @@ export async function updatePriceBookItem(formData: FormData) {
   const unit_price = formData.get("unit_price") as string;
   const labor_hours = formData.get("labor_hours") as string;
 
-  if (!id) throw new Error("Missing item id");
-  if (!name) throw new Error("Name is required");
+  if (!id) return { error: "Missing item. Refresh and try again." };
+  if (!name) return { error: "Name is required." };
 
   const update: Record<string, unknown> = {
     category: category || null,
@@ -76,19 +98,27 @@ export async function updatePriceBookItem(formData: FormData) {
 
   const { error } = await supabase.from("price_book_items").update(update).eq("id", id);
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("updatePriceBookItem failed", error.message);
+    return { error: "Couldn't save the item. Try again." };
+  }
 
-  await syncPriceBookItemToGraph(id);
+  await syncToGraph(id);
 
   revalidatePath("/price-book");
+  return {};
 }
 
 export async function deletePriceBookItem(id: string): Promise<{ error?: string }> {
-  await requireOffice();
+  if (await notOffice()) return NOT_ALLOWED;
   const { error } = await supabase.from("price_book_items").delete().eq("id", id);
   if (error) return { error: error.message };
 
-  await deletePriceBookItemFromGraph(id);
+  try {
+    await deletePriceBookItemFromGraph(id);
+  } catch (err) {
+    console.error("price book Graph delete failed", err instanceof Error ? err.message : err);
+  }
 
   revalidatePath("/price-book");
   return {};

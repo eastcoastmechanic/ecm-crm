@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
-import { generateDocument } from "./actions";
-import SubmitButton from "../../SubmitButton";
-import { buttonClass, buttonSecondaryClass, inputClass, subTextClass } from "../../ui";
+import { startTransition, useActionState, useRef, useState, useSyncExternalStore } from "react";
+import { generateDocument, type GenerateDocumentState } from "./actions";
+import { buttonClass, buttonSecondaryClass, errorClass, inputClass, subTextClass } from "../../ui";
 import CustomerPicker from "../../CustomerPicker";
 
 type Customer = { id: string; name: string };
@@ -55,6 +54,14 @@ export default function NewDocumentForm({
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const shouldKeepListeningRef = useRef(false);
+  const [state, generate, generating] = useActionState<GenerateDocumentState, FormData>(generateDocument, null);
+
+  // A new customer saved before generation failed: pick them so a retry doesn't make a second copy.
+  const [seenState, setSeenState] = useState(state);
+  if (state !== seenState) {
+    setSeenState(state);
+    if (state?.customerId) setCustomerId(state.customerId);
+  }
 
   // SSR-safe feature check: browser APIs aren't present during server render,
   // so this must not run as a plain useState+useEffect (flags as
@@ -107,7 +114,15 @@ export default function NewDocumentForm({
   }
 
   return (
-    <form action={generateDocument} className="flex flex-col gap-4">
+    // Submitted by hand (not the action prop) so React does not clear what was typed when it fails.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => generate(data));
+      }}
+      className="flex flex-col gap-4"
+    >
       <div className="grid gap-3 rounded-xl border border-white/8 bg-white/3 p-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-xs text-g300">
           Document type
@@ -177,9 +192,14 @@ export default function NewDocumentForm({
         <p className={subTextClass}>Add a customer first before generating a document.</p>
       )}
 
-      <SubmitButton className={`${buttonClass} w-fit`} pendingText="Generating…">
-        ⚡ Generate Document
-      </SubmitButton>
+      {state?.error && !generating && (
+        <p role="alert" className={errorClass}>
+          {state.error}
+        </p>
+      )}
+      <button type="submit" disabled={generating} className={`${buttonClass} w-fit disabled:opacity-50`}>
+        {generating ? "Generating…" : "⚡ Generate Document"}
+      </button>
     </form>
   );
 }

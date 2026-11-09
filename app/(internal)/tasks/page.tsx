@@ -2,6 +2,7 @@ import { listOpenPlannerTasksSafe, plannerConfigured } from "@/lib/planner-conne
 import { addTask } from "./actions";
 import TaskList from "./TaskList";
 import SubmitButton from "../SubmitButton";
+import ResultForm from "../ResultForm";
 import { buttonClass, cardClass, errorClass, headingClass, inputClass, subTextClass } from "../ui";
 
 export default async function TasksPage() {
@@ -15,7 +16,7 @@ export default async function TasksPage() {
         <p className={subTextClass}>To-dos and reminders — yours or created by the CRM assistant. Lives in Planner now.</p>
       </div>
 
-      <form action={addTask} className={cardClass}>
+      <ResultForm submit={addTask} resetOnDone className={cardClass}>
         <label className="flex flex-col gap-1 text-xs text-g300 sm:col-span-2">
           Title
           <input name="title" placeholder="Task title" required className={inputClass} />
@@ -29,7 +30,7 @@ export default async function TasksPage() {
           <textarea name="notes" placeholder="Notes" className={inputClass} />
         </label>
         <SubmitButton className={`${buttonClass} sm:col-span-2 sm:w-fit`}>Add Task</SubmitButton>
-      </form>
+      </ResultForm>
 
       {!configured && (
         <p className={errorClass}>Planner isn&apos;t configured yet — tasks can&apos;t be loaded or added until setup finishes.</p>

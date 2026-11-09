@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { sendManualReply } from "./actions";
-import SubmitButton from "../../SubmitButton";
-import { buttonClass, headingClass, inputClass, subTextClass } from "../../ui";
+import ReplyForm from "./ReplyForm";
+import { headingClass, subTextClass } from "../../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -55,18 +54,7 @@ export default async function ConversationDetailPage({
       </div>
 
       {conversation.channel === "sms" && conversation.phone_number && (
-        <form action={sendManualReply} className="flex items-center gap-2">
-          <input type="hidden" name="conversation_id" value={conversation.id} />
-          <input
-            name="message"
-            placeholder="Send a text reply…"
-            required
-            className={`${inputClass} flex-1`}
-          />
-          <SubmitButton className={buttonClass} pendingText="Sending…">
-            Send
-          </SubmitButton>
-        </form>
+        <ReplyForm conversationId={conversation.id} />
       )}
 
       <Link href="/conversations" className={subTextClass}>

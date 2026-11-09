@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { submitWarranty } from "./actions";
+import { startTransition, useActionState, useMemo, useState } from "react";
+import { submitWarranty, type WarrantyFormState } from "./actions";
 import { scanNameplate, type ScannedNameplate } from "../../../equipment/actions";
-import SubmitButton from "../../../SubmitButton";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, subTextClass } from "../../../ui";
 import CustomerPicker from "../../../CustomerPicker";
 import PropertyPicker from "../../../PropertyPicker";
@@ -47,6 +46,16 @@ export default function WarrantyForm({
   const [scanned, setScanned] = useState<Record<number, ScannedNameplate | null>>({});
   const [scanningRow, setScanningRow] = useState<number | null>(null);
   const [scanError, setScanError] = useState<Record<number, string>>({});
+  const [state, save, saving] = useActionState<WarrantyFormState, FormData>(submitWarranty, null);
+
+  // A new customer/property saved before a later step failed: point the pickers at
+  // them so pressing Save again does not create a second copy.
+  const [seenState, setSeenState] = useState(state);
+  if (state !== seenState) {
+    setSeenState(state);
+    if (state?.customerId) setCustomerId(state.customerId);
+    if (state?.propertyId) setPropertyId(state.propertyId);
+  }
 
   const propertyEquipment = useMemo(
     () => equipment.filter((e) => e.property_id === propertyId),
@@ -85,10 +94,11 @@ export default function WarrantyForm({
       if (result.model) setModelByRow((prev) => ({ ...prev, [rowId]: result.model! }));
       if (result.serial_number)
         setSerialByRow((prev) => ({ ...prev, [rowId]: result.serial_number! }));
-    } catch (err) {
+    } catch {
+      // Production hides a thrown server message, so say it plainly here.
       setScanError((prev) => ({
         ...prev,
-        [rowId]: err instanceof Error ? err.message : "Failed to read photo",
+        [rowId]: "Couldn't read that nameplate. Type the details in, or try another photo.",
       }));
     } finally {
       setScanningRow(null);
@@ -96,7 +106,15 @@ export default function WarrantyForm({
   }
 
   return (
-    <form action={submitWarranty} className="flex flex-col gap-4">
+    // Submitted by hand (not the action prop) so React does not clear what was typed when a save fails.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => save(data));
+      }}
+      className="flex flex-col gap-4"
+    >
       <input type="hidden" name="row_count" value={rowIds.length} />
 
       <div className="grid gap-3 rounded-xl border border-white/8 bg-white/3 p-4 sm:grid-cols-2">
@@ -290,9 +308,14 @@ export default function WarrantyForm({
         <p className={subTextClass}>Add a customer first before creating a warranty document.</p>
       )}
 
-      <SubmitButton className={`${buttonClass} w-fit`} pendingText="Saving…">
-        Save Warranty
-      </SubmitButton>
+      {state?.error && !saving && (
+        <p role="alert" className={errorClass}>
+          {state.error}
+        </p>
+      )}
+      <button type="submit" disabled={saving} className={`${buttonClass} w-fit disabled:opacity-50`}>
+        {saving ? "Saving…" : "Save Warranty"}
+      </button>
     </form>
   );
 }
