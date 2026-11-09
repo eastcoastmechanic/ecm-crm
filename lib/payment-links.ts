@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
-import { createInvoiceCheckoutSession } from "@/lib/invoice-checkout";
+import { createDepositCheckoutSession, createInvoiceCheckoutSession } from "@/lib/invoice-checkout";
+import { loadDepositContract, offeredDepositCents } from "@/lib/online-deposit";
 
 /**
  * Staff-side Stripe checkout link for an invoice.
@@ -45,4 +46,35 @@ export async function createInvoicePaymentLink(documentId: string): Promise<{
     docNumber: doc.doc_number ?? doc.id,
     total: doc.total,
   };
+}
+
+/**
+ * Staff-side Stripe checkout link for a signed contract's deposit. The amount
+ * is the deposit in the signed terms (lib/online-deposit.ts), offered only
+ * until a deposit is recorded. The webhook records it on the contract.
+ */
+export async function createDepositPaymentLink(documentId: string): Promise<{
+  url: string;
+  docNumber: string;
+  depositCents: number;
+}> {
+  const { doc, ready, error } = await loadDepositContract(documentId);
+  if (error) throw new Error("Couldn't read the contract. Try again.");
+  if (!doc) throw new Error("Contract not found");
+  if (!ready) throw new Error("Online deposits need SQL 0075 run first.");
+  if (doc.type !== "contract") throw new Error("Deposits are only taken on contracts.");
+  if (doc.status !== "signed") throw new Error("The customer has to sign the contract first.");
+  if ((doc.deposit_received_cents ?? 0) > 0) throw new Error("A deposit is already recorded on this contract.");
+  const depositCents = offeredDepositCents(doc, ready);
+  if (depositCents == null) {
+    throw new Error("The payment terms don't give a deposit amount, so it can't be paid online. Record it by hand.");
+  }
+
+  const session = await createDepositCheckoutSession(doc, depositCents, {
+    success: `${SITE_ORIGIN}/portal/documents/${doc.id}?deposit=1`,
+    cancel: `${SITE_ORIGIN}/portal/documents/${doc.id}`,
+  });
+  if (!session.url) throw new Error("Stripe did not return a checkout URL");
+
+  return { url: session.url, docNumber: doc.doc_number ?? doc.id, depositCents };
 }

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
@@ -47,18 +48,56 @@ export async function createInvoiceCheckoutSession(
   doc: CheckoutDoc,
   urls: { success: string; cancel: string }
 ): Promise<Stripe.Checkout.Session> {
-  const metadata: Record<string, string> = { document_id: doc.id };
+  return createCheckout(doc, Math.round(doc.total * 100), `Invoice ${doc.doc_number ?? doc.id} — East Coast Mechanical`, {}, urls);
+}
+
+/** Session metadata `kind` on a contract deposit. The webhook records it as a deposit, never as paid. */
+export const DEPOSIT_KIND = "deposit";
+
+/**
+ * Checkout for a contract's deposit. Same customer handling and metadata as an
+ * invoice, plus kind=deposit so app/api/stripe/webhook/route.ts records it on
+ * the contract (lib/online-deposit.ts) instead of marking the contract paid.
+ * depositCents must come from the signed terms (contractDepositCents), never
+ * from the browser. The idempotency key makes a double press within a few
+ * minutes return the same session instead of a second one.
+ */
+export async function createDepositCheckoutSession(
+  doc: Omit<CheckoutDoc, "total">,
+  depositCents: number,
+  urls: { success: string; cancel: string }
+): Promise<Stripe.Checkout.Session> {
+  if (!Number.isInteger(depositCents) || depositCents <= 0) throw new Error("No deposit amount");
+  return createCheckout(
+    doc,
+    depositCents,
+    `Deposit on contract ${doc.doc_number ?? doc.id} — East Coast Mechanical`,
+    { kind: DEPOSIT_KIND },
+    urls,
+    true
+  );
+}
+
+async function createCheckout(
+  doc: Omit<CheckoutDoc, "total">,
+  amountCents: number,
+  name: string,
+  kind: Record<string, string>,
+  urls: { success: string; cancel: string },
+  idempotent = false
+): Promise<Stripe.Checkout.Session> {
+  const metadata: Record<string, string> = { document_id: doc.id, ...kind };
   if (doc.customer_id) metadata.customer_id = doc.customer_id;
 
-  const build = (who: { customer: string } | { customer_creation: "always" }, extra: Record<string, string> = {}) =>
-    stripe.checkout.sessions.create({
+  const build = (who: { customer: string } | { customer_creation: "always" }, extra: Record<string, string> = {}) => {
+    const params: Stripe.Checkout.SessionCreateParams = {
       mode: "payment",
       line_items: [
         {
           price_data: {
             currency: "usd",
-            unit_amount: Math.round(doc.total * 100),
-            product_data: { name: `Invoice ${doc.doc_number ?? doc.id} — East Coast Mechanical` },
+            unit_amount: amountCents,
+            product_data: { name },
           },
           quantity: 1,
         },
@@ -70,7 +109,13 @@ export async function createInvoiceCheckoutSession(
       metadata: { ...metadata, ...extra },
       success_url: urls.success,
       cancel_url: urls.cancel,
-    });
+    };
+    if (!idempotent) return stripe.checkout.sessions.create(params);
+    // Same request within the same 10-minute window: Stripe hands back the first session.
+    const window = Math.floor(Date.now() / 600_000);
+    const key = createHash("sha256").update(JSON.stringify(params)).update(String(window)).digest("hex");
+    return stripe.checkout.sessions.create(params, { idempotencyKey: `checkout-${key}` });
+  };
 
   const who = await checkoutCustomerFields(doc.customer_id);
   try {

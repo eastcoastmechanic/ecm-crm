@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { getInvoicePaymentLink } from "./actions";
+import { getDepositPaymentLink, getInvoicePaymentLink } from "./actions";
 import { buttonSecondaryClass, subTextClass } from "../../ui";
 
-export default function PaymentLinkButton({ id }: { id: string }) {
+export default function PaymentLinkButton({ id, kind = "invoice" }: { id: string; kind?: "invoice" | "deposit" }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -14,7 +14,7 @@ export default function PaymentLinkButton({ id }: { id: string }) {
     setError(null);
     setCopied(false);
     start(async () => {
-      const res = await getInvoicePaymentLink(id);
+      const res = kind === "deposit" ? await getDepositPaymentLink(id) : await getInvoicePaymentLink(id);
       if (res.ok) setUrl(res.url);
       else setError(res.error);
     });
@@ -34,7 +34,7 @@ export default function PaymentLinkButton({ id }: { id: string }) {
     <div className="flex flex-col items-end gap-1">
       {!url ? (
         <button type="button" onClick={make} disabled={pending} className={buttonSecondaryClass}>
-          {pending ? "Making link…" : "Get Payment Link"}
+          {pending ? "Making link…" : kind === "deposit" ? "Get Deposit Link" : "Get Payment Link"}
         </button>
       ) : (
         <div className="flex items-center gap-2">

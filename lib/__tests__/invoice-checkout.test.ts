@@ -20,7 +20,7 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
-import { createInvoiceCheckoutSession } from "@/lib/invoice-checkout";
+import { createDepositCheckoutSession, createInvoiceCheckoutSession } from "@/lib/invoice-checkout";
 
 const doc = { id: "d1", doc_number: "INV-1", total: 250.5, customer_id: "c1" };
 const urls = { success: "https://x/ok", cancel: "https://x/no" };
@@ -68,5 +68,38 @@ describe("createInvoiceCheckoutSession", () => {
     h.create.mockRejectedValueOnce(new Error("rate limited"));
     await expect(createInvoiceCheckoutSession(doc, urls)).rejects.toThrow("rate limited");
     expect(h.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("createDepositCheckoutSession", () => {
+  const contract = { id: "k1", doc_number: "CON-7", customer_id: "c1" };
+
+  it("charges the deposit given, tagged kind=deposit for the webhook", async () => {
+    h.stripeCustomerId = "cus_saved";
+    await createDepositCheckoutSession(contract, 300000, urls);
+    const [params, opts] = h.create.mock.calls[0];
+    expect(params.line_items[0].price_data.unit_amount).toBe(300000);
+    expect(params.line_items[0].price_data.product_data.name).toContain("Deposit on contract CON-7");
+    expect(params.customer).toBe("cus_saved");
+    expect(params.metadata).toEqual({ document_id: "k1", kind: "deposit", customer_id: "c1" });
+    expect(params.payment_intent_data.metadata).toEqual({ document_id: "k1", kind: "deposit", customer_id: "c1" });
+    expect(opts.idempotencyKey).toMatch(/^checkout-[0-9a-f]{64}$/);
+  });
+
+  it("uses the same idempotency key for the same request, a different one for a different amount", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_000);
+    await createDepositCheckoutSession(contract, 300000, urls);
+    await createDepositCheckoutSession(contract, 300000, urls);
+    await createDepositCheckoutSession(contract, 250000, urls);
+    const keys = h.create.mock.calls.map((c) => c[1].idempotencyKey);
+    expect(keys[0]).toBe(keys[1]);
+    expect(keys[2]).not.toBe(keys[0]);
+    vi.restoreAllMocks();
+  });
+
+  it("refuses a missing or broken amount", async () => {
+    await expect(createDepositCheckoutSession(contract, 0, urls)).rejects.toThrow();
+    await expect(createDepositCheckoutSession(contract, 12.5, urls)).rejects.toThrow();
+    expect(h.create).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ContractSignaturePad from "./ContractSignaturePad";
+import DepositPayForm from "./DepositPayForm";
 import { subTextClass } from "../../../(internal)/ui";
 import { BrandedFormShell } from "@/lib/branded-form-shell";
 import { COMPANY_NAME, COMPANY_ADDRESS, COMPANY_PHONE, HIC_REGISTRATION_NUMBER } from "@/lib/brand";
@@ -26,9 +27,40 @@ function PaperSection({ title, children }: { title: string; children: React.Reac
   );
 }
 
+export type PortalDeposit = {
+  /** Deposit to offer, in cents; null when none is offered. */
+  dueCents: number | null;
+  receivedCents: number | null;
+  /** Back from Stripe; the payment may not have been recorded yet. */
+  justPaid?: boolean;
+};
+
+/** What the customer sees about the deposit: the Pay button, a "processing" note, or the deposit received. */
+export function depositPanel(documentId: string, deposit: PortalDeposit | undefined) {
+  if (!deposit) return null;
+  if ((deposit.receivedCents ?? 0) > 0) {
+    return (
+      <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">
+        Deposit received: {formatPrice(deposit.receivedCents! / 100)}. Thank you.
+      </div>
+    );
+  }
+  if (deposit.dueCents == null) return null;
+  if (deposit.justPaid) {
+    return (
+      <div className="rounded-xl border border-white/8 bg-white/3 p-4 text-sm text-white">
+        Thank you. We&apos;re confirming your deposit payment; refresh in a minute to see it here.
+      </div>
+    );
+  }
+  return <DepositPayForm documentId={documentId} amount={formatPrice(deposit.dueCents / 100)} />;
+}
+
 export default function ContractView({
   doc,
+  deposit,
 }: {
+  deposit?: PortalDeposit;
   doc: {
     id: string;
     doc_number: string | null;
@@ -125,6 +157,7 @@ export default function ContractView({
           in touch to schedule the work.
         </div>
       )}
+      {depositPanel(doc.id, deposit)}
 
       <Link href="/portal" className={subTextClass}>
         &larr; Back to dashboard

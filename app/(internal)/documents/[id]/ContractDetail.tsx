@@ -4,6 +4,8 @@ import ScheduleJobForm from "./ScheduleJobForm";
 import { buttonSecondaryClass, subTextClass } from "../../ui";
 import DocumentDeleteButton from "../DocumentDeleteButton";
 import DepositPanel from "./DepositPanel";
+import PaymentLinkButton from "./PaymentLinkButton";
+import { depositDueCents, offeredDepositCents } from "@/lib/online-deposit";
 import { BrandedFormShell } from "@/lib/branded-form-shell";
 import { COMPANY_NAME, COMPANY_ADDRESS, COMPANY_PHONE, HIC_REGISTRATION_NUMBER } from "@/lib/brand";
 import type { ContractLineItems } from "@/lib/contract-terms";
@@ -46,6 +48,8 @@ export default function ContractDetail({
     deposit_received_cents?: number | null;
     deposit_received_at?: string | null;
     deposit_method?: string | null;
+    deposit_payment_intent_ids?: string[] | null;
+    type?: string | null;
     customers: { id: string; name: string | null } | null;
     properties: { address: string | null } | null;
     line_items: ContractLineItems;
@@ -55,6 +59,18 @@ export default function ContractDetail({
 }) {
   const { scopeOfWork, paymentTerms, warrantyTerms, startDate, estimatedCompletion, notes } = doc.line_items;
   const transactionDate = formatDate(doc.created_at);
+  // The page reads every column, so the deposit id list is there once SQL 0075 has run.
+  const depositReady = "deposit_payment_intent_ids" in doc;
+  const onlineDepositCents = offeredDepositCents(
+    {
+      type: doc.type ?? "contract",
+      status: doc.status,
+      total: doc.total,
+      line_items: doc.line_items,
+      deposit_received_cents: doc.deposit_received_cents ?? null,
+    },
+    depositReady
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -96,6 +112,28 @@ export default function ContractDetail({
         receivedAt={doc.deposit_received_at ?? null}
         method={doc.deposit_method ?? null}
       />
+
+      {doc.status === "signed" && (doc.deposit_received_cents ?? 0) === 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/3 p-4">
+          {onlineDepositCents != null ? (
+            <>
+              <p className="text-sm">
+                Online deposit {formatPrice(onlineDepositCents / 100)}, from the payment terms. The customer sees Pay deposit in
+                the portal; it records here on its own when paid.
+              </p>
+              <PaymentLinkButton id={doc.id} kind="deposit" />
+            </>
+          ) : (
+            <p className={subTextClass}>
+              {!depositReady
+                ? "Online deposit is off until SQL 0075 is run."
+                : depositDueCents(doc) == null
+                  ? "The payment terms don't name a deposit amount, so it can't be paid online. Record it above when it comes in."
+                  : null}
+            </p>
+          )}
+        </div>
+      )}
 
       {doc.status === "signed" && (
         <div className="rounded-xl border border-white/8 bg-white/3 p-4">
