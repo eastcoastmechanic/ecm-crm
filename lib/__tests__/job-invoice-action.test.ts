@@ -10,7 +10,7 @@ const h = vi.hoisted(() => ({
   redirected: null as string | null,
 }));
 
-vi.mock("@/lib/require-role", () => ({ requireOffice: () => Promise.resolve() }));
+vi.mock("@/lib/require-role", () => ({ requireOffice: () => Promise.resolve(), getStaffRole: () => Promise.resolve("office") }));
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
@@ -33,7 +33,7 @@ vi.mock("@/lib/supabase", () => ({
   supabase: {
     from: (table: string) => {
       const chain: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "neq"]) chain[m] = () => chain;
+      for (const m of ["select", "eq", "neq", "or", "order"]) chain[m] = () => chain;
       chain.maybeSingle = () =>
         table === "jobs"
           ? Promise.resolve({ data: h.job, error: h.jobError })

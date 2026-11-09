@@ -347,8 +347,10 @@ export async function createInvoiceDirect(input: {
   jobId?: string;
   /** Extra columns for the new row (for example a marker the database keeps unique). */
   extra?: Record<string, unknown>;
+  /** A draft with no lines yet (Finish on a job with no price on file). The office adds them before sending. */
+  allowNoItems?: boolean;
 }): Promise<CreateInvoiceDirectResult> {
-  if (input.items.length === 0) throw new Error("Add at least one line item before creating an invoice");
+  if (input.items.length === 0 && !input.allowNoItems) throw new Error("Add at least one line item before creating an invoice");
 
   const total = Math.round(input.items.reduce((sum, item) => sum + item.unit_price * item.qty, 0) * 100) / 100;
 

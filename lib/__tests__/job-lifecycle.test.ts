@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   graph: vi.fn(),
   planner: vi.fn(),
   notifyTech: vi.fn(),
+  ensureInvoice: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", async () => {
@@ -35,6 +36,16 @@ vi.mock("@/lib/tech-notice-send", () => ({ notifyTech: (...a: unknown[]) => h.no
 vi.mock("@/lib/time-clock", () => ({
   finalizeJobTime: (...a: unknown[]) => (h.finalize(...a), Promise.resolve(null)),
   closeJobEntries: vi.fn(),
+}));
+vi.mock("@/lib/finish-invoice", () => ({
+  ensureFinishInvoice: (...a: unknown[]) => {
+    h.ensureInvoice(...a);
+    return Promise.resolve({
+      kind: "created",
+      priced: true,
+      invoice: { id: "inv1", doc_number: "INV-1001", status: "draft", total: 500, sent_at: null },
+    });
+  },
 }));
 
 import { applyJobStatus } from "../job-lifecycle";
@@ -66,7 +77,7 @@ function jobsTable(row: JobRow) {
 
 beforeEach(() => {
   h.calls = [];
-  for (const fn of [h.emailSend, h.notifyOwner, h.finalize, h.graph, h.planner, h.notifyTech]) fn.mockReset();
+  for (const fn of [h.emailSend, h.notifyOwner, h.finalize, h.graph, h.planner, h.notifyTech, h.ensureInvoice]) fn.mockReset();
   vi.stubEnv("OWNER_EMAIL", "");
 });
 
@@ -91,7 +102,13 @@ describe("applyJobStatus", () => {
 
     expect(results.map((r) => r.changed).sort()).toEqual([false, true]);
     expect(h.notifyOwner).toHaveBeenCalledTimes(1);
-    expect(h.notifyOwner).toHaveBeenCalledWith("job_completed", "j1");
+    // One alert, carrying what Finish did about the invoice; the draft is ensured once.
+    expect(h.notifyOwner).toHaveBeenCalledWith("job_completed", "j1", {
+      invoiceLine: "Draft invoice INV-1001 ready to review and send.",
+      invoiceId: "inv1",
+    });
+    expect(h.ensureInvoice).toHaveBeenCalledTimes(1);
+    expect(h.ensureInvoice).toHaveBeenCalledWith("j1");
     expect(h.finalize).toHaveBeenCalledTimes(1);
     expect(h.planner).toHaveBeenCalledTimes(1);
     expect(row.status).toBe("complete");
@@ -105,6 +122,15 @@ describe("applyJobStatus", () => {
     expect(h.notifyOwner).toHaveBeenCalledTimes(1);
     expect(h.finalize).toHaveBeenCalledTimes(1);
     expect(h.graph).toHaveBeenCalledTimes(1);
+    expect(h.ensureInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("only Finish looks at the invoice", async () => {
+    const row: JobRow = { id: "j1", status: "scheduled", completed_at: null, arrived_at: null, on_way_at: null };
+    jobsTable(row);
+    await applyJobStatus("j1", "in_progress");
+    await applyJobStatus("j1", "cancelled");
+    expect(h.ensureInvoice).not.toHaveBeenCalled();
   });
 
   it("only updates where the status is still the one it read", async () => {

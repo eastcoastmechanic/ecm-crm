@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireOffice } from "@/lib/require-role";
-import { createInvoiceDirect } from "@/lib/document-generation";
-import { centsToDollars, formatMoney, parseMoneyToCents } from "@/lib/job-invoice-rules";
+import { balanceLineFor, parseMoneyToCents } from "@/lib/job-invoice-rules";
+import { createJobBalanceInvoice, findLiveJobInvoice, loadLinkedDoc } from "@/lib/finish-invoice";
 
 export type CreateInvoiceState = { error: string } | null;
 
@@ -13,6 +13,8 @@ export type CreateInvoiceState = { error: string } | null;
  * Office-only: make the invoice for a finished job. The amount is what the office types
  * (prefilled with contract total minus deposit received), so nothing is guessed here.
  * The invoice is linked to the job and opens as a draft, where Send and Pay now already live.
+ * Finish makes the same draft on its own (lib/finish-invoice.ts); this is the manual path for
+ * a job that has none (an older job, or the draft was voided).
  */
 export async function createBalanceInvoice(_prev: CreateInvoiceState, formData: FormData): Promise<CreateInvoiceState> {
   await requireOffice();
@@ -31,67 +33,27 @@ export async function createBalanceInvoice(_prev: CreateInvoiceState, formData: 
   if (job.status !== "complete") return { error: "Finish the job before invoicing it." };
   if (!job.customer_id) return { error: "This job has no customer. Add one first." };
 
-  const { data: existing, error: existingError } = await supabase
-    .from("documents")
-    .select("id")
-    .eq("type", "invoice")
-    .eq("job_id", jobId)
-    .neq("status", "void")
-    .limit(1);
-  if (existingError) return { error: existingError.message };
-  if (existing && existing.length > 0) return { error: "This job already has an invoice." };
-
-  let description = "Balance due for completed work";
-  let notes: string | null = null;
-  if (job.document_id) {
-    const { data: contract } = await supabase
-      .from("documents")
-      .select("doc_number, type, total, deposit_received_cents")
-      .eq("id", job.document_id)
-      .maybeSingle();
-    if (contract && contract.type === "contract") {
-      description = `Balance due on contract ${contract.doc_number ?? ""}`.trim();
-      if (contract.total != null) {
-        const dep = contract.deposit_received_cents;
-        notes = `Contract total ${formatMoney(Math.round(Number(contract.total) * 100))}${
-          dep != null ? `, deposit received ${formatMoney(dep)}` : ""
-        }`;
-      }
-    }
-  }
-
-  const input = {
-    customerId: job.customer_id as string,
-    propertyId: (job.property_id as string | null) ?? null,
-    jobId,
-    items: [
-      {
-        category: "Contract balance",
-        description,
-        price_book_item_name: null,
-        qty: 1,
-        unit: "ea",
-        unit_price: centsToDollars(cents),
-        notes,
-      },
-    ],
-  };
-
-  // balance_for_job_id (SQL 0058) has a unique index, so the database itself refuses a second live
-  // balance invoice for the job, even when two taps race. Without that SQL there is no such guard,
-  // so refuse rather than risk billing twice.
-  let documentId: string;
   try {
-    const result = await createInvoiceDirect({ ...input, extra: { balance_for_job_id: jobId } });
-    documentId = result.documentId;
+    if (await findLiveJobInvoice(jobId, job.document_id as string | null)) return { error: "This job already has an invoice." };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "";
-    if (/documents_one_balance_invoice_per_job_idx/.test(message)) return { error: "This job already has an invoice." };
-    if (/balance_for_job_id/.test(message)) return { error: "Run SQL 0058 first (it stops a job being invoiced twice), then try again." };
-    return { error: message || "Could not create the invoice." };
+    return { error: err instanceof Error ? err.message : "Couldn't check for an invoice. Try again." };
   }
+
+  const line = balanceLineFor(await loadLinkedDoc(job.document_id as string | null));
+  const result = await createJobBalanceInvoice(
+    {
+      id: jobId,
+      customer_id: job.customer_id as string,
+      property_id: (job.property_id as string | null) ?? null,
+      document_id: (job.document_id as string | null) ?? null,
+    },
+    cents,
+    line
+  );
+  if ("exists" in result) return { error: "This job already has an invoice." };
+  if ("error" in result) return { error: result.error };
 
   revalidatePath("/jobs");
   revalidatePath("/documents");
-  redirect(`/documents/${documentId}`);
+  redirect(`/documents/${result.documentId}`);
 }

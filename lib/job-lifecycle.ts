@@ -9,6 +9,8 @@ import { formatEtDateTime } from "@/lib/tz";
 import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 import { notifyTech } from "@/lib/tech-notice-send";
 import { closeJobEntries, finalizeJobTime } from "@/lib/time-clock";
+import { ensureFinishInvoice } from "@/lib/finish-invoice";
+import { finishInvoiceAlertLine } from "@/lib/job-invoice-rules";
 
 // Shared job lifecycle. The Jobs page, the truck screen, the Field Board and the
 // field bot all change status through applyJobStatus so arrived_at, completed_at,
@@ -176,7 +178,14 @@ export async function applyJobStatus(
   }
 
   if (status === "complete") {
-    await notifyOwnerOfEvent("job_completed", id);
+    // Office sends, tech never sees money: make sure the job has an invoice (a draft, never
+    // sent), then one owner alert that says which. Nothing here reaches the caller, so a tech's
+    // Finish (button or phone queue) gets no invoice data back.
+    const invoice = await ensureFinishInvoice(id);
+    await notifyOwnerOfEvent("job_completed", id, {
+      invoiceLine: finishInvoiceAlertLine(invoice),
+      invoiceId: invoice.kind === "none" ? undefined : invoice.invoice.id,
+    });
 
     // A finished plan visit is done in the plan too. Best effort: never blocks the job.
     const { error: visitError } = await supabase

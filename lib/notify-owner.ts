@@ -119,7 +119,15 @@ function money(n: number | string | null | undefined) {
  *
  * Never throws: an alert must not undo or fail the thing it reports.
  */
-export async function notifyOwnerOfEvent(kind: OwnerEvent, id: string) {
+export async function notifyOwnerOfEvent(
+  kind: OwnerEvent,
+  id: string,
+  /**
+   * job_completed only: what Finish did about the invoice (lib/finish-invoice.ts). It goes in the
+   * owner's email, never in the Teams Dispatch post, which the techs read.
+   */
+  opts: { invoiceLine?: string; invoiceId?: string } = {}
+) {
   try {
     let who = "A customer";
     let what = "";
@@ -166,11 +174,13 @@ export async function notifyOwnerOfEvent(kind: OwnerEvent, id: string) {
     });
 
     if (OWNER_EMAIL) {
+      const invoiceLine = kind === "job_completed" ? opts.invoiceLine : undefined;
+      const invoiceLink = kind === "job_completed" && opts.invoiceId ? `${APP_URL}/documents/${opts.invoiceId}` : null;
       await resend.emails.send({
         from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
         to: OWNER_EMAIL,
-        subject: line,
-        text: `${line}\n\n${link}`,
+        subject: invoiceLine ? `${line}. ${invoiceLine}` : line,
+        text: [line, invoiceLine, invoiceLink ? `Invoice: ${invoiceLink}` : null, link].filter(Boolean).join("\n\n"),
       });
     }
     if (OWNER_PHONE && kind !== "job_completed") {

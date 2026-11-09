@@ -7,6 +7,8 @@ import { addJobPhotos, markOnWay, rescheduleJob, updateJobStatus } from "./actio
 import { addTask, completeTask } from "../tasks/actions";
 import SubmitButton from "../SubmitButton";
 import CreateInvoiceForm from "./CreateInvoiceForm";
+import FinishInvoicePanel from "./FinishInvoicePanel";
+import type { InvoicePrompt } from "@/lib/job-invoice-rules";
 import AssignJobForm from "./AssignJobForm";
 import JobNotebook from "./JobNotebook";
 import JobTimers, { type JobTimerView } from "./JobTimers";
@@ -147,6 +149,16 @@ export default function JobsView({
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [actionError, setActionError] = useState<string | null>(null);
+  // After Finish: the job's draft invoice to send (owner/office only; the server sends none to a tech).
+  const [invoicePrompts, setInvoicePrompts] = useState<Record<string, InvoicePrompt>>({});
+  function setInvoicePrompt(jobId: string, prompt: InvoicePrompt | undefined) {
+    setInvoicePrompts((prev) => {
+      const next = { ...prev };
+      if (prompt) next[jobId] = prompt;
+      else delete next[jobId];
+      return next;
+    });
+  }
   const [search, setSearch] = useState("");
   const [onWayPendingId, setOnWayPendingId] = useState<string | null>(null);
   const [optimizeDate, setOptimizeDate] = useState(() => toDateKey(new Date()));
@@ -208,6 +220,7 @@ export default function JobsView({
         setActionError(result.error);
         return;
       }
+      setInvoicePrompt(String(formData.get("id") ?? ""), result.invoicePrompt);
       router.refresh();
     } catch {
       setActionError("Couldn't save the status. Check your connection and try again.");
@@ -543,6 +556,10 @@ export default function JobsView({
                 <SubmitButton className={buttonClass}>Save</SubmitButton>
               </div>
             </form>
+
+              {invoicePrompts[job.id] && (
+                <FinishInvoicePanel prompt={invoicePrompts[job.id]} onClose={() => setInvoicePrompt(job.id, undefined)} />
+              )}
 
               <AssignJobForm jobId={job.id} assignedStaffId={job.assigned_staff_id ?? null} staff={staff} />
 

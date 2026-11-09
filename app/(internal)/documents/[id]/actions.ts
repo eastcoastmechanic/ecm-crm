@@ -341,6 +341,10 @@ async function buildDocumentEmail(id: string, type: string | undefined): Promise
   const { data, customerEmail, dueDate, error } = await getDocumentForPdf(id);
   if (error || !data) return { error: "Couldn't load this document. Refresh and try again." };
   if (!customerEmail) return { error: NO_EMAIL };
+  // A draft made on Finish with no price on file has no lines: never email an empty invoice.
+  if (data.type === "invoice" && Array.isArray(data.line_items) && data.line_items.length === 0) {
+    return { error: "This invoice has no line items yet. Add them and save, then send." };
+  }
   const label = typeLabel[data.type] ?? "Document";
   return {
     to: customerEmail,

@@ -175,8 +175,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     const priceDoc = job.document_id ? docById.get(job.document_id) : undefined;
     // With a contract/estimate, it is the price (its deposit and balance invoices are parts of it,
     // so they are not added again). Without one, the job's own invoices are the price.
+    // A draft made on Finish with no price on file has no lines yet: it is not a $0 price.
     const invoices = linkedDocs.filter(
-      (d) => d.type === "invoice" && (d.job_id === job.id || d.balance_for_job_id === job.id)
+      (d) =>
+        d.type === "invoice" &&
+        (d.job_id === job.id || d.balance_for_job_id === job.id) &&
+        !(Array.isArray(d.line_items?.items) && d.line_items.items.length === 0)
     );
     const pricedBy = priceDoc ? [priceDoc] : invoices;
     const price = pricedBy.length > 0 ? pricedBy.reduce((s, d) => s + (d.total ?? 0), 0) : null;

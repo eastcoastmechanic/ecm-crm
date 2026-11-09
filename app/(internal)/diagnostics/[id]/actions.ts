@@ -7,6 +7,7 @@ import { renderServiceReportPdf } from "@/lib/service-report-pdf";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createInvoiceDirect, type DirectLineItem } from "@/lib/document-generation";
+import { makeRoomForReportInvoice } from "@/lib/finish-invoice";
 import { requireOffice } from "@/lib/require-role";
 import { checkJobAccess } from "@/lib/job-access";
 import { parsePartsUsed } from "@/lib/parts-used";
@@ -260,6 +261,11 @@ async function createReportInvoice(
         "Nothing to invoice yet: save the parts used and/or enter the start and end time (labor needs HOURLY_LABOR_RATE set) first.",
     };
   }
+
+  // One live invoice per job: Finish may have made an empty draft already (voided here), or the
+  // job may be invoiced already (refused, so the customer is not billed twice).
+  const room = await makeRoomForReportInvoice(diagnostic.job_id);
+  if (room.error) return { error: room.error };
 
   try {
     const result = await createInvoiceDirect({ customerId, propertyId, items, jobId: diagnostic.job_id ?? undefined });

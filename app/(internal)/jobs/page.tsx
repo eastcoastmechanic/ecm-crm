@@ -5,7 +5,7 @@ import { resolveJobPhotoLists } from "@/lib/job-photos";
 import { chunk, fetchAllRows, pageLimit } from "@/lib/fetch-all";
 import { listOpenPlannerTasksSafe } from "@/lib/planner-connector";
 import NewServiceCallForm from "./NewServiceCallForm";
-import { balanceDueCents, formatMoney } from "@/lib/job-invoice-rules";
+import { balanceLineFor, formatMoney, type LinkedDoc } from "@/lib/job-invoice-rules";
 import JobsView from "./JobsView";
 import { listJobTimers } from "@/lib/time-edit";
 import { errorClass, headingClass, subTextClass } from "../ui";
@@ -118,24 +118,26 @@ export default async function JobsPage({
     chunk(contractIds).map((ids) =>
       supabase
         .from("documents")
-        .select("id, doc_number, type, total, deposit_received_cents")
-        .eq("type", "contract")
+        .select("id, doc_number, type, status, total, deposit_received_cents")
+        .in("type", ["contract", "estimate"])
         .in("id", ids)
     )
   );
   const contractById = new Map(contractChunks.flatMap((r) => r.data ?? []).map((c) => [c.id as string, c]));
   function invoiceHintFor(job: { id: unknown; document_id?: unknown }) {
     const c = job.document_id ? contractById.get(job.document_id as string) : undefined;
-    if (!c || c.total == null) return undefined;
+    // Same balance rule as the draft made on Finish (lib/job-invoice-rules.ts balanceLineFor).
+    const line = balanceLineFor(c as LinkedDoc | undefined);
+    if (!c || line.cents == null) return undefined;
+    const label = c.type === "contract" ? "Contract" : "Estimate";
     const totalCents = Math.round(Number(c.total) * 100);
     const dep = (c.deposit_received_cents as number | null) ?? null;
-    const balance = balanceDueCents(totalCents, dep);
     return {
-      suggested: (balance / 100).toFixed(2),
+      suggested: (line.cents / 100).toFixed(2),
       note:
         dep == null
-          ? `Contract ${c.doc_number ?? ""} total ${formatMoney(totalCents)}. No deposit is recorded, so the full amount is filled in. Fix it if a deposit came in.`
-          : `Contract ${c.doc_number ?? ""} total ${formatMoney(totalCents)} less deposit received ${formatMoney(dep)}.`,
+          ? `${label} ${c.doc_number ?? ""} total ${formatMoney(totalCents)}. No deposit is recorded, so the full amount is filled in. Fix it if a deposit came in.`
+          : `${label} ${c.doc_number ?? ""} total ${formatMoney(totalCents)} less deposit received ${formatMoney(dep)}.`,
     };
   }
 
