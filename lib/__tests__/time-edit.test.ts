@@ -36,7 +36,7 @@ vi.mock("@/lib/time-clock", () => ({
   getOpenShift: () => Promise.resolve(h.openShift),
 }));
 
-import { addTime, editTime, officePauseJob, officeResumeJob, voidTime } from "../time-edit";
+import { addTime, editTime, listJobTimers, officePauseJob, officeResumeJob, voidTime } from "../time-edit";
 
 const now = new Date("2026-11-05T20:00:00Z"); // Thu 3:00 PM New York (EST)
 
@@ -167,6 +167,43 @@ describe("editTime", () => {
   });
 });
 
+describe("editTime on a finished job", () => {
+  it("sets tracked hours to 0 when the last work timer becomes drive", async () => {
+    h.handler = (call) => {
+      if (call.table === "time_edits") return {};
+      if (call.table === "jobs") return { data: { status: "complete" } };
+      if (has(call, "update")) return {};
+      if (call.end === "maybeSingle") return { data: entryRow };
+      if (has(call, "limit")) return { data: [] }; // no work entries left
+      return { data: [entryRow] };
+    };
+    const result = await editTime({
+      table: "job_time_entries", id: "e1", start: "2026-11-04T08:00", end: "2026-11-04T11:00", kind: "drive", reason: "was driving", editedBy: null, now,
+    });
+    expect(result).toEqual({});
+    expect(h.recompute).toHaveBeenCalledWith("j1");
+    const jobUpdate = h.calls.find((c) => c.table === "jobs" && has(c, "update"));
+    expect(payload(jobUpdate!, "update")).toEqual({ tracked_hours: 0 });
+  });
+});
+
+describe("listJobTimers", () => {
+  it("shows running and paused timers, and nothing when the latest entry was voided", async () => {
+    h.handler = () => ({
+      data: [
+        { id: "x1", job_id: "j1", staff_id: "a", kind: "work", started_at: "2026-11-05T15:00:00Z", ended_at: null },
+        { id: "x2", job_id: "j2", staff_id: "a", kind: "work", started_at: "2026-11-05T13:00:00Z", ended_at: "2026-11-05T14:00:00Z", note: "paused" },
+        { id: "x3", job_id: "j3", staff_id: "a", kind: "work", started_at: "2026-11-05T12:00:00Z", ended_at: "2026-11-05T12:30:00Z", voided_at: "x" },
+        { id: "x4", job_id: "j3", staff_id: "a", kind: "work", started_at: "2026-11-05T11:00:00Z", ended_at: "2026-11-05T11:30:00Z", note: "paused" },
+      ],
+    });
+    const map = await listJobTimers(["j1", "j2", "j3"]);
+    expect(map.get("j1")).toEqual([{ staffId: "a", state: "running", since: "2026-11-05T15:00:00Z" }]);
+    expect(map.get("j2")).toEqual([{ staffId: "a", state: "paused", since: "2026-11-05T14:00:00Z" }]);
+    expect(map.has("j3")).toBe(false);
+  });
+});
+
 describe("addTime", () => {
   it("adds a missed job timer, ties it to the day shift, logs it and re-figures the job", async () => {
     const added = { ...entryRow, id: "e9", source: "office" };
@@ -215,6 +252,12 @@ describe("voidTime", () => {
     });
     expect(audits()[0]).toMatchObject({ action: "void", before: { voided_at: null }, after: { voided_at: now.toISOString(), voided_reason: "Test entry" } });
     expect(h.recompute).toHaveBeenCalledWith("j1");
+  });
+
+  it("clears the paused mark so the truck card stops offering Resume", async () => {
+    setup({ table: "job_time_entries", row: { ...entryRow, note: "paused" } });
+    await voidTime({ table: "job_time_entries", id: "e1", reason: "Test", editedBy: null, now });
+    expect(payload(updates("job_time_entries")[0], "update")).toMatchObject({ note: null, voided_reason: "Test" });
   });
 
   it("says to run SQL 0078 when the columns are missing", async () => {

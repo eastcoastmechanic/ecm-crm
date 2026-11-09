@@ -53,8 +53,20 @@ async function nearbyRows(table: TimeTable, staffId: string, start: Date, end: D
   return (data ?? []) as TimeSpan[];
 }
 
-async function afterEntryChange(table: TimeTable, jobId: unknown) {
-  if (table === "job_time_entries" && typeof jobId === "string" && jobId) await recomputeTrackedHours(jobId);
+async function afterEntryChange(table: TimeTable, jobId: unknown, wasWork = false) {
+  if (table !== "job_time_entries" || typeof jobId !== "string" || !jobId) return;
+  await recomputeTrackedHours(jobId);
+  // recomputeTrackedHours keeps the old number when a job has no work entries at all (older jobs).
+  // If the office just turned the job's last work timer into drive, its hours came from entries,
+  // so a finished job goes to 0 instead of keeping work time that is no longer there.
+  if (!wasWork) return;
+  const [{ data: job }, { data: work }] = await Promise.all([
+    supabase.from("jobs").select("status").eq("id", jobId).maybeSingle(),
+    supabase.from("job_time_entries").select("id").eq("job_id", jobId).eq("kind", "work").limit(1),
+  ]);
+  if (job?.status === "complete" && (work ?? []).length === 0) {
+    await supabase.from("jobs").update({ tracked_hours: 0 }).eq("id", jobId);
+  }
 }
 
 function readKind(value: unknown): "work" | "drive" | null {
@@ -130,7 +142,7 @@ export async function editTime(input: EditInput): Promise<Result> {
   await logTimeEdit(
     timeEditRecord({ table: input.table, rowId: row.id, action: "edit", before: row, change: { ...change, source: "office" }, reason: reason.reason, editedBy: input.editedBy })
   );
-  await afterEntryChange(input.table, row.job_id);
+  await afterEntryChange(input.table, row.job_id, row.kind === "work" && change.kind === "drive");
   return {};
 }
 
@@ -228,7 +240,9 @@ export async function voidTime(input: {
   if (isVoided(row)) return { error: "That entry is already voided." };
   if (!row.ended_at) return { error: "That one is still running. Give it an end time (Edit) or pause it first." };
 
-  const change = { voided_at: now.toISOString(), voided_reason: reason.reason };
+  // A voided paused timer must not leave the truck card (or Jobs) offering Resume on it.
+  const change: Record<string, unknown> = { voided_at: now.toISOString(), voided_reason: reason.reason };
+  if (input.table === "job_time_entries" && row.note === "paused") change.note = null;
   const { error } = await supabase
     .from(input.table)
     .update({ ...change, reviewed_at: now.toISOString() })
@@ -349,10 +363,13 @@ export async function listJobTimers(jobIds: string[]): Promise<Map<string, JobTi
   }
   const seen = new Set<string>();
   for (const row of rows) {
-    if (isVoided(row) || !row.job_id) continue;
+    if (!row.job_id) continue;
+    // Only the tech's latest work entry on the job decides (as on the truck card). A voided latest
+    // entry means nothing to pause or resume; an older entry's "paused" note is history.
     const key = `${row.job_id}:${row.staff_id}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    if (isVoided(row)) continue;
     const state = !row.ended_at ? "running" : row.note === "paused" ? "paused" : null;
     if (!state) continue;
     const list = out.get(row.job_id) ?? [];
