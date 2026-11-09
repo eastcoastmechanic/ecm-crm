@@ -7,14 +7,21 @@ import { selectedTier, TIER_LABEL } from "@/lib/estimate-tier";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
+const WEB_LEAD_SOURCE_LABEL = {
+  web_form: "website booking form",
+  web_chat: "AI chatbot",
+  portal: "customer portal",
+} as const;
+
 /**
- * A "requested" job from an anonymous website visitor (booking form or
- * chatbot) doesn't otherwise surface anywhere until staff happen to check
- * the Jobs list — unlike scheduled jobs, which already email OWNER_EMAIL.
- * This fires immediately so a new web lead doesn't sit unseen.
+ * A "requested" job from a website visitor (booking form or chatbot) or a
+ * signed-in customer (portal Request Service) doesn't otherwise surface
+ * anywhere until staff happen to check the Jobs list — unlike scheduled jobs,
+ * which already email OWNER_EMAIL. This fires immediately so a new request
+ * doesn't sit unseen.
  */
 export async function notifyOwnerOfWebLead(params: {
-  source: "web_form" | "web_chat";
+  source: keyof typeof WEB_LEAD_SOURCE_LABEL;
   customerName: string;
   phone: string | null;
   address: string;
@@ -24,12 +31,12 @@ export async function notifyOwnerOfWebLead(params: {
   if (!OWNER_EMAIL) return;
 
   const { source, customerName, phone, address, description, scheduledAt } = params;
-  const sourceLabel = source === "web_chat" ? "AI chatbot" : "website booking form";
+  const sourceLabel = WEB_LEAD_SOURCE_LABEL[source];
 
   await resend.emails.send({
     from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
     to: OWNER_EMAIL,
-    subject: `New web lead: ${customerName}`,
+    subject: source === "portal" ? `Portal service request: ${customerName}` : `New web lead: ${customerName}`,
     text: `New service request from the ${sourceLabel}, pending confirmation.
 
 Name: ${customerName}

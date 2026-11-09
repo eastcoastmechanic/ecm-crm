@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
+import { claimPortalCustomer } from "@/lib/portal-customer";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -10,14 +11,9 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.user?.email) {
-      // First login: claim the customer record matching this verified
-      // email (RLS only allows this when the row is unclaimed — see
-      // db/migrations/0003_portal_auth.sql).
-      await supabase
-        .from("customers")
-        .update({ auth_user_id: data.user.id })
-        .eq("email", data.user.email)
-        .is("auth_user_id", null);
+      // First login: link the customer record matching this verified email,
+      // only while it's unclaimed (done on the server, see lib/portal-customer.ts).
+      await claimPortalCustomer(data.user);
 
       return NextResponse.redirect(`${origin}/portal`);
     }

@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { requestService, type RequestState } from "./actions";
 import SubmitButton from "../../(internal)/SubmitButton";
 import { buttonClass, errorClass, inputClass } from "../../(internal)/ui";
+import { REQUEST_NOTE_MAX } from "@/lib/portal-view";
 
 export default function RequestServiceForm({ properties }: { properties: { id: string; address: string | null }[] }) {
   const [state, action] = useActionState<RequestState, FormData>(requestService, null);
@@ -50,6 +51,7 @@ export default function RequestServiceForm({ properties }: { properties: { id: s
           name="notes"
           required
           rows={4}
+          maxLength={REQUEST_NOTE_MAX}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="e.g. AC isn't cooling, blowing warm air for the past two days."

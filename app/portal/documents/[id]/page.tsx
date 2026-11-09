@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { createPortalServerClient } from "@/lib/supabase-portal/server";
+import { supabase as adminDb } from "@/lib/supabase";
+import { one } from "@/lib/appointment-reminder";
+import { portalCustomerFor, requirePortalUser } from "@/lib/portal-customer";
+import { formatPortalDate, portalContractTerms, portalPmReport, portalPricedLines } from "@/lib/portal-view";
 import PayNowForm from "./PayNowForm";
 import SignaturePad from "./SignaturePad";
 import ContractView from "./ContractView";
@@ -19,17 +22,6 @@ function estimateMonthlyPayment(principal: number, termMonths: number) {
   return Math.round(payment);
 }
 
-type LineItem = {
-  category: string;
-  description: string;
-  qty: number;
-  unit: string;
-  good: number | null;
-  better: number | null;
-  best: number | null;
-  notes: string | null;
-};
-
 const typeLabel: Record<string, string> = {
   estimate: "Estimate",
   invoice: "Invoice",
@@ -47,45 +39,51 @@ export default async function PortalDocumentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createPortalServerClient();
+  const user = await requirePortalUser();
+  const customer = await portalCustomerFor(user.id);
+  if (!customer) notFound();
 
-  const { data: doc, error } = await supabase
+  // Read on the server with the service client, scoped to this customer, never
+  // a draft, and only the columns this page shows. line_items is narrowed below
+  // (portal-view.ts) so internal fields like a line's cost never reach the page.
+  const { data: row, error } = await adminDb
     .from("documents")
-    .select("*, properties(address)")
+    .select("id, doc_number, type, status, total, created_at, signed_at, paid_at, selected_tier, line_items, properties(address)")
     .eq("id", id)
-    .single();
+    .eq("customer_id", customer.id)
+    .neq("status", "draft")
+    .maybeSingle();
 
-  if (error || !doc) notFound();
+  if (error || !row) notFound();
+
+  const { line_items: rawLineItems, properties, ...fields } = row;
+  const doc = { ...fields, properties: one(properties as { address: string | null } | { address: string | null }[] | null) };
 
   if (doc.type === "contract") {
-    return <ContractView doc={doc} />;
+    return <ContractView doc={{ ...doc, line_items: portalContractTerms(rawLineItems) }} />;
   }
 
   if (doc.type === "pm_report") {
-    const snapshot = doc.line_items as {
-      recommendations?: string | null;
-      failures?: { key?: string; section?: string; label?: string; notes?: string | null }[];
-      summary?: { pass?: number; fail?: number; na?: number };
-    } | null;
-    const failures = snapshot?.failures ?? [];
+    const snapshot = portalPmReport(rawLineItems);
+    const failures = snapshot.failures;
     return (
       <div className="flex flex-col gap-6">
         <div>
           <h1 className={headingClass}>Maintenance report {doc.doc_number ?? ""}</h1>
           <p className={subTextClass}>
             {doc.properties?.address ? `${doc.properties.address} · ` : ""}
-            {new Date(doc.created_at).toLocaleDateString()}
+            {formatPortalDate(doc.created_at)}
           </p>
         </div>
-        {snapshot?.summary && (
+        {snapshot.summary && (
           <p className={subTextClass}>
-            Pass {snapshot.summary.pass ?? 0} · Fail {snapshot.summary.fail ?? 0} · N/A {snapshot.summary.na ?? 0}
+            Pass {snapshot.summary.pass} · Fail {snapshot.summary.fail} · N/A {snapshot.summary.na}
           </p>
         )}
         {failures.length > 0 && (
           <ul className="grid gap-2 text-sm">
-            {failures.map((item) => (
-              <li key={item.key ?? item.label}>
+            {failures.map((item, i) => (
+              <li key={item.key ?? item.label ?? i}>
                 {item.section ? `${item.section} — ` : ""}
                 {item.label}
                 {item.notes ? `. ${item.notes}` : ""}
@@ -93,19 +91,12 @@ export default async function PortalDocumentPage({
             ))}
           </ul>
         )}
-        {snapshot?.recommendations ? <p className="text-sm text-white">{snapshot.recommendations}</p> : null}
+        {snapshot.recommendations ? <p className="text-sm text-white">{snapshot.recommendations}</p> : null}
       </div>
     );
   }
 
-  const lineData = doc.line_items as {
-    items: LineItem[];
-    brand: { good: string | null; better: string | null; best: string | null };
-    mass_save_eligible: boolean;
-    mass_save_note: string | null;
-    totals: { good: number; better: number; best: number };
-    pricing_mode?: "tiered" | "flat";
-  };
+  const lineData = portalPricedLines(rawLineItems);
   const isFlat = lineData.pricing_mode === "flat";
   const chosen = selectedTier(lineData.pricing_mode, doc.selected_tier);
   // Line prices follow the customer's pick once they've chosen; Better until then.
@@ -123,7 +114,7 @@ export default async function PortalDocumentPage({
         </h1>
         <p className={subTextClass}>
           {doc.properties?.address ? `${doc.properties.address} · ` : ""}
-          {new Date(doc.created_at).toLocaleDateString()}
+          {formatPortalDate(doc.created_at)}
         </p>
       </div>
 
@@ -226,7 +217,7 @@ export default async function PortalDocumentPage({
       )}
       {doc.status === "paid" && (
         <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">
-          Paid{doc.paid_at ? ` on ${new Date(doc.paid_at).toLocaleDateString()}` : ""}.
+          Paid{doc.paid_at ? ` on ${formatPortalDate(doc.paid_at)}` : ""}.
         </div>
       )}
 
@@ -236,7 +227,7 @@ export default async function PortalDocumentPage({
       {doc.type === "estimate" && doc.status === "approved" && (
         <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">
           Approved{chosen ? `: ${TIER_LABEL[chosen]} option, ${formatPrice(lineData.totals[chosen])}` : ""}
-          {doc.signed_at ? ` on ${new Date(doc.signed_at).toLocaleDateString()}` : ""}.
+          {doc.signed_at ? ` on ${formatPortalDate(doc.signed_at)}` : ""}.
           We&apos;ll be in touch to schedule the work.
         </div>
       )}

@@ -10,6 +10,8 @@ import type { ContractLineItems } from "@/lib/contract-terms";
 import { etDateKey } from "@/lib/tz";
 import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 import { approvalChoice, type TierTotals } from "@/lib/estimate-tier";
+import { portalCustomerFor } from "@/lib/portal-customer";
+import { isSignatureImage } from "@/lib/portal-view";
 
 export type PayState = { error?: string } | null;
 
@@ -92,12 +94,19 @@ export async function approveEstimate(formData: FormData): Promise<{ error?: str
   if (!user) redirect("/portal/login");
 
   if (!signatureData) return { error: "A signature is required to approve this estimate." };
+  if (!isSignatureImage(signatureData)) return { error: "We couldn't read your signature. Please clear it and sign again." };
 
-  const { data: doc, error } = await supabase
+  // Reads and writes go through the service client, scoped to this customer's
+  // own sent estimate. The customer's session can't write documents (SQL 0070).
+  const customer = await portalCustomerFor(user.id);
+  if (!customer) return { error: "Estimate not found." };
+
+  const { data: doc, error } = await adminDb
     .from("documents")
     .select("id, type, status, line_items")
     .eq("id", documentId)
-    .single();
+    .eq("customer_id", customer.id)
+    .maybeSingle();
 
   if (error || !doc) return { error: "Estimate not found." };
   if (doc.type !== "estimate") return { error: "Only estimates can be approved." };
@@ -114,8 +123,9 @@ export async function approveEstimate(formData: FormData): Promise<{ error?: str
     if (!Number.isFinite(seen) || Math.abs(seen - choice.total) > 0.005) return { error: changed };
   }
 
-  // line_items is never written here, so an office edit saved meanwhile is kept.
-  let update = supabase
+  // Only these columns are written; line_items never is, so an office edit saved meanwhile is kept.
+  // The conditions make a double press or a race apply once.
+  let update = adminDb
     .from("documents")
     .update({
       status: "approved",
@@ -124,6 +134,8 @@ export async function approveEstimate(formData: FormData): Promise<{ error?: str
       ...(choice.tier ? { selected_tier: choice.tier, subtotal: choice.total, tax: 0, total: choice.total } : {}),
     })
     .eq("id", documentId)
+    .eq("customer_id", customer.id)
+    .eq("type", "estimate")
     .eq("status", "sent");
   // And the chosen option's price must not have changed between the read above and this write.
   if (choice.tier) update = update.eq(`line_items->totals->>${choice.tier}`, String(choice.total));
@@ -151,12 +163,19 @@ export async function signContract(formData: FormData): Promise<{ error?: string
 
   if (!signatureData) return { error: "A signature is required to sign this contract." };
   if (!agreed) return { error: "Please tick the box to confirm you've read and agree to the contract terms." };
+  if (!isSignatureImage(signatureData)) return { error: "We couldn't read your signature. Please clear it and sign again." };
 
-  const { data: doc, error } = await supabase
+  // Reads and writes go through the service client, scoped to this customer's
+  // own sent contract. The customer's session can't write documents (SQL 0070).
+  const customer = await portalCustomerFor(user.id);
+  if (!customer) return { error: "We couldn't find this contract. Refresh the page and try again." };
+
+  const { data: doc, error } = await adminDb
     .from("documents")
-    .select("id, type, status, customer_id, property_id, line_items")
+    .select("id, type, status, total, customer_id, property_id, line_items")
     .eq("id", documentId)
-    .single();
+    .eq("customer_id", customer.id)
+    .maybeSingle();
 
   if (error || !doc) return { error: "We couldn't find this contract. Refresh the page and try again." };
   if (doc.type !== "contract") return { error: "Only contracts can be signed here." };
@@ -172,7 +191,9 @@ export async function signContract(formData: FormData): Promise<{ error?: string
   const authorizeRenewal = formData.get("auto_renew") === "on" && !!renewalCents && renewalCents > 0;
   const signedAt = new Date().toISOString();
 
-  const { data: signed, error: updateError } = await supabase
+  // Only these columns are written. The conditions make a double press or a race apply once, and refuse
+  // the signature if the contract price changed between the read above and this write.
+  let update = adminDb
     .from("documents")
     .update({
       status: "signed",
@@ -183,8 +204,11 @@ export async function signContract(formData: FormData): Promise<{ error?: string
       ...(authorizeRenewal ? { line_items: { ...lineItems, autoRenewAuthorizedAt: signedAt } } : {}),
     })
     .eq("id", documentId)
-    .eq("status", "sent")
-    .select("id");
+    .eq("customer_id", customer.id)
+    .eq("type", "contract")
+    .eq("status", "sent");
+  update = doc.total === null ? update.is("total", null) : update.eq("total", doc.total);
+  const { data: signed, error: updateError } = await update.select("id");
 
   if (updateError) {
     console.error("signContract: update failed", updateError.message);

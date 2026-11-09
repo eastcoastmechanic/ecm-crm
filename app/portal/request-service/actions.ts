@@ -2,52 +2,74 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createPortalServerClient } from "@/lib/supabase-portal/server";
-import { etDateAtHour, etDateKey } from "@/lib/tz";
-
-const WINDOW_HOURS: Record<string, number> = {
-  morning: 8,
-  afternoon: 12,
-  evening: 16,
-};
+import { supabase as adminDb } from "@/lib/supabase";
+import { portalCustomerFor, requirePortalUser } from "@/lib/portal-customer";
+import { validateServiceRequest } from "@/lib/portal-view";
+import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
+import { etDateKey } from "@/lib/tz";
 
 export type RequestState = { error?: string } | null;
 
-/** Customer asks for service from the portal. Returns { error } so the form keeps what they typed. */
+/**
+ * Customer asks for service from the portal. Returns { error } so the form keeps what they typed.
+ * The customer only picks one of their own properties, a day, a window and says what's wrong; the
+ * server sets everything else on the job and saves it with the service client (the customer's
+ * own session can't insert jobs after SQL 0070).
+ */
 export async function requestService(_prev: RequestState, formData: FormData): Promise<RequestState> {
-  const supabase = await createPortalServerClient();
+  const user = await requirePortalUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login");
-
-  const { data: customer } = await supabase.from("customers").select("id").limit(1).maybeSingle();
+  const customer = await portalCustomerFor(user.id);
   if (!customer) return { error: "Your login isn't linked to a customer account yet. Please call us and we'll fix it." };
 
-  const property_id = String(formData.get("property_id") ?? "");
-  const date = String(formData.get("date") ?? "");
-  const window = String(formData.get("window") ?? "");
-  const notes = String(formData.get("notes") ?? "").trim();
+  const { data: properties, error: propertiesError } = await adminDb
+    .from("properties")
+    .select("id, address")
+    .eq("customer_id", customer.id);
+  if (propertiesError) {
+    console.error("requestService: property lookup failed", propertiesError.message);
+    return { error: "Couldn't send your request. Please try again, or call us." };
+  }
 
-  if (!property_id) return { error: "Please pick the property." };
-  if (!notes) return { error: "Please tell us what you need service for." };
-  // The window is New York time; the server clock is UTC.
-  const scheduled_at = date ? etDateAtHour(date, WINDOW_HOURS[window] ?? 8) : null;
-  if (!scheduled_at) return { error: "Please pick a preferred date." };
-  if (date < etDateKey()) return { error: "That date has passed. Please pick today or a later day." };
+  const checked = validateServiceRequest(
+    {
+      propertyId: String(formData.get("property_id") ?? ""),
+      date: String(formData.get("date") ?? ""),
+      window: String(formData.get("window") ?? ""),
+      notes: String(formData.get("notes") ?? ""),
+    },
+    { today: etDateKey(), propertyIds: (properties ?? []).map((p) => p.id as string) }
+  );
+  if (!checked.ok) return { error: checked.error };
 
-  const { error } = await supabase.from("jobs").insert({
+  const { error } = await adminDb.from("jobs").insert({
     customer_id: customer.id,
-    property_id,
-    scheduled_at: scheduled_at.toISOString(),
+    property_id: checked.propertyId,
+    scheduled_at: checked.scheduledAt.toISOString(),
     status: "requested",
-    notes,
+    created_via: "portal",
+    notes: checked.notes,
   });
 
   if (error) {
     console.error("requestService: insert failed", error.message);
     return { error: "Couldn't send your request. Please try again, or call us." };
+  }
+
+  // The request is saved; a failed owner email shouldn't make the customer retry.
+  try {
+    const { data: contact } = await adminDb.from("customers").select("phone").eq("id", customer.id).maybeSingle();
+    const address = (properties ?? []).find((p) => p.id === checked.propertyId)?.address as string | null | undefined;
+    await notifyOwnerOfWebLead({
+      source: "portal",
+      customerName: customer.name ?? "A portal customer",
+      phone: (contact?.phone as string | null | undefined) ?? null,
+      address: address ?? "address not on file",
+      description: checked.notes,
+      scheduledAt: checked.scheduledAt,
+    });
+  } catch (err) {
+    console.error("requestService: owner alert failed", err instanceof Error ? err.message : err);
   }
 
   revalidatePath("/portal");
