@@ -5,6 +5,9 @@ import { requireOwner } from "@/lib/require-role";
 import { postToTeams, teamsConfigured, type TeamsChannel } from "@/lib/teams";
 import { disconnect } from "@/lib/microsoft-delegated";
 import { revalidatePath } from "next/cache";
+import { supabase } from "@/lib/supabase";
+import { getMyStaffId } from "@/lib/job-access";
+import { BOT_NAME_PATTERN, newBotKey } from "@/lib/bot-keys";
 
 export async function updatePassword(formData: FormData) {
   const password = formData.get("password") as string;
@@ -72,6 +75,53 @@ export async function disconnectOneNote(): Promise<{ error?: string }> {
     return { error: "Only the owner can do this." };
   }
   await disconnect();
+  revalidatePath("/account");
+  return {};
+}
+
+export type BotKeyState = { error?: string; name?: string; created?: { name: string; key: string } } | null;
+
+/** Owner-only. Makes a key for one bot. The key is returned once and only its hash is stored. */
+export async function createBotKey(_prev: BotKeyState, formData: FormData): Promise<BotKeyState> {
+  try {
+    await requireOwner();
+  } catch {
+    return { error: "Only the owner can do this." };
+  }
+  const name = String(formData.get("name") ?? "").trim().toLowerCase();
+  if (!BOT_NAME_PATTERN.test(name)) {
+    return { error: "Name: 2 to 40 letters, numbers or dashes, like quo or field-board.", name };
+  }
+  const { key, hash, hint } = newBotKey();
+  const { error } = await supabase.from("bot_keys").insert({
+    name,
+    token_hash: hash,
+    token_hint: hint,
+    created_by: await getMyStaffId(),
+  });
+  if (error) {
+    if (error.code === "23505") return { error: `${name} already has a live key. Revoke it first.`, name };
+    if (error.code === "42P01") return { error: "The bot_keys table isn't there yet. Run SQL 0068 first.", name };
+    return { error: "Couldn't save the key. Try again.", name };
+  }
+  revalidatePath("/account");
+  return { created: { name, key } };
+}
+
+/** Owner-only. Cuts one bot off. Its old posts stay. */
+export async function revokeBotKey(_prev: BotKeyState, formData: FormData): Promise<BotKeyState> {
+  try {
+    await requireOwner();
+  } catch {
+    return { error: "Only the owner can do this." };
+  }
+  const id = String(formData.get("id") ?? "");
+  const { error } = await supabase
+    .from("bot_keys")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("revoked_at", null);
+  if (error) return { error: "Couldn't revoke the key. Try again." };
   revalidatePath("/account");
   return {};
 }

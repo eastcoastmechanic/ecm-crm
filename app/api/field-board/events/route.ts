@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import {
-  fieldBoardAuthorized,
-  ingestFieldBoardEvent,
-  type FieldBoardEventBody,
-} from "@/lib/field-board";
+import { ingestFieldBoardEvent, type FieldBoardEventBody } from "@/lib/field-board";
+import { fieldBoardCaller } from "@/lib/bot-keys";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!fieldBoardAuthorized(request)) {
+  const caller = await fieldBoardCaller(request);
+  if (!caller) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -17,7 +15,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const result = await ingestFieldBoardEvent(body);
+  // A bot's own key decides its name; the `source` it sends is ignored.
+  const result = await ingestFieldBoardEvent(caller.bot ? { ...body, source: caller.bot } : body);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

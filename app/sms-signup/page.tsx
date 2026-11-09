@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { signUpForSms } from "./actions";
+import ActionForm from "../ActionForm";
 
 export const metadata = {
   title: "Text Message Sign-Up | East Coast Mechanical",
@@ -41,7 +42,7 @@ export default async function SmsSignupPage({
               scheduled service appointments — confirmations, rescheduling, and reminders.
             </p>
 
-            <form action={signUpForSms} className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
+            <ActionForm action={signUpForSms} className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
               <label className="flex flex-col gap-1 text-xs text-g300">
                 Name (optional)
                 <input
@@ -80,11 +81,11 @@ export default async function SmsSignupPage({
 
               <button
                 type="submit"
-                className="w-fit rounded-lg bg-gradient-to-br from-accent to-accent-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90"
+                className="w-fit rounded-lg bg-gradient-to-br from-accent to-accent-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 Send Confirmation Text
               </button>
-            </form>
+            </ActionForm>
           </>
         )}
       </main>

@@ -210,7 +210,10 @@ const setLeadStageTool = betaZodTool({
     fd.set("id", leadId);
     fd.set("status", status);
     try {
-      if (status === "dismissed") await dismissLead(fd);
+      if (status === "dismissed") {
+        const dismissed = await dismissLead(fd);
+        if (dismissed.error) return `Failed to update lead: ${dismissed.error}`;
+      }
       else {
         const result = await setLeadStage(fd);
         if (result.error) return `Failed to update lead: ${result.error}`;
@@ -243,7 +246,8 @@ const addLeadTool = betaZodTool({
     if (address) fd.set("address", address);
     if (summary) fd.set("summary", summary);
     try {
-      await addManualLead(fd);
+      const added = await addManualLead(fd);
+      if (added.error) return `Failed to add lead: ${added.error}`;
       return `Added lead for ${contactName}.`;
     } catch (err) {
       return `Failed to add lead: ${err instanceof Error ? err.message : "unknown error"}`;

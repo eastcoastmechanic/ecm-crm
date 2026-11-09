@@ -105,6 +105,38 @@ describe("review-requests cron", () => {
     expect(h.sms).not.toHaveBeenCalled();
   });
 
+  it("does not text a customer who opted out of follow-ups, and does not stamp the job", async () => {
+    h.jobs = [job({ customers: { ...customer, no_followups: true } })];
+    const out = await run();
+    expect(out.sent).toBe(0);
+    expect(out.skipped).toBe(1);
+    expect(h.sms).not.toHaveBeenCalled();
+    expect(h.updates).toEqual([]);
+  });
+
+  it("does not text when the customer row comes back as an array and follow-ups are off", async () => {
+    h.jobs = [job({ customers: [{ ...customer, no_followups: true }] })];
+    const out = await run();
+    expect(out.sent).toBe(0);
+    expect(out.skipped).toBe(1);
+    expect(h.sms).not.toHaveBeenCalled();
+    expect(h.updates).toEqual([]);
+  });
+
+  it("does not send the reminder when follow-ups are off for that customer", async () => {
+    h.jobs = [job({ review_request_sent_at: ago(5.2), customers: { ...customer, no_followups: true } })];
+    const out = await run();
+    expect(out.sent).toBe(0);
+    expect(h.sms).not.toHaveBeenCalled();
+    expect(h.updates).toEqual([]);
+  });
+
+  it("still texts when the follow-up flag is off", async () => {
+    h.jobs = [job({ customers: { ...customer, no_followups: false } })];
+    expect((await run()).sent).toBe(1);
+    expect(h.sms).toHaveBeenCalledTimes(1);
+  });
+
   it("does not text a number that is opted out", async () => {
     h.canText = false;
     expect((await run()).sent).toBe(0);

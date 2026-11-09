@@ -11,6 +11,7 @@ type Customer = {
   email: string | null;
   phone: string | null;
   billing_address: string | null;
+  no_followups?: boolean | null;
 };
 
 type Property = {
@@ -96,7 +97,14 @@ export default function CustomerList({
         {filtered.map((customer) => (
           <div key={customer.id} className="flex items-center gap-2 py-3">
             <Link href={`/customers/${customer.id}`} className="min-w-0 flex-1 hover:opacity-80">
-              <div className={itemTitleClass}>{customer.name}</div>
+              <div className={itemTitleClass}>
+                {customer.name}
+                {customer.no_followups && (
+                  <span className="ml-2 rounded bg-gold/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">
+                    No follow-ups
+                  </span>
+                )}
+              </div>
               <div className={itemSubClass}>
                 {[customer.email, customer.phone].filter(Boolean).join(" · ")}
               </div>
