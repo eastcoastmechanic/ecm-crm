@@ -6,7 +6,7 @@ import { idsWhere, idsWhereIn, unique, cascadeUnlinkEquipment, cascadeUnlinkJobs
 import { syncCustomerToGraph, deleteCustomerFromGraph, deleteJobFromGraph, deleteDocumentFromGraph } from "@/lib/graph-connector";
 import { requireOffice } from "@/lib/require-role";
 
-export async function addCustomer(formData: FormData) {
+export async function addCustomer(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
   const name = (formData.get("name") as string)?.trim();
   const email = (formData.get("email") as string)?.trim();
@@ -25,7 +25,7 @@ export async function addCustomer(formData: FormData) {
   const billingSame = formData.get("billing_same") === "on";
 
   if (!name) {
-    throw new Error("Name is required");
+    return { error: "Name is required" };
   }
 
   const { data: customer, error } = await supabase
@@ -47,7 +47,7 @@ export async function addCustomer(formData: FormData) {
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    return { error: "Couldn't save. Try again." };
   }
 
   if (customer && propertyAddress) {
@@ -57,16 +57,17 @@ export async function addCustomer(formData: FormData) {
       property_type: propertyType || null,
       access_notes: accessNotes || null,
     });
-    if (propertyError) throw new Error(`Customer saved, but the property was not: ${propertyError.message}`);
+    if (propertyError) return { error: "Customer saved, but the property was not. Add it from the customer page." };
   }
 
   if (customer) await syncCustomerToGraph(customer.id);
 
   revalidatePath("/customers");
   revalidatePath("/properties");
+  return {};
 }
 
-export async function updateCustomer(formData: FormData) {
+export async function updateCustomer(formData: FormData): Promise<{ error?: string }> {
   await requireOffice();
   const id = formData.get("id") as string;
   const name = (formData.get("name") as string)?.trim();
@@ -79,8 +80,8 @@ export async function updateCustomer(formData: FormData) {
   const company_name = (formData.get("company_name") as string)?.trim();
   const alt_phone = (formData.get("alt_phone") as string)?.trim();
 
-  if (!id) throw new Error("Missing customer id");
-  if (!name) throw new Error("Name is required");
+  if (!id) return { error: "Missing customer id" };
+  if (!name) return { error: "Name is required" };
 
   // Stamp the consent time only when the box goes from off to on. Saving a
   // customer who was on with no time (old default, see SQL 0064) leaves the
@@ -112,7 +113,7 @@ export async function updateCustomer(formData: FormData) {
     })
     .eq("id", id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { error: "Couldn't save. Try again." };
 
   await syncCustomerToGraph(id);
 
@@ -121,6 +122,7 @@ export async function updateCustomer(formData: FormData) {
   revalidatePath("/documents", "layout");
   revalidatePath("/jobs");
   revalidatePath("/dispatch");
+  return {};
 }
 
 export async function deleteCustomer(id: string): Promise<{ error?: string }> {
