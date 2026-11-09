@@ -1,9 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { toE164, phoneKey } from "@/lib/phone";
-import { sendSMS } from "@/lib/sms";
-import { OPT_IN_CONFIRM_REQUEST, clearPendingOptIn, requestOptIn } from "@/lib/sms-consent";
+import { phoneKey } from "@/lib/phone";
+import { startDoubleOptIn } from "@/lib/sms-consent";
 import { COMPANY_PHONE_DISPLAY } from "@/lib/brand";
 
 export type SignupState = { error?: string } | null;
@@ -23,15 +22,7 @@ export async function signUpForSms(_prev: SignupState, formData: FormData): Prom
 
   const sorry = `We couldn't send the confirmation text. Please try again, or call us at ${COMPANY_PHONE_DISPLAY}.`;
   try {
-    const shouldSend = await requestOptIn(phone, name);
-    if (shouldSend) {
-      const sent = await sendSMS(toE164(phone), OPT_IN_CONFIRM_REQUEST);
-      if (!sent.ok) {
-        // Don't let a failed send block the next attempt for 10 minutes.
-        await clearPendingOptIn(phone);
-        return { error: sorry };
-      }
-    }
+    if ((await startDoubleOptIn(phone, name)) === "failed") return { error: sorry };
   } catch (err) {
     console.error("signUpForSms failed", err instanceof Error ? err.message : err);
     return { error: sorry };

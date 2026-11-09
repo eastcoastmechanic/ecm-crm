@@ -121,7 +121,8 @@ export default function BookForm() {
           className="mt-0.5"
         />
         <span>
-          Text me updates about my appointment. Message and data rates may apply, reply STOP to opt out. See our{" "}
+          Text me updates about my appointment. We&apos;ll send one text to confirm; reply YES to start. Message and
+          data rates may apply, reply STOP to opt out. See our{" "}
           <Link href="/privacy" className="underline">
             Privacy Policy
           </Link>{" "}

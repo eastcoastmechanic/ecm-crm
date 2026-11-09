@@ -7,6 +7,11 @@ import { etDateKey } from "@/lib/tz";
 import {
   CAMPAIGN_GAP_DAYS,
   decide,
+  dedupeRecipients,
+  emailMatchKey,
+  lastCampaignForContact,
+  optedOutEmailKeys,
+  sameContactIds,
   fill,
   emailBody,
   MAX_PER_SEND,
@@ -15,6 +20,7 @@ import {
   withinLimit,
   type CampaignKind,
   type Channel,
+  type CustomerFacts,
   type Template,
 } from "@/lib/campaigns";
 
@@ -102,13 +108,37 @@ async function loadFacts() {
   const planned = new Set(
     (plansRes.data ?? []).filter((p) => !p.end_date || (p.end_date as string) >= today).map((p) => p.customer_id as string)
   );
-  const lastCampaign = new Map<string, string>();
+  const lastCampaignById = new Map<string, string>();
   for (const s of sendsRes.data ?? []) {
     const id = s.customer_id as string;
-    const prev = lastCampaign.get(id);
-    if (!prev || (s.sent_at as string) > prev) lastCampaign.set(id, s.sent_at as string);
+    const prev = lastCampaignById.get(id);
+    if (!prev || (s.sent_at as string) > prev) lastCampaignById.set(id, s.sent_at as string);
   }
-  return { customers: (customersRes.data ?? []) as CustomerRow[], lastDone, open, planned, lastCampaign };
+  const allCustomers = (customersRes.data ?? []) as CustomerRow[];
+  // Duplicate records (same phone or email) count as one person: the 30 days
+  // and an email unsubscribe on any of them cover all of them.
+  const sameContact = sameContactIds(allCustomers);
+  const lastCampaign = lastCampaignForContact(sameContact, lastCampaignById);
+  const optedOutEmails = optedOutEmailKeys(allCustomers);
+  return { customers: allCustomers, lastDone, open, planned, lastCampaign, sameContact, optedOutEmails };
+}
+
+function emailOptedOut(c: CustomerRow, optedOutEmails: Set<string>): boolean {
+  const key = emailMatchKey(c.email);
+  return !!c.email_opt_out_at || (!!key && optedOutEmails.has(key));
+}
+
+/** Unsubscribed emails across every customer record, read fresh. Throws on a read error. */
+async function freshOptedOutEmails(): Promise<Set<string>> {
+  const rows = await allRows<{ email: string | null; email_opt_out_at: string | null }>((a, b) =>
+    supabase
+      .from("customers")
+      .select("email, email_opt_out_at")
+      .not("email_opt_out_at", "is", null)
+      .order("id")
+      .range(a, b)
+  );
+  return optedOutEmailKeys(rows);
 }
 
 async function textable(c: CustomerRow): Promise<boolean> {
@@ -123,38 +153,31 @@ export async function buildAudience(kind: CampaignKind, loaded?: Facts): Promise
   const now = new Date();
   const rows: AudienceRow[] = [];
   for (const c of facts.customers) {
-    const decision = decide(
-      kind,
-      {
-        lastCompletedAt: facts.lastDone.get(c.id) ?? null,
-        hasOpenJob: facts.open.has(c.id),
-        hasActivePlan: facts.planned.has(c.id),
-        lastCampaignAt: facts.lastCampaign.get(c.id) ?? null,
-        // Only ask the opt-out tables when the cheaper checks haven't already ruled them out.
-        textable: false,
-        email: c.email,
-        emailOptedOut: !!c.email_opt_out_at,
-      },
-      now
-    );
+    // A duplicate record (same phone or email) is the same person: an open job,
+    // active plan or recent visit on any of them counts for this one too.
+    const group = facts.sameContact.get(c.id) ?? [c.id];
+    let lastCompletedAt: string | null = null;
+    for (const id of group) {
+      const t = facts.lastDone.get(id);
+      if (t && (!lastCompletedAt || t > lastCompletedAt)) lastCompletedAt = t;
+    }
+    const base: CustomerFacts = {
+      lastCompletedAt,
+      hasOpenJob: group.some((id) => facts.open.has(id)),
+      hasActivePlan: group.some((id) => facts.planned.has(id)),
+      lastCampaignAt: facts.lastCampaign.get(c.id) ?? null,
+      // Only ask the opt-out tables when the cheaper checks haven't already ruled them out.
+      textable: false,
+      email: c.email,
+      emailOptedOut: emailOptedOut(c, facts.optedOutEmails),
+    };
+    const decision = decide(kind, base, now);
     // Recheck with real texting permission only for customers who pass everything else.
     if (!decision.send && decision.reason !== "no way to reach them (no texting consent, no email)") {
       rows.push({ customerId: c.id, name: c.name ?? "Unnamed", channel: null, reason: decision.reason });
       continue;
     }
-    const final = decide(
-      kind,
-      {
-        lastCompletedAt: facts.lastDone.get(c.id) ?? null,
-        hasOpenJob: facts.open.has(c.id),
-        hasActivePlan: facts.planned.has(c.id),
-        lastCampaignAt: facts.lastCampaign.get(c.id) ?? null,
-        textable: await textable(c),
-        email: c.email,
-        emailOptedOut: !!c.email_opt_out_at,
-      },
-      now
-    );
+    const final = decide(kind, { ...base, textable: await textable(c) }, now);
     rows.push({
       customerId: c.id,
       name: c.name ?? "Unnamed",
@@ -162,7 +185,9 @@ export async function buildAudience(kind: CampaignKind, loaded?: Facts): Promise
       reason: final.send ? null : final.reason,
     });
   }
-  return rows;
+  // One message per person: duplicate records with the same phone or email drop off.
+  const byId = new Map(facts.customers.map((c) => [c.id, c]));
+  return dedupeRecipients(rows, (id) => byId.get(id));
 }
 
 export type SendResult = { sent: number; failed: number; skipped: number; leftOver: number; errors: string[] };
@@ -194,10 +219,12 @@ export async function sendCampaign(kind: CampaignKind, template: Template): Prom
       result.errors.push(`${row.name}: couldn't record the send`);
       continue;
     }
+    // Counted across every record with the same phone or email, so a duplicate
+    // record can't be the way round the 30 days.
     const { count, error: countError } = await supabase
       .from("campaign_sends")
       .select("id", { count: "exact", head: true })
-      .eq("customer_id", c.id)
+      .in("customer_id", facts.sameContact.get(c.id) ?? [c.id])
       .is("error", null)
       .gte("sent_at", new Date(Date.now() - CAMPAIGN_GAP_DAYS * 86_400_000).toISOString());
     if (!withinLimit(countError ? null : (count ?? 0))) {
@@ -225,7 +252,20 @@ export async function sendCampaign(kind: CampaignKind, template: Template): Prom
       if (freshError || !fresh) error = "couldn't re-check their email settings";
       else if (fresh.email_opt_out_at) error = "unsubscribed since the list was built";
       else if (!fresh.email?.trim()) error = "no email any more";
-      else emailTo = fresh.email.trim();
+      else {
+        // An unsubscribe on any record with this email covers this one too.
+        let optedOut: Set<string> | null = null;
+        try {
+          optedOut = await freshOptedOutEmails();
+        } catch {
+          error = "couldn't re-check their email settings";
+        }
+        if (optedOut) {
+          const key = emailMatchKey(fresh.email);
+          if (key && optedOut.has(key)) error = "unsubscribed on another record with this email";
+          else emailTo = fresh.email.trim();
+        }
+      }
     }
     if (row.channel === "email" && !error && emailTo) {
       try {
