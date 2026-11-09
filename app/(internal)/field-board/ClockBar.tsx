@@ -61,11 +61,11 @@ export default function ClockBar({
   finishedWeek: ClockWeek | null;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  // Ticks while clocked out too, so a page left open past Monday 00:00 ET resets the week. Local only, no requests.
   useEffect(() => {
-    if (!shiftStartedAt) return;
     const t = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(t);
-  }, [shiftStartedAt]);
+  }, []);
 
   const [inState, inAction] = useActionState(async () => clockInAction(), null);
   const [outState, outAction] = useActionState(clockOutAction, null);
