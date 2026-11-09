@@ -5,12 +5,15 @@ import { getChecklist, isUuid } from "@/lib/pm/db";
 import { PM_PHOTO_BUCKET } from "@/lib/pm/photos";
 import { errorClass, headingClass, subTextClass } from "../../ui";
 import ChecklistForm from "./ChecklistForm";
+import { mayOpenChecklist } from "../tech-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function PmChecklistPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!isUuid(id)) notFound();
+  // A tech opens only a checklist for a job that is theirs (or not yet assigned).
+  if (!(await mayOpenChecklist(id))) notFound();
   const { row, error } = await getChecklist(id);
   if (error) return <p className={errorClass}>{error}</p>;
   if (!row) notFound();

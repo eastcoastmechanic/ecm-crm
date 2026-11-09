@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -18,7 +17,8 @@ import {
 } from "@/lib/refrigerant";
 import { syncJobToPlanner } from "@/lib/planner-connector";
 import { requireRole } from "@/lib/require-role";
-import { requireJobAccess } from "@/lib/job-access";
+import { checkJobAccess } from "@/lib/job-access";
+import { nextReportNumberFrom } from "@/lib/report-number";
 
 const ScannedReadingsSchema = z.object({
   outdoor_temp: z.number().nullable(),
@@ -38,11 +38,26 @@ const ScannedReadingsSchema = z.object({
 
 export type ScannedReadings = z.infer<typeof ScannedReadingsSchema>;
 
-export async function scanReadingPhoto(formData: FormData): Promise<ScannedReadings> {
-  await requireRole(["owner", "office", "tech"]);
-  const photo = formData.get("photo") as File;
-  if (!photo || photo.size === 0) throw new Error("No photo provided");
+/** Read a gauge or meter photo into readings. Returns { error } with a plain message. */
+export async function scanReadingPhoto(
+  formData: FormData
+): Promise<{ readings: ScannedReadings; error?: undefined } | { error: string; readings?: undefined }> {
+  try {
+    await requireRole(["owner", "office", "tech"]);
+  } catch {
+    return { error: "You can't scan readings." };
+  }
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) return { error: "Choose a photo of the gauge or meter." };
+  try {
+    return { readings: await readReadingPhoto(photo) };
+  } catch (err) {
+    console.error("[diagnostics] reading scan failed:", err);
+    return { error: "Couldn't read that photo. Type the readings in, or try another photo." };
+  }
+}
 
+async function readReadingPhoto(photo: File): Promise<ScannedReadings> {
   return extractFromImage(
     photo,
     ScannedReadingsSchema,
@@ -83,8 +98,22 @@ function isRefrigerantType(value: string | null): value is RefrigerantType {
 }
 
 async function nextReportNumber() {
-  const { count } = await supabase.from("diagnostics").select("id", { count: "exact", head: true });
-  return `RPT-${1001 + (count ?? 0)}`;
+  // Highest RPT number in use plus one (a row count repeats a live number after a
+  // delete). Read in pages so a long history is never cut off at the row cap.
+  const numbers: (string | null)[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("diagnostics")
+      .select("doc_number")
+      .like("doc_number", "RPT-%")
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    numbers.push(...(data ?? []).map((row) => row.doc_number as string | null));
+    if (!data || data.length < PAGE) break;
+  }
+  return nextReportNumberFrom(numbers);
 }
 
 async function uploadPhotos(files: File[]) {
@@ -102,16 +131,28 @@ async function uploadPhotos(files: File[]) {
   return uploaded;
 }
 
-export async function generateDiagnosis(formData: FormData) {
+export type DiagnosisResult = { error: string; id?: undefined } | { id: string; error?: undefined };
+
+const KEPT = "Your entries are kept, try again.";
+
+/**
+ * Start a service report: ask Claude for a diagnosis, then save the report.
+ * Returns { id } (the form opens the report) or { error }; it never throws for
+ * an expected problem, and nothing is saved until the diagnosis is back, so a
+ * failed try leaves no half-made customer or report and the form keeps
+ * everything the tech entered.
+ */
+export async function generateDiagnosis(formData: FormData): Promise<DiagnosisResult> {
   const submittedEquipmentId = (formData.get("equipment_id") as string) || null;
   const job_id = (formData.get("job_id") as string) || null;
   // Techs can run a diagnosis only on a job they may work, and always need a job:
   // a report with no job is office and owner only (a tech couldn't open it after).
   // Office and owner are not limited.
-  await requireJobAccess(job_id, { allowClosedJob: true });
+  const access = await checkJobAccess(job_id, { allowClosedJob: true });
+  if (access.error !== undefined) return { error: access.error };
   const symptoms = (formData.get("symptoms") as string)?.trim();
   const refrigerantOverride = formData.get("refrigerant") as string;
-  const photoFiles = formData.getAll("photos") as File[];
+  const photoFiles = formData.getAll("photos").filter((f): f is File => f instanceof File);
 
   const customerName = (formData.get("customer_name") as string)?.trim() || null;
   const customerPhone = (formData.get("customer_phone") as string)?.trim() || null;
@@ -122,35 +163,17 @@ export async function generateDiagnosis(formData: FormData) {
   const newEquipmentModel = (formData.get("new_equipment_model") as string)?.trim() || null;
   const newEquipmentRefrigerant = (formData.get("new_equipment_refrigerant") as string) || null;
 
-  if (!symptoms) throw new Error("Describe the symptoms before generating a diagnosis");
+  if (!symptoms) return { error: "Describe the symptoms before generating a diagnosis." };
 
   let equipment_id = submittedEquipmentId;
   let resolvedCustomerId: string | null = null;
   let resolvedPropertyId: string | null = null;
-  let walkInCustomerName: string | null = null;
-  let walkInAddress: string | null = null;
-
-  if (!equipment_id && customerName && customerAddress) {
-    const resolved = await resolveCustomerPropertyEquipment({
-      customerName,
-      phone: customerPhone,
-      smsConsent,
-      address: customerAddress,
-      equipment: newEquipmentType
-        ? {
-            type: newEquipmentType,
-            brand: newEquipmentBrand,
-            model: newEquipmentModel,
-            refrigerant_type: newEquipmentRefrigerant,
-          }
-        : null,
-    });
-    resolvedCustomerId = resolved.customerId;
-    resolvedPropertyId = resolved.propertyId;
-    equipment_id = resolved.equipmentId;
-    walkInCustomerName = customerName;
-    walkInAddress = customerAddress;
-  }
+  // A walk-in customer (no equipment picked, name and address typed) is saved
+  // only after the diagnosis comes back, so a failed try never leaves a
+  // duplicate customer behind when the tech presses Generate again.
+  const isWalkIn = !submittedEquipmentId && !!customerName && !!customerAddress;
+  const walkInCustomerName = isWalkIn ? customerName : null;
+  const walkInAddress = isWalkIn ? customerAddress : null;
 
   const readings = {
     outdoor_temp: parseNullableNumber(formData.get("outdoor_temp")),
@@ -168,27 +191,32 @@ export async function generateDiagnosis(formData: FormData) {
     voltage: parseNullableNumber(formData.get("voltage")),
   };
 
-  const [{ data: equipment }, priceBookRows] = await Promise.all([
-    equipment_id
-      ? supabase
-          .from("equipment")
-          .select("*, properties(id, customer_id, address, customers(name))")
-          .eq("id", equipment_id)
-          .single()
-      : Promise.resolve({ data: null }),
-    fetchAllPriceBookItems(supabase, "category, name, tier, unit_price"),
-  ]);
+  let equipment: Awaited<ReturnType<typeof loadEquipment>> = null;
+  let priceBookRows: Awaited<ReturnType<typeof loadPriceBook>>;
+  try {
+    [equipment, priceBookRows] = await Promise.all([
+      equipment_id ? loadEquipment(equipment_id) : Promise.resolve(null),
+      loadPriceBook(),
+    ]);
+  } catch (err) {
+    console.error("[diagnostics] loading equipment or price book failed:", err);
+    return { error: `Couldn't load the equipment or price book. ${KEPT}` };
+  }
 
   if (equipment) {
     resolvedCustomerId = equipment.properties?.customer_id ?? resolvedCustomerId;
     resolvedPropertyId = equipment.properties?.id ?? resolvedPropertyId;
   }
 
+  // Override first, then the unit on file, then the new unit typed for a walk-in
+  // (which is what gets saved on that unit's record below).
   const refrigerant = isRefrigerantType(refrigerantOverride)
     ? refrigerantOverride
     : equipment && isRefrigerantType(equipment.refrigerant_type)
       ? (equipment.refrigerant_type as RefrigerantType)
-      : null;
+      : !equipment && isWalkIn && newEquipmentType && isRefrigerantType(newEquipmentRefrigerant)
+        ? newEquipmentRefrigerant
+        : null;
 
   const superheat = refrigerant
     ? computeSuperheat(refrigerant, readings.suction_pressure, readings.suction_line_temp)
@@ -246,22 +274,56 @@ Compressor amp draw: ${readings.amp_draw ?? "—"}A, Line voltage: ${readings.vo
 
 Diagnose the fault and suggest a fix.`;
 
-  const response = await claude.messages.parse({
-    model: CLAUDE_MODEL,
-    max_tokens: 4096,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
-    output_config: {
-      format: zodOutputFormat(DiagnosisSchema),
-    },
-  });
+  let parsed: z.infer<typeof DiagnosisSchema> | null = null;
+  try {
+    const response = await claude.messages.parse({
+      model: CLAUDE_MODEL,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userMessage }],
+      output_config: {
+        format: zodOutputFormat(DiagnosisSchema),
+      },
+    });
+    parsed = response.parsed_output ?? null;
+  } catch (err) {
+    console.error("[diagnostics] Claude diagnosis failed:", err);
+  }
+  if (!parsed) return { error: `Couldn't get a diagnosis. ${KEPT}` };
 
-  const parsed = response.parsed_output;
-  if (!parsed) {
-    throw new Error("Claude did not return a parseable diagnosis. Try again.");
+  if (isWalkIn) {
+    try {
+      const resolved = await resolveCustomerPropertyEquipment({
+        customerName,
+        phone: customerPhone,
+        smsConsent,
+        address: customerAddress,
+        equipment: newEquipmentType
+          ? {
+              type: newEquipmentType,
+              brand: newEquipmentBrand,
+              model: newEquipmentModel,
+              refrigerant_type: newEquipmentRefrigerant,
+            }
+          : null,
+      });
+      resolvedCustomerId = resolved.customerId;
+      resolvedPropertyId = resolved.propertyId;
+      equipment_id = resolved.equipmentId;
+    } catch (err) {
+      console.error("[diagnostics] saving walk-in customer failed:", err);
+      return { error: `Couldn't save the customer details. ${KEPT}` };
+    }
   }
 
-  const [photos, doc_number] = await Promise.all([uploadPhotos(photoFiles), nextReportNumber()]);
+  let photos: Awaited<ReturnType<typeof uploadPhotos>>;
+  let doc_number: string;
+  try {
+    [photos, doc_number] = await Promise.all([uploadPhotos(photoFiles), nextReportNumber()]);
+  } catch (err) {
+    console.error("[diagnostics] photo upload or report number failed:", err);
+    return { error: `Couldn't save the photos. ${KEPT}` };
+  }
 
   const { data: diagnostic, error } = await supabase
     .from("diagnostics")
@@ -285,28 +347,37 @@ Diagnose the fault and suggest a fix.`;
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error || !diagnostic) {
+    console.error("[diagnostics] saving report failed:", error);
+    return { error: `Couldn't save the service report. ${KEPT}` };
+  }
 
+  // The report is saved from here on; a failure below is logged, not shown,
+  // so the tech isn't asked to retry and make a second report.
   if (job_id) {
-    const { data: job } = await supabase
-      .from("jobs")
-      .select("status, customer_id, property_id")
-      .eq("id", job_id)
-      .single();
+    try {
+      const { data: job } = await supabase
+        .from("jobs")
+        .select("status, customer_id, property_id")
+        .eq("id", job_id)
+        .single();
 
-    if (job) {
-      const updates: Record<string, string> = {};
-      if (!job.customer_id && resolvedCustomerId) updates.customer_id = resolvedCustomerId;
-      if (!job.property_id && resolvedPropertyId) updates.property_id = resolvedPropertyId;
-      if (Object.keys(updates).length) {
-        await supabase.from("jobs").update(updates).eq("id", job_id);
+      if (job) {
+        const updates: Record<string, string> = {};
+        if (!job.customer_id && resolvedCustomerId) updates.customer_id = resolvedCustomerId;
+        if (!job.property_id && resolvedPropertyId) updates.property_id = resolvedPropertyId;
+        if (Object.keys(updates).length) {
+          await supabase.from("jobs").update(updates).eq("id", job_id);
+        }
+
+        // Resyncs the job's Planner card against its current status. Matters
+        // most when the job was already marked complete before this diagnostic
+        // existed -- its card would be stuck in Needs Attention otherwise, with
+        // nothing else to ever move it to Finished.
+        await syncJobToPlanner(job_id, job.status);
       }
-
-      // Resyncs the job's Planner card against its current status. Matters
-      // most when the job was already marked complete before this diagnostic
-      // existed -- its card would be stuck in Needs Attention otherwise, with
-      // nothing else to ever move it to Finished.
-      await syncJobToPlanner(job_id, job.status);
+    } catch (err) {
+      console.error("[diagnostics] job follow-up after report failed:", err);
     }
   }
 
@@ -315,5 +386,18 @@ Diagnose the fault and suggest a fix.`;
   revalidatePath("/properties");
   revalidatePath("/equipment");
   if (job_id) revalidatePath("/jobs");
-  redirect(`/diagnostics/${diagnostic.id}`);
+  return { id: diagnostic.id as string };
+}
+
+function loadEquipment(id: string) {
+  return supabase
+    .from("equipment")
+    .select("*, properties(id, customer_id, address, customers(name))")
+    .eq("id", id)
+    .single()
+    .then(({ data }) => data);
+}
+
+function loadPriceBook() {
+  return fetchAllPriceBookItems(supabase, "category, name, tier, unit_price");
 }

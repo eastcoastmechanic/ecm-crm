@@ -1,11 +1,20 @@
 import Link from "next/link";
 import { listChecklists } from "@/lib/pm/db";
+import { getMyStaffId } from "@/lib/job-access";
 import { buttonClass, errorClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import { isTechRequest } from "./tech-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function PmListPage() {
-  const { rows, error } = await listChecklists();
+  // A tech sees only checklists for jobs that are theirs (or not yet assigned),
+  // the same ones they can open. No staff row means nothing to show.
+  const isTech = await isTechRequest();
+  const techStaffId = isTech ? await getMyStaffId() : null;
+  const { rows, error } =
+    isTech && !techStaffId
+      ? { rows: [], error: null }
+      : await listChecklists(techStaffId ? { forTechStaffId: techStaffId } : {});
   // Techs open this page: show a plain line, log the real error (often SQL 0048 not run).
   if (error) console.error("[pm] listChecklists failed:", error);
 
@@ -17,9 +26,11 @@ export default async function PmListPage() {
           <p className={subTextClass}>Preventive maintenance checklists for a maintenance job and a piece of equipment.</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/pm/templates" className="text-sm text-g300 underline">
-            Edit templates
-          </Link>
+          {!isTech && (
+            <Link href="/pm/templates" className="text-sm text-g300 underline">
+              Edit templates
+            </Link>
+          )}
           <Link href="/pm/new" className={buttonClass}>
             New checklist
           </Link>

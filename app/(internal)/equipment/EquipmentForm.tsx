@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { addEquipment, scanNameplate, type ScannedNameplate } from "./actions";
+import { addEquipment, scanNameplateResult, type ScannedNameplate } from "./actions";
 import { decodeManufactureDate } from "@/lib/pm/nameplate";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, buttonSecondaryClass, cardClass, errorClass, inputClass } from "../ui";
@@ -27,10 +27,12 @@ export default function EquipmentForm({ properties }: { properties: Property[] }
     try {
       const formData = new FormData();
       formData.set("photo", file);
-      const result = await scanNameplate(formData);
-      setExtracted(result);
-    } catch (err) {
-      setScanError(err instanceof Error ? err.message : "Failed to read photo");
+      const result = await scanNameplateResult(formData);
+      if (result.error !== undefined) setScanError(result.error);
+      else setExtracted(result.nameplate);
+    } catch {
+      // Network drop or similar; production hides a thrown server message anyway.
+      setScanError("Couldn't read that nameplate. Type the details in, or try another photo.");
     } finally {
       setScanning(false);
     }

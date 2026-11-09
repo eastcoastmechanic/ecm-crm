@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { REFRIGERANT_TYPES } from "@/lib/refrigerant";
 import { generateDiagnosis, scanReadingPhoto, type ScannedReadings } from "./actions";
 import { downscaleFileInput, downscaleImage, totalBytes } from "@/lib/downscale-image";
-import SubmitButton from "../../SubmitButton";
 import { buttonClass, errorClass, inputClass } from "../../ui";
 
 type Equipment = {
@@ -28,6 +28,9 @@ export default function DiagnosticForm({
   const [scanError, setScanError] = useState<string | null>(null);
   const [equipmentId, setEquipmentId] = useState("");
   const [photoNote, setPhotoNote] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const router = useRouter();
 
   async function handleScan(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -41,20 +44,53 @@ export default function DiagnosticForm({
       // gauge photo alone can exceed it.
       formData.set("photo", await downscaleImage(file));
       const result = await scanReadingPhoto(formData);
-      setExtracted(result);
-    } catch (err) {
-      setScanError(err instanceof Error ? err.message : "Failed to read photo");
+      if (result.error !== undefined) {
+        setScanError(result.error);
+      } else {
+        // Only values the photo actually showed change; a second scan (say the
+        // meter after the gauges) adds to the first instead of blanking it.
+        const scanned = result.readings;
+        setExtracted((prev) => {
+          const merged = { ...(prev ?? scanned) } as ScannedReadings;
+          for (const key of Object.keys(scanned) as (keyof ScannedReadings)[]) {
+            if (scanned[key] !== null) merged[key] = scanned[key];
+          }
+          return merged;
+        });
+      }
+    } catch {
+      setScanError("Couldn't read that photo. Type the readings in, or try another photo.");
     } finally {
       setScanning(false);
     }
   }
 
+  // Submits by hand, not as a form action: React clears a form's fields after an
+  // action runs, even a failed one, and the tech would lose the symptoms,
+  // readings and photos. On an error everything stays as entered.
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (submitting) return;
+    const data = new FormData(e.currentTarget);
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      const result = await generateDiagnosis(data);
+      if (result.error !== undefined) {
+        setSubmitError(result.error);
+        setSubmitting(false);
+        return;
+      }
+      // Stays "Generating…" while the report page opens.
+      router.push(`/diagnostics/${result.id}`);
+    } catch {
+      setSubmitError("Couldn't get a diagnosis. Your entries are kept, try again.");
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <form
-      key={JSON.stringify(extracted)}
-      action={generateDiagnosis}
-      className="flex flex-col gap-6"
-    >
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {jobId && <input type="hidden" name="job_id" value={jobId} />}
 
       <section className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
@@ -296,9 +332,14 @@ export default function DiagnosticForm({
         {photoNote && <p className="text-xs text-g300">{photoNote}</p>}
       </section>
 
-      <SubmitButton className={`${buttonClass} w-fit`} pendingText="Generating…">
-        Generate Diagnosis
-      </SubmitButton>
+      {submitError && (
+        <p role="alert" className={errorClass}>
+          {submitError}
+        </p>
+      )}
+      <button type="submit" disabled={submitting} className={`${buttonClass} w-fit disabled:opacity-50`}>
+        {submitting ? "Generating…" : "Generate Diagnosis"}
+      </button>
     </form>
   );
 }
@@ -318,6 +359,9 @@ function Field({
     <label className="flex flex-col gap-1 text-xs text-g300">
       {label}
       <input
+        // A new scanned value remounts just this field with it; anything typed
+        // in the other fields (and the symptoms and photos) stays put.
+        key={value ?? "none"}
         type="number"
         step="any"
         name={name}

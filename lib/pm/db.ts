@@ -157,12 +157,24 @@ function mapChecklist(row: Record<string, unknown>): ChecklistDetail {
   };
 }
 
-export async function listChecklists(): Promise<{ rows: ChecklistDetail[]; error: string | null }> {
-  const { data, error } = await supabase
+/**
+ * Latest checklists. With `forTechStaffId`, only checklists whose job is
+ * assigned to that tech or to no one yet (the jobs a tech may open; see
+ * lib/job-access-rules.ts).
+ */
+export async function listChecklists(
+  opts: { forTechStaffId?: string } = {}
+): Promise<{ rows: ChecklistDetail[]; error: string | null }> {
+  const techId = opts.forTechStaffId;
+  if (techId !== undefined && !isUuid(techId)) return { rows: [], error: null };
+  let query = supabase
     .from("pm_checklists")
-    .select(CHECKLIST_SELECT)
-    .order("created_at", { ascending: false })
-    .limit(50);
+    // The cast only keeps the row type; the extra join is used for filtering, not read.
+    .select((techId ? `${CHECKLIST_SELECT}, jobs!inner(assigned_staff_id)` : CHECKLIST_SELECT) as typeof CHECKLIST_SELECT);
+  if (techId) {
+    query = query.or(`assigned_staff_id.eq.${techId},assigned_staff_id.is.null`, { referencedTable: "jobs" });
+  }
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(50);
   if (error) return { rows: [], error: error.message };
   return { rows: (data ?? []).map((row) => mapChecklist(row as Record<string, unknown>)), error: null };
 }

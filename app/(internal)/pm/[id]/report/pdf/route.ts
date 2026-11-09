@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { checklistReport, getChecklist, isUuid } from "@/lib/pm/db";
 import { renderPmReportPdf } from "@/lib/pm/report-pdf";
+import { mayOpenChecklist } from "../../../tech-access";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!isUuid(id)) return NextResponse.json({ error: "Checklist not found" }, { status: 404 });
+  // Same rule as the report page: a tech only for a job that is theirs (or not yet assigned).
+  if (!(await mayOpenChecklist(id))) return NextResponse.json({ error: "Checklist not found" }, { status: 404 });
   const { row, error } = await getChecklist(id);
   if (error || !row) return NextResponse.json({ error: error ?? "Checklist not found" }, { status: 404 });
   const report = await checklistReport(row);
