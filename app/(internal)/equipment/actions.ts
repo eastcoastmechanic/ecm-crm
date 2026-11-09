@@ -45,10 +45,54 @@ const NameplateSchema = z.object({
 
 export type ScannedNameplate = z.infer<typeof NameplateSchema>;
 
-export async function scanNameplate(formData: FormData): Promise<ScannedNameplate> {
-  const photo = formData.get("photo") as File;
-  if (!photo || photo.size === 0) throw new Error("No photo provided");
+/**
+ * Equipment changes are office and owner only: techs can't open the equipment
+ * pages (proxy.ts), and no truck screen calls these. The chat assistant that
+ * also calls add/update already refuses techs. Returns the message to show, or
+ * null when allowed.
+ */
+async function officeOnly(): Promise<string | null> {
+  try {
+    await requireOffice();
+    return null;
+  } catch {
+    return "Only the office or owner can change equipment.";
+  }
+}
 
+/**
+ * Read a nameplate photo for the Add Equipment form. Office and owner only (each
+ * scan is a paid Claude vision call). Returns { error } with a plain message;
+ * production builds hide a thrown server action's text.
+ */
+export async function scanNameplateResult(
+  formData: FormData
+): Promise<{ nameplate: ScannedNameplate; error?: undefined } | { error: string; nameplate?: undefined }> {
+  const denied = await officeOnly();
+  if (denied) return { error: denied };
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) return { error: "Choose a photo of the nameplate." };
+  try {
+    return { nameplate: await readNameplate(photo) };
+  } catch (err) {
+    console.error("[equipment] nameplate scan failed:", err);
+    return { error: "Couldn't read that nameplate. Type the details in, or try another photo." };
+  }
+}
+
+/**
+ * Same read, for the warranty and assessment forms, which take the result
+ * directly and catch a thrown error (they show their own plain message).
+ * Office and owner only. New callers should use scanNameplateResult.
+ */
+export async function scanNameplate(formData: FormData): Promise<ScannedNameplate> {
+  await requireOffice();
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) throw new Error("No photo provided");
+  return readNameplate(photo);
+}
+
+async function readNameplate(photo: File): Promise<ScannedNameplate> {
   return extractFromImage(
     photo,
     NameplateSchema,
@@ -69,6 +113,8 @@ Read only what is legibly printed. Leave any field null if it isn't shown or you
 }
 
 export async function addEquipment(formData: FormData): Promise<{ error?: string }> {
+  const denied = await officeOnly();
+  if (denied) return { error: denied };
   const property_id = formData.get("property_id") as string;
   const type = (formData.get("type") as string)?.trim();
   const brand = (formData.get("brand") as string)?.trim();
@@ -114,6 +160,8 @@ export async function addEquipment(formData: FormData): Promise<{ error?: string
 }
 
 export async function updateEquipment(formData: FormData): Promise<{ error?: string }> {
+  const denied = await officeOnly();
+  if (denied) return { error: denied };
   const id = formData.get("id") as string;
   const property_id = formData.get("property_id") as string;
   const type = (formData.get("type") as string)?.trim();
@@ -153,6 +201,9 @@ export async function deleteEquipment(id: string): Promise<{ error?: string }> {
 }
 
 export async function scanDataPlate(equipmentId: string, formData: FormData) {
+  // A paid Claude vision call plus a photo upload: office and owner only.
+  const denied = await officeOnly();
+  if (denied) return { error: denied };
   const photo = formData.get("photo");
   if (!(photo instanceof File) || photo.size === 0) return { error: "Choose a photo of the data plate." };
   if (!photo.type.startsWith("image/")) return { error: "That file is not a photo." };
@@ -173,6 +224,8 @@ function postedIdentity(formData: FormData): NameplateIdentity {
 }
 
 export async function confirmDataPlate(equipmentId: string, formData: FormData): Promise<{ error?: string }> {
+  const denied = await officeOnly();
+  if (denied) return { error: denied };
   const { data, error } = await supabase
     .from("equipment")
     .select("brand, model, serial_number, type, refrigerant_type, nameplate")

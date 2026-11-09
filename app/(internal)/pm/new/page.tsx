@@ -1,7 +1,10 @@
 import { supabase } from "@/lib/supabase";
-import { headingClass, subTextClass } from "../../ui";
-import NewPmForm from "./NewPmForm";
+import { getMyStaffId } from "@/lib/job-access";
+import { isUuid } from "@/lib/pm/db";
 import { formatEtDate } from "@/lib/tz";
+import { headingClass, subTextClass } from "../../ui";
+import { isTechRequest } from "../tech-access";
+import NewPmForm from "./NewPmForm";
 
 export const dynamic = "force-dynamic";
 
@@ -22,16 +25,36 @@ function first<T>(value: T | T[] | null | undefined): T | null {
 
 export default async function NewPmPage({ searchParams }: { searchParams: Promise<{ job_id?: string }> }) {
   const { job_id: jobId } = await searchParams;
-  const [{ data: jobs }, { data: equipment }, { data: templates }] = await Promise.all([
-    supabase
-      .from("jobs")
-      .select("id, job_type, scheduled_at, status, property_id, customers(name), properties(address, property_type)")
-      .neq("status", "cancelled")
-      .order("scheduled_at", { ascending: false })
-      .limit(80),
-    supabase.from("equipment").select("id, property_id, type, brand, model, serial_number").order("type").limit(300),
+
+  // A tech picks only from jobs that are theirs (or not yet assigned), the same
+  // rule startPmChecklist checks, and sees only those properties' equipment.
+  const isTech = await isTechRequest();
+  const techStaffId = isTech ? await getMyStaffId() : null;
+  if (isTech && !isUuid(techStaffId)) {
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className={headingClass}>New PM checklist</h1>
+        <p className={subTextClass}>Your login isn&apos;t linked to a staff account yet. Tell the office.</p>
+      </div>
+    );
+  }
+
+  let jobsQuery = supabase
+    .from("jobs")
+    .select("id, job_type, scheduled_at, status, property_id, customers(name), properties(address, property_type)")
+    .neq("status", "cancelled");
+  if (isTech) jobsQuery = jobsQuery.or(`assigned_staff_id.eq.${techStaffId},assigned_staff_id.is.null`);
+  const [{ data: jobs }, { data: templates }] = await Promise.all([
+    jobsQuery.order("scheduled_at", { ascending: false }).limit(80),
     supabase.from("pm_templates").select("id, slug, name, audience").order("audience"),
   ]);
+
+  let equipmentQuery = supabase.from("equipment").select("id, property_id, type, brand, model, serial_number");
+  if (isTech) {
+    const propertyIds = [...new Set(((jobs ?? []) as JobRow[]).map((job) => job.property_id).filter(isUuid))];
+    equipmentQuery = equipmentQuery.in("property_id", propertyIds);
+  }
+  const { data: equipment } = await equipmentQuery.order("type").limit(300);
 
   const jobOptions = ((jobs ?? []) as JobRow[])
     .map((job) => {

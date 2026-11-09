@@ -4,12 +4,15 @@ import { checklistReport, getChecklist, isUuid } from "@/lib/pm/db";
 import { buttonSecondaryClass, errorClass } from "../../../ui";
 import PmReportArticle from "../../PmReportArticle";
 import PrintButton from "./PrintButton";
+import { mayOpenChecklist } from "../../tech-access";
 
 export const dynamic = "force-dynamic";
 
 export default async function PmReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!isUuid(id)) notFound();
+  // A tech opens only the report for a job that is theirs (or not yet assigned).
+  if (!(await mayOpenChecklist(id))) notFound();
   const { row, error } = await getChecklist(id);
   if (error) return <p className={errorClass}>{error}</p>;
   if (!row) notFound();
