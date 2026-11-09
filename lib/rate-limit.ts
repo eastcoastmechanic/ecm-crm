@@ -12,9 +12,9 @@ const hits = new Map<string, number[]>();
  * abuse of a Claude-calling endpoint; not a substitute for real
  * infrastructure-level rate limiting if abuse becomes a real problem.
  */
-export function isRateLimited(key: string, maxRequests = MAX_REQUESTS): boolean {
+export function isRateLimited(key: string, maxRequests = MAX_REQUESTS, windowMs = WINDOW_MS): boolean {
   const now = Date.now();
-  const timestamps = (hits.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
+  const timestamps = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
   timestamps.push(now);
   hits.set(key, timestamps);
   return timestamps.length > maxRequests;

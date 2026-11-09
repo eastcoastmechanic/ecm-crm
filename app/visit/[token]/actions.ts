@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { notifyOwnerOfVisitRequest } from "@/lib/notify-owner";
+import { LIMITS, RATE_LIMITED_MESSAGE, allowAll, rateKey, requestIp, rule } from "@/lib/rate-limit-db";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -15,6 +16,9 @@ export async function requestVisit(_prev: VisitRequestState, formData: FormData)
   const note = String(formData.get("note") ?? "").trim();
   if (!UUID.test(token)) return { error: "This link isn't valid. Please call us." };
   if (note.length > 500) return { error: "Please keep your note under 500 characters." };
+  if (!(await allowAll([rule(rateKey("token-link", "ip", await requestIp()), LIMITS.tokenLinkPerIp)]))) {
+    return { error: RATE_LIMITED_MESSAGE };
+  }
 
   const { data: updated, error } = await supabase
     .from("maintenance_visits")

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { notifyOwnerOfLowSurveyRating } from "@/lib/notify-owner";
 import { one } from "@/lib/appointment-reminder";
+import { LIMITS, RATE_LIMITED_MESSAGE, allowAll, rateKey, requestIp, rule } from "@/lib/rate-limit-db";
 
 export type SurveyState = { error?: string } | null;
 
@@ -15,6 +16,9 @@ export async function submitSurvey(_prev: SurveyState, formData: FormData): Prom
 
   if (!jobId) return { error: "This survey link is missing its job. Please use the link from your text or email." };
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) return { error: "Please pick a rating from 1 to 5." };
+  if (!(await allowAll([rule(rateKey("token-link", "ip", await requestIp()), LIMITS.tokenLinkPerIp)]))) {
+    return { error: RATE_LIMITED_MESSAGE };
+  }
 
   const { error } = await supabase.from("satisfaction_surveys").insert({
     job_id: jobId,

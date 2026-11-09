@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { COMPANY_PHONE_DISPLAY } from "@/lib/brand";
+import { LIMITS, RATE_LIMITED_MESSAGE, allowAll, rateKey, requestIp, rule } from "@/lib/rate-limit-db";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
@@ -23,6 +24,13 @@ export async function sendContactMessage(_prev: ContactState, formData: FormData
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Please enter a valid email address." };
   if (!message) return { error: "Please include a message." };
   if (message.length > 5000) return { error: "Please keep the message under 5,000 characters, or call us." };
+
+  // Honeypot alone doesn't stop a script. Cap per visitor and per email address.
+  const allowed = await allowAll([
+    rule(rateKey("contact", "ip", await requestIp()), LIMITS.contactPerIp),
+    rule(rateKey("contact", "email", email), LIMITS.contactPerEmail),
+  ]);
+  if (!allowed) return { error: RATE_LIMITED_MESSAGE };
 
   const sorry = `Sorry, your message didn't go through. Please try again, or call us at ${COMPANY_PHONE_DISPLAY}.`;
   // Before, a missing owner address or a failed send still said "thanks" and the message was lost.

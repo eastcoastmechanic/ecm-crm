@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import { respondToWebChat } from "@/lib/receptionist/web-agent";
 import { isRateLimited } from "@/lib/rate-limit";
+import { LIMITS, RATE_LIMITED_MESSAGE, allowAll, clientIpFrom, rateKey, rule } from "@/lib/rate-limit-db";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
 export async function POST(request: Request) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = clientIpFrom(request.headers);
+  // Short burst limit on this server, then an hourly cap shared by every server.
   if (isRateLimited(ip)) {
     return NextResponse.json(
       { error: "Too many messages. Please wait a few minutes and try again." },
       { status: 429 }
     );
+  }
+  if (!(await allowAll([rule(rateKey("chat", "ip", ip), LIMITS.chatPerIp)]))) {
+    return NextResponse.json({ error: RATE_LIMITED_MESSAGE }, { status: 429 });
   }
 
   const body = await request.json().catch(() => null);
