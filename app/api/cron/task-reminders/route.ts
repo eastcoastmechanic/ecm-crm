@@ -1,6 +1,7 @@
 import { cronAuthorized } from "@/lib/cron-auth";
 import { NextResponse } from "next/server";
 import { listOpenPlannerTasks } from "@/lib/planner-connector";
+import { taskDigestLine, tasksDueByEndOfEtDay } from "@/lib/task-reminders";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
@@ -20,21 +21,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ sent: 0, errors: ["OWNER_EMAIL not configured"] });
   }
 
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
-
+  const now = new Date();
   const allOpenTasks = await listOpenPlannerTasks();
-  const tasks = allOpenTasks.filter((t) => t.dueDateTime && new Date(t.dueDateTime) <= endOfToday);
+  const tasks = tasksDueByEndOfEtDay(allOpenTasks, now);
 
   if (tasks.length === 0) {
     return NextResponse.json({ sent: 0, errors: [] });
   }
 
-  const lines = tasks.map((t) => {
-    const due = new Date(t.dueDateTime as string);
-    const overdue = due.getTime() < Date.now();
-    return `- ${t.title}${overdue ? " (overdue)" : ""} — due ${due.toLocaleDateString()}${t.notes ? `: ${t.notes}` : ""}`;
-  });
+  const lines = tasks.map((t) => taskDigestLine(t, now));
 
   const { error: sendError } = await resend.emails.send({
     from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,

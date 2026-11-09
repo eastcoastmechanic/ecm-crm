@@ -182,6 +182,57 @@ export async function notifyOwnerOfEvent(kind: OwnerEvent, id: string) {
 }
 
 /**
+ * The phone/text receptionist booked a job request or moved an existing job. Both
+ * are pending: nothing is confirmed to the customer until the office sets the job
+ * to Scheduled. This puts it in front of Josh (Teams Dispatch plus email) so it
+ * doesn't sit unseen on the Jobs list. Never throws: the request is already saved.
+ */
+export async function notifyOwnerOfReceptionistRequest(params: {
+  kind: "new" | "reschedule";
+  jobId: string;
+  channel: string;
+  previousAt?: string | null;
+}) {
+  const { kind, jobId, channel, previousAt } = params;
+  try {
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("scheduled_at, notes, customers(name, phone), properties(address)")
+      .eq("id", jobId)
+      .single();
+    const customer = Array.isArray(job?.customers) ? job?.customers[0] : job?.customers;
+    const property = Array.isArray(job?.properties) ? job?.properties[0] : job?.properties;
+    const who = customer?.name ?? "A caller";
+    const via = channel === "ai_voice" ? "phone" : channel === "ai_sms" ? "text" : "receptionist";
+    const when = job?.scheduled_at ? `${formatEtDateTime(job.scheduled_at)} ET` : "no time given";
+    const line =
+      kind === "new" ? `New job request by ${via}: ${who}, ${when}` : `${who} asked by ${via} to move their job to ${when}`;
+    const details = [
+      kind === "reschedule" ? `Was: ${previousAt ? `${formatEtDateTime(previousAt)} ET` : "no time set"}` : null,
+      property?.address ? `Address: ${property.address}` : null,
+      customer?.phone ? `Phone: ${customer.phone}` : "No phone on file.",
+      kind === "new" && job?.notes ? `Details: ${job.notes}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const link = `${APP_URL}/dispatch`;
+
+    await postToTeams("dispatch", { title: line, text: details, url: link });
+
+    if (OWNER_EMAIL) {
+      await resend.emails.send({
+        from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+        to: OWNER_EMAIL,
+        subject: line,
+        text: `${line}.\n\n${details}\n\nPending: the customer was told it needs confirming. Confirm or change the time on the dispatch board, which sets it to Scheduled and sends the customer their notice:\n${link}`,
+      });
+    }
+  } catch (err) {
+    console.error(`[notify-owner] receptionist ${kind} alert failed for ${jobId}:`, err);
+  }
+}
+
+/**
  * A customer tapped the link in their plan visit reminder and asked for a visit.
  * Nothing is scheduled for them: this just puts the request in front of Josh with
  * their note, so he can call or pick a day on the dispatch board.

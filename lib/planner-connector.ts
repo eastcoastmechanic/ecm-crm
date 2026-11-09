@@ -24,6 +24,7 @@
  */
 import { graphConfigured, graphFetch, graphFetchWithRetry } from "@/lib/graph-auth";
 import { supabase } from "@/lib/supabase";
+import { etDateAtHour, etDateKey } from "@/lib/tz";
 
 export type PlannerBucketName =
   | "tasks"
@@ -97,7 +98,8 @@ export async function createPlannerTask(input: {
       planId: getPlanId(),
       bucketId,
       title: input.title,
-      dueDateTime: input.dueDate ? new Date(`${input.dueDate}T12:00:00`).toISOString() : undefined,
+      // Noon New York time on the due day, so Planner shows the same date in ET.
+      dueDateTime: input.dueDate ? etDateAtHour(input.dueDate.slice(0, 10), 12)?.toISOString() : undefined,
     }),
   });
   if (!res.ok) {
@@ -227,7 +229,8 @@ export async function syncJobToPlanner(jobId: string, status: string): Promise<b
 
       taskId = await createPlannerTask({
         title,
-        dueDate: job.scheduled_at ? job.scheduled_at.slice(0, 10) : undefined,
+        // The New York day of the job (an evening job is already the next day in UTC).
+        dueDate: job.scheduled_at ? etDateKey(new Date(job.scheduled_at)) : undefined,
         bucket: "jobs",
       });
       if (!taskId) return true; // Planner not configured — nothing more to do

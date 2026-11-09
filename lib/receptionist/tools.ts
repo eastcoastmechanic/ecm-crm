@@ -3,8 +3,14 @@ import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { supabase } from "@/lib/supabase";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { etDayRange, formatEtDateTime, parseEtLocal } from "@/lib/tz";
+import { applyJobStatus } from "@/lib/job-lifecycle";
+import { notifyOwnerOfReceptionistRequest } from "@/lib/notify-owner";
+import { notifyTech } from "@/lib/tech-notice-send";
 import { BUSINESS_HOURS } from "./config";
 import { openHoursFor, weekdayOf } from "./availability";
+
+// Jobs a caller may move. Finished, cancelled and under-way jobs are refused.
+const RESCHEDULABLE = new Set(["requested", "scheduled"]);
 
 // All dates and times the receptionist hears or says are New York time. The
 // server clock is UTC, so nothing here uses new Date(y, m, d, h) or getHours().
@@ -115,15 +121,22 @@ export function buildReceptionistTools(params: {
         return `Failed to set up customer/property: ${err instanceof Error ? err.message : "unknown error"}`;
       }
 
-      const { error: jobError } = await supabase.from("jobs").insert({
-        customer_id: finalCustomerId,
-        property_id: propertyId,
-        scheduled_at: scheduledAt.toISOString(),
-        status: "requested",
-        created_via: createdVia,
-        notes: description,
-      });
-      if (jobError) return `Failed to create job request: ${jobError.message}`;
+      const { data: newJob, error: jobError } = await supabase
+        .from("jobs")
+        .insert({
+          customer_id: finalCustomerId,
+          property_id: propertyId,
+          scheduled_at: scheduledAt.toISOString(),
+          status: "requested",
+          created_via: createdVia,
+          notes: description,
+        })
+        .select("id")
+        .single();
+      if (jobError || !newJob) return `Failed to create job request: ${jobError?.message ?? "no job saved"}`;
+
+      // Pending until the office confirms, so make sure Josh sees it.
+      await notifyOwnerOfReceptionistRequest({ kind: "new", jobId: newJob.id as string, channel: createdVia });
 
       return `Job request created for ${date} at ${time}, pending confirmation from East Coast Mechanical.`;
     },
@@ -146,18 +159,44 @@ export function buildReceptionistTools(params: {
 
       const { data: job } = await supabase
         .from("jobs")
-        .select("id, customer_id")
+        .select("id, customer_id, status, scheduled_at, assigned_staff_id")
         .eq("id", jobId)
         .single();
       if (!job || job.customer_id !== customerId) {
         return "That job was not found for this customer.";
       }
+      // A finished or cancelled job can't be moved, and a job the tech is already
+      // working is the office's call, not the receptionist's.
+      if (!RESCHEDULABLE.has(job.status as string)) {
+        return job.status === "in_progress"
+          ? "That job is already under way, so it can't be moved here. Tell the caller the office will call them back."
+          : "That job is already finished or cancelled, so it can't be moved. Offer to book a new visit instead.";
+      }
 
-      const { error } = await supabase
+      // Only while the job is still open, in case it closed since the read above.
+      const { data: moved, error } = await supabase
         .from("jobs")
-        .update({ scheduled_at: scheduledAt.toISOString(), status: "requested", created_via: createdVia })
-        .eq("id", jobId);
+        .update({ scheduled_at: scheduledAt.toISOString(), created_via: createdVia })
+        .eq("id", jobId)
+        .in("status", [...RESCHEDULABLE])
+        .select("id");
       if (error) return `Failed to reschedule: ${error.message}`;
+      if (!moved || moved.length === 0) return "That job can't be moved any more. Tell the caller the office will call them back.";
+
+      // Back to pending through the lifecycle, so the calendar and Planner sync see it.
+      try {
+        await applyJobStatus(jobId, "requested", { onlyFrom: job.status as string });
+      } catch (err) {
+        console.error(`[receptionist] could not set job ${jobId} back to requested:`, err);
+      }
+
+      await notifyOwnerOfReceptionistRequest({
+        kind: "reschedule",
+        jobId,
+        channel: createdVia,
+        previousAt: (job.scheduled_at as string | null) ?? null,
+      });
+      await notifyTech({ jobId, staffId: (job.assigned_staff_id as string | null) ?? null, kind: "rescheduled" });
 
       return `Reschedule requested for ${newDate} at ${newTime}, pending confirmation from East Coast Mechanical.`;
     },
