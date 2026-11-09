@@ -18,7 +18,9 @@ import {
 import { syncJobToPlanner } from "@/lib/planner-connector";
 import { requireRole } from "@/lib/require-role";
 import { checkJobAccess } from "@/lib/job-access";
-import { nextReportNumberFrom } from "@/lib/report-number";
+import { allocateReportNumberWith } from "@/lib/report-number";
+import { isMissingFunctionError } from "@/lib/doc-number";
+import { techEquipmentError, techWalkInError } from "@/lib/diagnosis-intake";
 
 const ScannedReadingsSchema = z.object({
   outdoor_temp: z.number().nullable(),
@@ -97,23 +99,33 @@ function isRefrigerantType(value: string | null): value is RefrigerantType {
   return !!value && (REFRIGERANT_TYPES as string[]).includes(value);
 }
 
-async function nextReportNumber() {
-  // Highest RPT number in use plus one (a row count repeats a live number after a
-  // delete). Read in pages so a long history is never cut off at the row cap.
-  const numbers: (string | null)[] = [];
-  const PAGE = 1000;
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from("diagnostics")
-      .select("doc_number")
-      .like("doc_number", "RPT-%")
-      .order("id")
-      .range(from, from + PAGE - 1);
-    if (error) throw new Error(error.message);
-    numbers.push(...(data ?? []).map((row) => row.doc_number as string | null));
-    if (!data || data.length < PAGE) break;
-  }
-  return nextReportNumberFrom(numbers);
+/**
+ * Next RPT number: next_report_number() (SQL 0072, a locked counter, so two
+ * reports at once never share a number), or before 0072 is run, the highest RPT
+ * number in use plus one.
+ */
+function nextReportNumber() {
+  return allocateReportNumberWith({
+    rpc: () => supabase.rpc("next_report_number"),
+    isMissingFunction: isMissingFunctionError,
+    loadExisting: async () => {
+      // Read in pages so a long history is never cut off at the row cap.
+      const numbers: (string | null)[] = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("diagnostics")
+          .select("doc_number")
+          .like("doc_number", "RPT-%")
+          .order("id")
+          .range(from, from + PAGE - 1);
+        if (error) throw new Error(error.message);
+        numbers.push(...(data ?? []).map((row) => row.doc_number as string | null));
+        if (!data || data.length < PAGE) break;
+      }
+      return numbers;
+    },
+  });
 }
 
 async function uploadPhotos(files: File[]) {
@@ -165,13 +177,30 @@ export async function generateDiagnosis(formData: FormData): Promise<DiagnosisRe
 
   if (!symptoms) return { error: "Describe the symptoms before generating a diagnosis." };
 
+  // Making a customer, property or unit and setting text consent is office and
+  // owner only. A tech's report goes on their own job's customer and address.
+  const isTech = access.role === "tech";
+  if (isTech) {
+    const walkInError = techWalkInError({
+      customerName,
+      customerPhone,
+      customerAddress,
+      smsConsent,
+      newEquipmentType,
+      newEquipmentBrand,
+      newEquipmentModel,
+      newEquipmentRefrigerant,
+    });
+    if (walkInError) return { error: walkInError };
+  }
+
   let equipment_id = submittedEquipmentId;
   let resolvedCustomerId: string | null = null;
   let resolvedPropertyId: string | null = null;
   // A walk-in customer (no equipment picked, name and address typed) is saved
   // only after the diagnosis comes back, so a failed try never leaves a
-  // duplicate customer behind when the tech presses Generate again.
-  const isWalkIn = !submittedEquipmentId && !!customerName && !!customerAddress;
+  // duplicate customer behind when Generate is pressed again. Never for a tech.
+  const isWalkIn = !isTech && !submittedEquipmentId && !!customerName && !!customerAddress;
   const walkInCustomerName = isWalkIn ? customerName : null;
   const walkInAddress = isWalkIn ? customerAddress : null;
 
@@ -201,6 +230,25 @@ export async function generateDiagnosis(formData: FormData): Promise<DiagnosisRe
   } catch (err) {
     console.error("[diagnostics] loading equipment or price book failed:", err);
     return { error: `Couldn't load the equipment or price book. ${KEPT}` };
+  }
+
+  // A tech may only pick a unit at their job's address (checkJobAccess already
+  // made sure a tech has a job).
+  if (isTech && equipment_id) {
+    const { data: techJob, error: jobError } = await supabase
+      .from("jobs")
+      .select("property_id")
+      .eq("id", job_id as string)
+      .maybeSingle();
+    if (jobError) {
+      console.error("[diagnostics] loading job for unit check failed:", jobError);
+      return { error: `Couldn't check the job. ${KEPT}` };
+    }
+    const equipmentError = techEquipmentError({
+      jobPropertyId: (techJob?.property_id as string | null | undefined) ?? null,
+      equipmentPropertyId: equipment?.properties?.id ?? null,
+    });
+    if (equipmentError) return { error: equipmentError };
   }
 
   if (equipment) {
@@ -320,13 +368,18 @@ Diagnose the fault and suggest a fix.`;
   }
 
   let photos: Awaited<ReturnType<typeof uploadPhotos>>;
-  let doc_number: string;
+  let numberResult: Awaited<ReturnType<typeof nextReportNumber>>;
   try {
-    [photos, doc_number] = await Promise.all([uploadPhotos(photoFiles), nextReportNumber()]);
+    [photos, numberResult] = await Promise.all([uploadPhotos(photoFiles), nextReportNumber()]);
   } catch (err) {
-    console.error("[diagnostics] photo upload or report number failed:", err);
+    console.error("[diagnostics] photo upload failed:", err);
     return { error: `Couldn't save the photos. ${KEPT}` };
   }
+  if (numberResult.error !== undefined) {
+    console.error("[diagnostics] report number failed:", numberResult.error);
+    return { error: `Couldn't get a report number. ${KEPT}` };
+  }
+  const doc_number = numberResult.reportNumber;
 
   const { data: diagnostic, error } = await supabase
     .from("diagnostics")

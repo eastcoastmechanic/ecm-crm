@@ -56,7 +56,7 @@ export default async function NewDiagnosticPage({
         </p>
       </div>
 
-      <DiagnosticForm equipment={equipment} jobId={job_id} />
+      <DiagnosticForm equipment={equipment} jobId={job_id} isTech={isTech} />
     </div>
   );
 }
