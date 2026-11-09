@@ -1,10 +1,6 @@
-import SubmitButton from "../SubmitButton";
 import PhotoButtons, { type PhotoCounts } from "./PhotoButtons";
-import { truckOnMyWay } from "./actions";
-import ArriveForm from "./ArriveForm";
-import { pauseJobAction, resumeJobAction } from "./clock-actions";
 import ChecklistPanel, { type TruckChecklistItem } from "./ChecklistPanel";
-import FinishForm from "./FinishForm";
+import TruckStep from "./TruckStep";
 import { formatEtTime } from "@/lib/tz";
 import OnSiteLine from "./OnSiteLine";
 import { jobFilesUrl } from "@/lib/job-files";
@@ -95,9 +91,6 @@ function SiteInfo({ job }: { job: TruckJob }) {
   );
 }
 
-const bigButton =
-  "w-full rounded-xl bg-gradient-to-br from-accent to-accent-2 px-4 py-4 text-base font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90";
-
 const linkButton =
   "flex flex-1 items-center justify-center rounded-xl border border-white/8 bg-white/4 px-4 py-3 text-sm font-bold uppercase tracking-wide text-white transition-colors hover:bg-white/8";
 
@@ -108,44 +101,6 @@ function timeLabel(value: string | null) {
     minute: "2-digit",
     timeZone: "America/New_York",
   });
-}
-
-// One step at a time: On my way -> I'm here -> Finish job. Pause / Resume sits above Finish.
-function StepButton({ job }: { job: TruckJob }) {
-  if (job.status === "in_progress") {
-    return (
-      <div className="flex flex-col gap-2">
-        {job.timer === "running" && (
-          <form action={pauseJobAction}>
-            <input type="hidden" name="id" value={job.id} />
-            <SubmitButton className={linkButton} pendingText="Pausing…">
-              Pause timer
-            </SubmitButton>
-          </form>
-        )}
-        {job.timer === "paused" && (
-          <form action={resumeJobAction}>
-            <input type="hidden" name="id" value={job.id} />
-            <SubmitButton className={linkButton} pendingText="Resuming…">
-              Timer paused. Resume
-            </SubmitButton>
-          </form>
-        )}
-      <FinishForm jobId={job.id} blockers={job.blockers ?? []} />
-      </div>
-    );
-  }
-  if (job.on_way_at) {
-    return <ArriveForm jobId={job.id} className={bigButton} />;
-  }
-  return (
-    <form action={truckOnMyWay}>
-      <input type="hidden" name="id" value={job.id} />
-      <SubmitButton className={bigButton} pendingText="Sending…">
-        On my way
-      </SubmitButton>
-    </form>
-  );
 }
 
 function stateLabel(job: TruckJob) {
@@ -226,7 +181,7 @@ export default function TruckJobCard({
       )}
 
       <div className="mt-3">
-        <JobNotebook jobId={job.id} buttonClassName={linkButton} />
+        <JobNotebook jobId={job.id} buttonClassName={linkButton} queueOnPhone />
       </div>
 
       {(primary || job.status === "in_progress") && (
@@ -269,7 +224,9 @@ export default function TruckJobCard({
       )}
 
       <div className="mt-3">
-        <StepButton job={job} />
+        <TruckStep
+          job={{ id: job.id, status: job.status, on_way_at: job.on_way_at, timer: job.timer, blockers: job.blockers }}
+        />
       </div>
     </div>
   );

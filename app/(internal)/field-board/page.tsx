@@ -12,6 +12,7 @@ import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } fr
 import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import FieldNoteForm from "./FieldNoteForm";
 import TruckJobCard, { OnSite, type TruckJob } from "./TruckJobCard";
+import OfflineSync from "./OfflineSync";
 
 export const dynamic = "force-dynamic";
 
@@ -279,6 +280,7 @@ export default async function FieldBoardPage() {
           </div>
         )}
       </div>
+      <OfflineSync staffKey={myId ?? "none"} renderedAt={new Date().toISOString()} />
 
       {!isTech && !secrets.field_board_secret && (
         <p className="text-sm text-accent">

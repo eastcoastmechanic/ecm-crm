@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { addJobNote, loadJobNotebook, type NotebookState } from "./notebook-actions";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, subTextClass } from "../ui";
+import { queueTap, useOfflineQueue } from "../field-board/offline-store";
+
+const EMPTY_NOTEBOOK: NotebookState = { notes: [], folderUrl: null, folderName: null, folderNote: null, oneNoteUrl: null };
 
 function when(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
@@ -22,9 +25,12 @@ function when(iso: string): string {
 export default function JobNotebook({
   jobId,
   buttonClassName = buttonSecondaryClass,
+  queueOnPhone = false,
 }: {
   jobId: string;
   buttonClassName?: string;
+  /** Truck screen: notes are saved on the phone first and sent from there, so they work with no signal. */
+  queueOnPhone?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<NotebookState | null>(null);
@@ -32,19 +38,44 @@ export default function JobNotebook({
   const [error, setError] = useState<string | null>(null);
   const [loading, startLoad] = useTransition();
   const [saving, startSave] = useTransition();
+  const queue = useOfflineQueue();
+  const waitingNotes = queueOnPhone
+    ? queue.items.filter((i) => i.jobId === jobId && i.type === "note" && i.staffKey === queue.staffKey)
+    : [];
+
+  function load() {
+    startLoad(async () => {
+      try {
+        setState(await loadJobNotebook(jobId));
+      } catch {
+        // No signal: the notes can't load, but a new note can still be saved on the phone.
+        setState({ ...EMPTY_NOTEBOOK, error: "No signal. Notes load when you're back online. You can still add one." });
+      }
+    });
+  }
+
+  // A note that just reached the server: reload so it shows with the others.
+  const sentVersion = queue.sentVersion;
+  useEffect(() => {
+    if (queueOnPhone && open && sentVersion > 0) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when a queued note is sent
+  }, [sentVersion]);
 
   function toggle() {
     const next = !open;
     setOpen(next);
-    if (next) {
-      startLoad(async () => {
-        setState(await loadJobNotebook(jobId));
-      });
-    }
+    if (next) load();
   }
 
   function save() {
     setError(null);
+    if (queueOnPhone) {
+      const body = text.trim();
+      if (!body) return;
+      setText("");
+      void queueTap("note", jobId, { body });
+      return;
+    }
     startSave(async () => {
       const result = await addJobNote(jobId, text);
       if (result.error || !result.note) {
@@ -112,7 +143,22 @@ export default function JobNotebook({
             </div>
           </div>
 
-          {state && !state.error && state.notes.length === 0 && <p className={subTextClass}>No notes on this job yet.</p>}
+          {waitingNotes.length > 0 && (
+            <ul className="flex flex-col divide-y divide-white/8">
+              {waitingNotes.map((n) => (
+                <li key={n.clientActionId} className="py-2">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-g300">
+                    {n.state === "refused" ? `Not saved: ${n.error}` : "Saved on phone — will send when you have signal"} · {when(n.createdAt)}
+                  </div>
+                  <p className="mt-0.5 whitespace-pre-wrap text-sm text-white">{n.payload.body}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {state && !state.error && state.notes.length === 0 && waitingNotes.length === 0 && (
+            <p className={subTextClass}>No notes on this job yet.</p>
+          )}
           {state && state.notes.length > 0 && (
             <ul className="flex flex-col divide-y divide-white/8">
               {state.notes.map((n) => (

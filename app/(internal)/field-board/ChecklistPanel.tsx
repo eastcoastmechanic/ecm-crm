@@ -1,6 +1,7 @@
 import SubmitButton from "../SubmitButton";
 import { inputClass } from "../ui";
 import { toggleChecklistItem, unlockChecklist } from "./checklist-actions";
+import NeedsSignal from "./NeedsSignal";
 
 export type TruckChecklistItem = { id: string; label: string; required: boolean; done: boolean };
 
@@ -34,7 +35,7 @@ export default function ChecklistPanel({
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-2">
+      <NeedsSignal what="The checklist" className="flex flex-col gap-2">
         {items.map((item) => (
           <form key={item.id} action={toggleChecklistItem}>
             <input type="hidden" name="item_id" value={item.id} />
@@ -48,7 +49,7 @@ export default function ChecklistPanel({
             </SubmitButton>
           </form>
         ))}
-      </div>
+      </NeedsSignal>
       {unlocked && <p className="mt-2 text-xs text-g300">Unlocked by the owner. This job can be finished.</p>}
       {canUnlock && !unlocked && blockers.length > 0 && (
         <details className="mt-3 text-sm">

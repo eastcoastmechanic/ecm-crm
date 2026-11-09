@@ -153,6 +153,17 @@ describe("applyJobStatus", () => {
     expect(row.status).toBe("scheduled");
   });
 
+  it("a tap saved on the phone stamps arrival and finish at the tap, not when it arrived", async () => {
+    const row: JobRow = { id: "j1", status: "scheduled", completed_at: null, arrived_at: null, on_way_at: null };
+    jobsTable(row);
+    await applyJobStatus("j1", "in_progress", { at: "2026-11-09T14:00:00.000Z" });
+    expect(row.arrived_at).toBe("2026-11-09T14:00:00.000Z");
+    await applyJobStatus("j1", "complete", { at: "2026-11-09T15:30:00.000Z" });
+    expect(row.completed_at).toBe("2026-11-09T15:30:00.000Z");
+    expect(row.tracked_hours).toBe(1.5);
+    expect(h.finalize).toHaveBeenCalledWith("j1", "2026-11-09T15:30:00.000Z");
+  });
+
   it("a job with no status yet is claimed with an is-null filter", async () => {
     const row: JobRow = { id: "j1", status: null, completed_at: null, arrived_at: null, on_way_at: null };
     h.handler = (call) => {

@@ -95,11 +95,15 @@ export async function sendScheduleNotifications(jobId: string) {
  * `onlyFrom` limits the move to a job still in that status, for callers that
  * decided on an earlier read (giving a requested job a time must not drag a job
  * someone just finished or cancelled back to scheduled).
+ *
+ * `at` is when the step really happened (a truck tap saved on the phone with no signal and
+ * sent later, already clamped by lib/offline-sync-rules.ts). It is used for arrived_at and
+ * completed_at instead of the server time. Leave it out everywhere else.
  */
 export async function applyJobStatus(
   id: string,
   status: string,
-  opts: { onlyFrom?: string } = {}
+  opts: { onlyFrom?: string; at?: string } = {}
 ): Promise<{ changed: boolean }> {
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
@@ -113,13 +117,14 @@ export async function applyJobStatus(
   // Moved on since the caller looked: leave it alone.
   if (opts.onlyFrom !== undefined && existing.status !== opts.onlyFrom) return { changed: false };
 
+  const stampAt = opts.at ?? new Date().toISOString();
   const completed_at =
-    status === "complete" ? existing.completed_at ?? new Date().toISOString() : existing.completed_at;
+    status === "complete" ? existing.completed_at ?? stampAt : existing.completed_at;
 
   // Going in_progress means the tech is on site and working. Stamped once, so
   // bouncing the status around doesn't restart the clock.
   const arrived_at =
-    status === "in_progress" ? existing.arrived_at ?? new Date().toISOString() : existing.arrived_at;
+    status === "in_progress" ? existing.arrived_at ?? stampAt : existing.arrived_at;
 
   // Measure from arrival when we have it, and fall back to on_way_at for jobs
   // that predate arrived_at. Anything measured from on_way_at includes the
