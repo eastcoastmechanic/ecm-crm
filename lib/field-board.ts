@@ -122,7 +122,7 @@ type ResolvedJob = {
   id: string;
   // True only when the job is certain: the caller named it by job_id, or this
   // same source already tied this external_ref to it. A match on the customer's
-  // name in the text is never certain (two Sullivans, a typo, a note about a
+  // name in the text is never certain (two customers with one last name, a typo, a note about a
   // neighbour): it may attach the note, but it never changes the job's status.
   confident: boolean;
 };

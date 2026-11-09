@@ -80,10 +80,10 @@ describe("ingestFieldBoardEvent status changes", () => {
   it("a single customer-name match attaches the note but never changes status", async () => {
     world({
       jobIds: ["job-1"],
-      customers: [{ id: "c1", name: "Sullivan" }],
+      customers: [{ id: "c1", name: "Testcustomer" }],
       customerJobs: [{ id: "job-1", status: "scheduled" }],
     });
-    const result = await ingestFieldBoardEvent({ source: "quo", title: "Finished at Sullivan", crm_status: "complete" });
+    const result = await ingestFieldBoardEvent({ source: "quo", title: "Finished at Testcustomer", crm_status: "complete" });
     expect(result.ok).toBe(true);
     expect(result).toMatchObject({ job_id: "job-1", status_applied: false });
     expect(result).toHaveProperty("status_skipped");
