@@ -507,6 +507,100 @@
           "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
         }
       }
+    },
+    "/api/copilot-actions/add_log_entry": {
+      "post": {
+        "operationId": "addLogEntry",
+        "summary": "Add a note to the running log (Texts, Plans, Jobs, Vendors / parts). A Jobs entry can link a job and also lands in its Notebook. Nothing reaches a customer.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["section", "text"],
+                "properties": {
+                  "section": { "type": "string", "description": "Texts, Plans, Jobs, or Vendors / parts" },
+                  "text": { "type": "string" },
+                  "jobId": { "type": "string", "description": "Jobs section only, from list_jobs" },
+                  "customerId": { "type": "string", "description": "Texts section only, from find_customer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/list_log": {
+      "post": {
+        "operationId": "listLog",
+        "summary": "List running-log entries with their ids, newest first. Open entries only unless includeFolded is true.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "section": { "type": "string", "description": "Texts, Plans, Jobs, or Vendors / parts; leave out for all" },
+                  "includeFolded": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/fold_log_entry": {
+      "post": {
+        "operationId": "foldLogEntry",
+        "summary": "Fold a running-log entry away (kept under Folded, never deleted). Pass its id, or a piece of its text that matches exactly one entry; otherwise the candidates come back.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "match": { "type": "string" },
+                  "section": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
+    },
+    "/api/copilot-actions/unfold_log_entry": {
+      "post": {
+        "operationId": "unfoldLogEntry",
+        "summary": "Bring a folded running-log entry back to the open list. Pass its id, or a piece of its text that matches exactly one folded entry.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "match": { "type": "string" },
+                  "section": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActionResult" } } } }
+        }
+      }
     }
   }
 }

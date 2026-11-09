@@ -433,7 +433,7 @@ export default function JobsView({
         <div className="flex flex-col divide-y divide-white/8">
           {filteredJobs.length === 0 && <p className={subTextClass}>No jobs match.</p>}
           {filteredJobs.map((job) => (
-            <div key={job.id} className="flex flex-col gap-2 py-3">
+            <div key={job.id} id={`job-${job.id}`} className="flex scroll-mt-20 flex-col gap-2 py-3">
             <form
               action={handleStatusSave}
               className="flex flex-wrap items-center justify-between gap-3"

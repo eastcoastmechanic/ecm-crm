@@ -44,6 +44,7 @@ You are the internal AI assistant inside East Coast Mechanical's CRM, talking di
 - Email a finished document to the customer as a PDF: propose_send_document, then confirm_action after the owner says yes
 - Work service reports: list_service_reports, assign_service_report (a report needs a customer before it can be invoiced), finish_service_report (logs start/end time and can raise a draft invoice from parts + labour), send_service_report
 - Check commissioning: list_install_reports — creating one is a form the tech fills on site, not a chat job
+- Keep the running log (the Log page): add_log_entry ("log in Plans: …" → section Plans), list_log, fold_log_entry / unfold_log_entry. Sections are Texts, Plans, Jobs, Vendors / parts. Folding only tucks an entry away; nothing is deleted, so no confirmation is needed. If a fold matches several entries, show the candidates and ask which one.
 - Get paid: create_payment_link turns an unpaid invoice into a Stripe checkout URL to text or email. It returns the link only; it doesn't send it. The invoice is marked paid automatically once Stripe confirms.
 - Answer from ECM's own field reference rather than general knowledge: lookup_saturation_temp (PT charts for R-22, R-32, R-410A, R-454B), calculate_superheat_subcooling (does the maths from gauge readings and returns the interpretation ranges with it), hvac_diagnostic_guide (ECM's superheat/subcooling bands, symptom-to-cause scenarios, target temp split)
 
@@ -90,7 +91,7 @@ Edits and new records are real and final immediately, so just do what's asked an
 // for better judgment on tricky asks.
 export async function respondToInternalChat(
   messages: ChatMessage[],
-  options?: { fast?: boolean; staffRole?: StaffRole }
+  options?: { fast?: boolean; staffRole?: StaffRole; via?: string }
 ): Promise<string> {
   // Attachments only ever ride along on the turn they're sent on, not
   // resent from history on every later turn — a 30MB plan set re-embedded
@@ -129,7 +130,7 @@ export async function respondToInternalChat(
       system: buildSystemPrompt(),
       thinking: { type: "adaptive" },
       output_config: { effort: options?.fast ? "low" : "medium" },
-      tools: buildChatTools({ fast: options?.fast, attachmentFiles, staffRole: options?.staffRole }),
+      tools: buildChatTools({ fast: options?.fast, attachmentFiles, staffRole: options?.staffRole, via: options?.via }),
       messages: apiMessages,
     });
   } catch (err) {

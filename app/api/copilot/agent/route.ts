@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   const startedAt = Date.now();
   try {
-    const reply = await runAsStaffRole("owner", () => respondToInternalChat(messages, { fast: true }));
+    const reply = await runAsStaffRole("owner", () => respondToInternalChat(messages, { fast: true, via: "Teams agent" }));
     console.log(`[copilot/agent] total ${Date.now() - startedAt}ms`);
     return NextResponse.json({ reply });
   } catch (err) {

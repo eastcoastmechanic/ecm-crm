@@ -39,6 +39,10 @@ export const COPILOT_ACTION_NAMES = [
   "create_invoice",
   "create_proposal",
   "get_daily_brief",
+  "add_log_entry",
+  "list_log",
+  "fold_log_entry",
+  "unfold_log_entry",
 ] as const;
 
 export type CopilotActionName = (typeof COPILOT_ACTION_NAMES)[number];
@@ -65,6 +69,6 @@ export type CopilotActionTool = {
  * Teams connector uses it).
  */
 export function getCopilotActionTools(): CopilotActionTool[] {
-  const all = buildInternalTools({ fast: true }) as unknown as CopilotActionTool[];
+  const all = buildInternalTools({ fast: true, via: "Copilot" }) as unknown as CopilotActionTool[];
   return all.filter((tool) => (COPILOT_ACTION_NAMES as readonly string[]).includes(tool.name));
 }

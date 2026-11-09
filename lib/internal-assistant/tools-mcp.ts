@@ -351,7 +351,7 @@ const GATED_TOOL_NAMES = new Set([
 ]);
 
 export function buildMcpTools(): McpTool[] {
-  const base = (buildInternalTools({ fast: true }) as unknown as McpTool[]).filter(
+  const base = (buildInternalTools({ fast: true, via: "MCP connector" }) as unknown as McpTool[]).filter(
     (tool) => !GATED_TOOL_NAMES.has(tool.name)
   );
   const gated = [
