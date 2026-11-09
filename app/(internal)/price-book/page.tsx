@@ -4,6 +4,7 @@ import { fetchAllPriceBookItems } from "@/lib/price-book";
 import { addPriceBookItem } from "./actions";
 import PriceBookList, { type PriceBookItem } from "./PriceBookList";
 import SubmitButton from "../SubmitButton";
+import ResultForm from "../ResultForm";
 import { buttonClass, cardClass, headingClass, inputClass, subTextClass } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function PriceBookPage() {
         </p>
       </div>
 
-      <form action={addPriceBookItem} className={cardClass}>
+      <ResultForm submit={addPriceBookItem} resetOnDone className={cardClass}>
         <label className="flex flex-col gap-1 text-xs text-g300">
           Category
           <input name="category" placeholder="Category" className={inputClass} />
@@ -80,7 +81,7 @@ export default async function PriceBookPage() {
           </label>
         )}
         <SubmitButton className={`${buttonClass} sm:col-span-2 sm:w-fit`}>Add Price Book Item</SubmitButton>
-      </form>
+      </ResultForm>
 
       <PriceBookList items={items} canSeeProfit={canSeeProfit} />
     </div>

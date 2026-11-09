@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { updatePriceBookItem, deletePriceBookItem } from "./actions";
 import SubmitButton from "../SubmitButton";
+import ResultForm from "../ResultForm";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 
 function formatPrice(value: number | null) {
@@ -40,11 +41,9 @@ function EditPriceBookItemForm({
   onDone: () => void;
 }) {
   return (
-    <form
-      action={async (formData) => {
-        await updatePriceBookItem(formData);
-        onDone();
-      }}
+    <ResultForm
+      submit={updatePriceBookItem}
+      onDone={onDone}
       className="grid gap-3 rounded-xl border border-white/8 bg-white/3 p-4 sm:grid-cols-2"
     >
       <input type="hidden" name="id" value={item.id} />
@@ -112,7 +111,7 @@ function EditPriceBookItemForm({
           Cancel
         </button>
       </div>
-    </form>
+    </ResultForm>
   );
 }
 

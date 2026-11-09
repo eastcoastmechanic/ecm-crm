@@ -53,17 +53,25 @@ function jobLabel(job: JobOption | null) {
 
 function AddPurchaseOrderModal({ jobOptions, onClose }: { jobOptions: JobOption[]; onClose: () => void }) {
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      {/* Submitted by hand (not the action prop) so React does not clear what was typed when a save fails. */}
       <form
-        action={async (formData) => {
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
           setError("");
+          setSaving(true);
           try {
-            await createPurchaseOrder(formData);
-            onClose();
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to save purchase order");
+            const result = await createPurchaseOrder(formData);
+            if (result.error) setError(result.error);
+            else onClose();
+          } catch {
+            setError("Couldn't save the purchase order. Try again.");
+          } finally {
+            setSaving(false);
           }
         }}
         className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-white/8 bg-navy p-5"
@@ -115,10 +123,14 @@ function AddPurchaseOrderModal({ jobOptions, onClose }: { jobOptions: JobOption[
           <textarea name="notes" rows={2} className={inputClass} />
         </label>
 
-        {error && <p className={errorClass}>{error}</p>}
+        {error && (
+          <p role="alert" className={errorClass}>
+            {error}
+          </p>
+        )}
 
-        <SubmitButton className={buttonClass} pendingText="Saving…">
-          Save purchase order
+        <SubmitButton className={buttonClass} disabled={saving}>
+          {saving ? "Saving…" : "Save purchase order"}
         </SubmitButton>
       </form>
     </div>
@@ -239,6 +251,7 @@ export default function ProcurementList({
   const [showAdd, setShowAdd] = useState(false);
   const [localStatus, setLocalStatus] = useState<Record<string, string>>({});
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [statusError, setStatusError] = useState("");
 
   const livePOs = useMemo(
     () => purchaseOrders.filter((po) => !deletedIds.has(po.id)),
@@ -273,12 +286,29 @@ export default function ProcurementList({
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [withLocalStatus, search, statusFilter]);
 
-  function handleStatusChange(id: string, status: string) {
+  async function handleStatusChange(id: string, status: string) {
+    const before = localStatus[id];
     setLocalStatus((prev) => ({ ...prev, [id]: status }));
+    setStatusError("");
     const fd = new FormData();
     fd.set("id", id);
     fd.set("status", status);
-    updatePoStatus(fd);
+    let error: string | undefined;
+    try {
+      error = (await updatePoStatus(fd)).error;
+    } catch {
+      error = "Couldn't change the status. Try again.";
+    }
+    if (error) {
+      // Put the select back so it shows what is really saved.
+      setLocalStatus((prev) => {
+        const next = { ...prev };
+        if (before) next[id] = before;
+        else delete next[id];
+        return next;
+      });
+      setStatusError(error);
+    }
   }
 
   function handleDelete(id: string) {
@@ -321,6 +351,12 @@ export default function ProcurementList({
           + New purchase order
         </button>
       </div>
+
+      {statusError && (
+        <p role="alert" className={errorClass}>
+          {statusError}
+        </p>
+      )}
 
       <div className="flex flex-col gap-3">
         {filtered.length === 0 && <p className={subTextClass}>No purchase orders match.</p>}

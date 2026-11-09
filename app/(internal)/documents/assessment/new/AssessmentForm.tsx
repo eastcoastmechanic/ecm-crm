@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { submitAssessment } from "./actions";
+import { startTransition, useActionState, useMemo, useState } from "react";
+import { submitAssessment, type AssessmentFormState } from "./actions";
 import { scanNameplate, type ScannedNameplate } from "../../../equipment/actions";
-import SubmitButton from "../../../SubmitButton";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, subTextClass } from "../../../ui";
 import CustomerPicker from "../../../CustomerPicker";
 import PropertyPicker from "../../../PropertyPicker";
@@ -34,6 +33,27 @@ export default function AssessmentForm({
   const [extracted, setExtracted] = useState<Record<number, ScannedNameplate | null>>({});
   const [scanningRow, setScanningRow] = useState<number | null>(null);
   const [scanError, setScanError] = useState<Record<number, string>>({});
+  const [state, save, saving] = useActionState<AssessmentFormState, FormData>(submitAssessment, null);
+
+  // New equipment already saved by a failed try, by row, sent back so the retry reuses it.
+  const [createdByRow, setCreatedByRow] = useState<Record<number, string>>({});
+
+  // A new customer/property/equipment saved before a later step failed: point the form
+  // at them so pressing Generate again does not create a second copy. Rows cannot be
+  // added or removed while saving, so index i is still rowIds[i] here.
+  const [seenState, setSeenState] = useState(state);
+  if (state !== seenState) {
+    setSeenState(state);
+    if (state?.customerId) setCustomerId(state.customerId);
+    if (state?.propertyId) setPropertyId(state.propertyId);
+    if (state?.equipmentIds) {
+      const next: Record<number, string> = { ...createdByRow };
+      state.equipmentIds.forEach((id, i) => {
+        if (id && rowIds[i] !== undefined) next[rowIds[i]] = id;
+      });
+      setCreatedByRow(next);
+    }
+  }
 
   const propertyEquipment = useMemo(
     () => equipment.filter((e) => e.property_id === propertyId),
@@ -59,10 +79,11 @@ export default function AssessmentForm({
       formData.set("photo", file);
       const result = await scanNameplate(formData);
       setExtracted((prev) => ({ ...prev, [rowId]: result }));
-    } catch (err) {
+    } catch {
+      // Production hides a thrown server message, so say it plainly here.
       setScanError((prev) => ({
         ...prev,
-        [rowId]: err instanceof Error ? err.message : "Failed to read photo",
+        [rowId]: "Couldn't read that nameplate. Type the details in, or try another photo.",
       }));
     } finally {
       setScanningRow(null);
@@ -70,7 +91,15 @@ export default function AssessmentForm({
   }
 
   return (
-    <form action={submitAssessment} className="flex flex-col gap-4">
+    // Submitted by hand (not the action prop) so React does not clear what was typed when it fails.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => save(data));
+      }}
+      className="flex flex-col gap-4"
+    >
       <input type="hidden" name="row_count" value={rowIds.length} />
 
       <div className="grid gap-3 rounded-xl border border-white/8 bg-white/3 p-4 sm:grid-cols-2">
@@ -89,7 +118,7 @@ export default function AssessmentForm({
         const rowExtracted = extracted[rowId] ?? null;
         return (
           <section
-            key={`${rowId}-${JSON.stringify(rowExtracted)}`}
+            key={rowId}
             className="flex flex-col gap-3 rounded-xl border border-white/8 p-4"
           >
             <div className="flex items-center justify-between">
@@ -100,6 +129,7 @@ export default function AssessmentForm({
                 <button
                   type="button"
                   onClick={() => removeRow(rowId)}
+                  disabled={saving}
                   className="text-xs text-g300 underline"
                 >
                   Remove
@@ -109,6 +139,7 @@ export default function AssessmentForm({
 
             <label className="flex flex-col gap-1 text-xs text-g300">
               Equipment
+              <input type="hidden" name={`created_equipment_id_${index}`} value={createdByRow[rowId] ?? ""} />
               <select name={`equipment_id_${index}`} className={inputClass} defaultValue="">
                 <option value="">New equipment (fill in below, or scan nameplate)</option>
                 {propertyEquipment.map((e) => (
@@ -137,7 +168,9 @@ export default function AssessmentForm({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1 text-xs text-g300">
                 Type
+                {/* Keyed on the scanned value so a nameplate scan refills these boxes without wiping the rest of the row. */}
                 <input
+                  key={`type-${rowExtracted?.type ?? ""}`}
                   name={`new_equipment_type_${index}`}
                   placeholder="Type (e.g. mini-split, boiler)"
                   defaultValue={rowExtracted?.type ?? ""}
@@ -147,6 +180,7 @@ export default function AssessmentForm({
               <label className="flex flex-col gap-1 text-xs text-g300">
                 Brand
                 <input
+                  key={`brand-${rowExtracted?.brand ?? ""}`}
                   name={`new_equipment_brand_${index}`}
                   placeholder="Brand"
                   defaultValue={rowExtracted?.brand ?? ""}
@@ -156,6 +190,7 @@ export default function AssessmentForm({
               <label className="flex flex-col gap-1 text-xs text-g300">
                 Model
                 <input
+                  key={`model-${rowExtracted?.model ?? ""}`}
                   name={`new_equipment_model_${index}`}
                   placeholder="Model"
                   defaultValue={rowExtracted?.model ?? ""}
@@ -165,6 +200,7 @@ export default function AssessmentForm({
               <label className="flex flex-col gap-1 text-xs text-g300">
                 Refrigerant
                 <input
+                  key={`refrigerant-${rowExtracted?.refrigerant_type ?? ""}`}
                   name={`new_equipment_refrigerant_${index}`}
                   placeholder="Refrigerant (optional)"
                   defaultValue={rowExtracted?.refrigerant_type ?? ""}
@@ -207,7 +243,7 @@ export default function AssessmentForm({
         );
       })}
 
-      <button type="button" onClick={addRow} className={`${buttonSecondaryClass} w-fit`}>
+      <button type="button" onClick={addRow} disabled={saving} className={`${buttonSecondaryClass} w-fit`}>
         + Add Another Piece of Equipment
       </button>
 
@@ -215,9 +251,14 @@ export default function AssessmentForm({
         <p className={subTextClass}>Add a customer first before creating an assessment.</p>
       )}
 
-      <SubmitButton className={`${buttonClass} w-fit`} pendingText="Generating…">
-        ⚡ Generate Condition Assessment
-      </SubmitButton>
+      {state?.error && !saving && (
+        <p role="alert" className={errorClass}>
+          {state.error}
+        </p>
+      )}
+      <button type="submit" disabled={saving} className={`${buttonClass} w-fit disabled:opacity-50`}>
+        {saving ? "Generating…" : "⚡ Generate Condition Assessment"}
+      </button>
     </form>
   );
 }

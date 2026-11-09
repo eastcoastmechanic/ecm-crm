@@ -56,10 +56,17 @@ function readUnits(formData: FormData): Unit[] {
   return units;
 }
 
-export async function createInstallReport(formData: FormData) {
+export type InstallReportState = { error?: string } | null;
+
+/** File an install report. Returns { error } (the multi-unit form keeps what was typed); redirects on success. */
+export async function createInstallReport(_prev: InstallReportState, formData: FormData): Promise<InstallReportState> {
   const job_id = str(formData, "job_id");
   // Techs can file a report only for a job they may work. Office and owner are not limited.
-  await requireJobAccess(job_id, { allowClosedJob: true });
+  try {
+    await requireJobAccess(job_id, { allowClosedJob: true });
+  } catch (err) {
+    return { error: err instanceof Error && err.message ? err.message : "Not allowed." };
+  }
   const equipment_id = str(formData, "equipment_id");
 
   let customer_id: string | null = null;
@@ -126,7 +133,10 @@ export async function createInstallReport(formData: FormData) {
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error || !report) {
+    console.error("createInstallReport: insert failed", error?.message);
+    return { error: "Couldn't save the install report. Your entries are still here, try again." };
+  }
 
   revalidatePath("/tech-hub/install-report");
   if (job_id) revalidatePath("/jobs");

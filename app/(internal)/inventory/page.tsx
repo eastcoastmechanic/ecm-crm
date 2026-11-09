@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { fetchAllPriceBookItems } from "@/lib/price-book";
 import { addInventoryItem, adjustInventoryQty } from "./actions";
 import SubmitButton from "../SubmitButton";
+import ResultForm from "../ResultForm";
 import {
   buttonClass,
   cardClass,
@@ -42,7 +43,7 @@ export default async function InventoryPage() {
         </p>
       </div>
 
-      <form action={addInventoryItem} className={cardClass}>
+      <ResultForm submit={addInventoryItem} resetOnDone className={cardClass}>
         <label className="flex flex-col gap-1 text-xs text-g300 sm:col-span-2">
           Part
           <select name="price_book_item_id" required className={inputClass}>
@@ -71,7 +72,7 @@ export default async function InventoryPage() {
           <input name="reorder_threshold" type="number" step="1" min="0" className={inputClass} />
         </label>
         <SubmitButton className={`${buttonClass} sm:col-span-2 sm:w-fit`}>Add to Inventory</SubmitButton>
-      </form>
+      </ResultForm>
 
       {error && <p className={itemSubClass}>Error loading inventory: {error.message}</p>}
 
@@ -97,7 +98,7 @@ export default async function InventoryPage() {
                   {item.reorder_threshold !== null ? ` · Reorder at ${item.reorder_threshold}` : ""}
                 </div>
               </div>
-              <form action={adjustInventoryQty} className="flex items-center gap-2">
+              <ResultForm submit={adjustInventoryQty} className="flex flex-wrap items-center justify-end gap-2">
                 <input type="hidden" name="id" value={item.id} />
                 <input
                   type="number"
@@ -109,7 +110,7 @@ export default async function InventoryPage() {
                   className={`${inputClass} w-20 text-right`}
                 />
                 <SubmitButton className={buttonClass}>Save</SubmitButton>
-              </form>
+              </ResultForm>
             </div>
           );
         })}
