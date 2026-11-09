@@ -8,7 +8,7 @@ import { finishBlockers } from "@/lib/checklist-rules";
 import { ensureChecklists, loadChecklists, unlockedJobIds } from "@/lib/job-checklist";
 import { formatEtTime } from "@/lib/tz";
 import { getClockState, getFinishedWeek } from "@/lib/time-clock";
-import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } from "@/lib/field-board";
+import { FIELD_BOT_INSTRUCTIONS, getFieldBoardSheet } from "@/lib/field-board";
 import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import FieldNoteForm from "./FieldNoteForm";
 import TruckJobCard, { OnSite, type TruckJob } from "./TruckJobCard";
@@ -162,7 +162,6 @@ export default async function FieldBoardPage() {
   const staffRole = (await headers()).get("x-staff-role");
   const isTech = staffRole === "tech";
   const isOwner = staffRole === "owner";
-  const secrets = fieldBoardSecretStatus();
   const myStaffId = getMyStaffId();
   const [sheetResult, rawJobs, myId] = await Promise.all([
     getFieldBoardSheet()
@@ -282,11 +281,6 @@ export default async function FieldBoardPage() {
       </div>
       <OfflineSync staffKey={myId ?? "none"} renderedAt={new Date().toISOString()} />
 
-      {!isTech && !secrets.field_board_secret && (
-        <p className="text-sm text-accent">
-          FIELD_BOARD_SECRET is not on this production deploy. Add it in Vercel for Production, then Redeploy.
-        </p>
-      )}
       {tableMissing && (
         <p className="text-sm text-accent">This part isn&apos;t set up yet — tell the office.</p>
       )}

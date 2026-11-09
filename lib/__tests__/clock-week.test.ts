@@ -134,3 +134,18 @@ describe("format", () => {
     expect(formatHmShort(8.5)).toBe("8:30");
   });
 });
+
+describe("countableShifts", () => {
+  it("leaves out voided shifts and keeps the rest", async () => {
+    const { countableShifts } = await import("../clock-week");
+    const rows = [
+      { started_at: "2026-11-09T12:00:00Z", ended_at: "2026-11-09T20:00:00Z", break_minutes: 30, voided_at: null },
+      { started_at: "2026-11-10T12:00:00Z", ended_at: "2026-11-10T20:00:00Z", break_minutes: 0, voided_at: "2026-11-11T12:00:00Z" },
+      { started_at: "2026-11-11T12:00:00Z", ended_at: "2026-11-11T16:00:00Z", break_minutes: null },
+    ];
+    const out = countableShifts(rows);
+    expect(out).toHaveLength(2);
+    expect(out.map((s) => s.started_at)).toEqual(["2026-11-09T12:00:00Z", "2026-11-11T12:00:00Z"]);
+    expect(out[1].break_minutes).toBeNull();
+  });
+});

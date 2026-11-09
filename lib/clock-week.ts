@@ -54,6 +54,17 @@ function shiftHours(shift: ClockShift, now: Date): number {
 }
 
 /** Per-day, today and week hours for one person's shifts in the New York week containing `now`. */
+/** Shift rows that count toward hours: voided ones (SQL 0078) are left out. Accepts rows read with "*". */
+export function countableShifts(rows: Array<Record<string, unknown>>): ClockShift[] {
+  return rows
+    .filter((r) => !r.voided_at)
+    .map((r) => ({
+      started_at: String(r.started_at),
+      ended_at: (r.ended_at as string | null) ?? null,
+      break_minutes: (r.break_minutes as number | null) ?? null,
+    }));
+}
+
 export function clockWeek(shifts: ClockShift[], now: Date = new Date()): ClockWeek {
   const todayKey = etDateKey(now);
   const weekStart = mondayOfKey(todayKey);
