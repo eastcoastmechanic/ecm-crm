@@ -20,6 +20,7 @@ import {
   buttonSecondaryClass,
   errorClass,
 } from "../ui";
+import { BUSINESS_TZ } from "@/lib/tz";
 
 type Lead = {
   id: string;
@@ -274,7 +275,9 @@ function LeadCard({
             </div>
             <div className={itemSubClass}>
               {[address, lead.town && lead.town !== address ? lead.town : null].filter(Boolean).join(" · ")}
-              {lead.created_at && ` · ${new Date(lead.created_at).toLocaleDateString()}`}
+              {/* New York date, the same on the server (UTC) and in the browser. */}
+              {lead.created_at &&
+                ` · ${new Date(lead.created_at).toLocaleDateString("en-US", { timeZone: BUSINESS_TZ })}`}
               {lead.source_url && (
                 <>
                   {" · "}

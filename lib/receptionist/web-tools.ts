@@ -5,6 +5,7 @@ import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
 import { checkAvailabilityTool } from "./tools";
 import { parseEtLocal } from "@/lib/tz";
+import { bookingConsentPlan, smsOptInState, startDoubleOptIn, type SmsOptInState } from "@/lib/sms-consent";
 
 // Unlike the SMS/voice tools, a website visitor is never a "recognized
 // customer" (no phone-number channel to match against), so there's no
@@ -32,13 +33,28 @@ const createWebBookingRequest = betaZodTool({
     const scheduledAt = parseEtLocal(`${date}T${time}`);
     if (!scheduledAt) return `Couldn't read "${date} ${time}" as a date and time. Use YYYY-MM-DD and HH:MM.`;
 
+    // Same rule as /book: a chat visitor can type anyone's number, so "yes, text
+    // me" only starts a double opt-in. Consent is saved now only if that number
+    // already confirmed (YES or START on file); see bookingConsentPlan.
+    const wantsTexts = smsConsent === true;
+    let optInState: SmsOptInState = "none";
+    if (wantsTexts) {
+      try {
+        optInState = await smsOptInState(phone);
+      } catch (err) {
+        console.error("web chat booking: opt-in lookup failed", err instanceof Error ? err.message : err);
+        optInState = "opted_out"; // can't tell, so no consent and no text
+      }
+    }
+    const consentPlan = bookingConsentPlan(wantsTexts, optInState);
+
     let customerId: string;
     let propertyId: string;
     try {
       const resolved = await resolveCustomerPropertyEquipment({
         customerName: name,
         phone,
-        smsConsent: smsConsent === true,
+        smsConsent: consentPlan.consentNow,
         address,
       });
       customerId = resolved.customerId!;
@@ -57,6 +73,18 @@ const createWebBookingRequest = betaZodTool({
     });
     if (jobError) return `Failed to create job request: ${jobError.message}`;
 
+    // The request is saved; a failed "Reply YES" text shouldn't fail the booking.
+    let confirmTextSent = false;
+    if (consentPlan.askToConfirm) {
+      try {
+        const sent = await startDoubleOptIn(phone, name);
+        if (sent === "failed") console.error("web chat booking: opt-in text failed to send");
+        confirmTextSent = sent === "sent";
+      } catch (err) {
+        console.error("web chat booking: opt-in request failed", err instanceof Error ? err.message : err);
+      }
+    }
+
     await notifyOwnerOfWebLead({
       source: "web_chat",
       customerName: name,
@@ -66,7 +94,10 @@ const createWebBookingRequest = betaZodTool({
       scheduledAt,
     });
 
-    return `Job request created for ${date} at ${time}, pending confirmation from East Coast Mechanical.`;
+    const textNote = confirmTextSent
+      ? " We texted that number once to confirm text updates; the visitor must reply YES to that text to start getting them."
+      : "";
+    return `Job request created for ${date} at ${time}, pending confirmation from East Coast Mechanical.${textNote}`;
   },
 });
 

@@ -14,6 +14,7 @@ import {
   type JobPhotoPhase,
 } from "@/lib/job-photos";
 import { listOpenPlannerTasks } from "@/lib/planner-connector";
+import { applyJobStatus } from "@/lib/job-lifecycle";
 
 /**
  * Jobs, leads, inventory and document sending.
@@ -62,27 +63,41 @@ const scheduleJobTool = betaZodTool({
   inputSchema: z.object({
     customerId: z.string(),
     propertyId: z.string().optional(),
-    scheduledAt: z.string().describe("ISO 8601 datetime, e.g. 2026-08-12T09:00:00-04:00"),
+    scheduledAt: z
+      .string()
+      .describe("Date and time, ISO 8601. Without a zone (e.g. 2026-11-12T09:00) it is read as New York time."),
     notes: z.string().optional().describe("What the visit is for"),
   }),
   run: async ({ customerId, propertyId, scheduledAt, notes }) => {
-    const when = new Date(scheduledAt);
-    if (Number.isNaN(when.getTime())) return `Couldn't read "${scheduledAt}" as a date/time.`;
+    const local = etLocalFromIso(scheduledAt);
+    const when = local ? parseEtLocal(local) : null;
+    if (!when) return `Couldn't read "${scheduledAt}" as a date/time.`;
 
+    // Saved as requested, then moved to scheduled through job-lifecycle, the
+    // same as the office setting a time on a booked request. That one status
+    // change sends the customer's schedule notice and syncs Graph and Planner,
+    // so nothing is sent twice and nothing is skipped.
     const { data, error } = await supabase
       .from("jobs")
       .insert({
         customer_id: customerId,
         property_id: propertyId ?? null,
         scheduled_at: when.toISOString(),
-        status: "scheduled",
+        status: "requested",
         notes: notes ?? null,
         created_via: "manual",
       })
       .select("id")
       .single();
     if (error) return `Failed to schedule job: ${error.message}`;
-    return `Scheduled job ${data.id} for ${when.toLocaleString("en-US", { timeZone: "America/New_York" })} ET.`;
+
+    try {
+      await applyJobStatus(data.id, "scheduled", { onlyFrom: "requested" });
+    } catch (err) {
+      console.error("schedule_job: status change failed", err instanceof Error ? err.message : err);
+      return `Saved job ${data.id} for ${formatEtDateTime(when)} ET, but couldn't mark it Scheduled. Set the status on the Jobs list.`;
+    }
+    return `Scheduled job ${data.id} for ${formatEtDateTime(when)} ET.`;
   },
 });
 

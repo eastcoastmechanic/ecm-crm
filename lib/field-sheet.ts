@@ -1,3 +1,4 @@
+import { etDateKey, etDayRange } from "@/lib/tz";
 import { supabase } from "@/lib/supabase";
 import { getFieldBoardSheet } from "@/lib/field-board";
 import { formatEtDate, formatEtDateTime } from "@/lib/tz";
@@ -36,9 +37,13 @@ function line(id: string, parts: (string | null | undefined)[], stamp: string | 
   };
 }
 
-function startOfToday() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+/**
+ * 00:00 today in New York. The server runs in UTC, so the server's own
+ * midnight would be 7 or 8 PM ET the night before: after that, today's
+ * open jobs would land on the leftover list a whole evening early.
+ */
+export function startOfToday(now: Date = new Date()): Date {
+  return etDayRange(etDateKey(now)).start;
 }
 
 function formatStamp(value: string | null) {

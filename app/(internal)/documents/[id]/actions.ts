@@ -37,6 +37,9 @@ function parseNullableNumber(value: FormDataEntryValue | null): number | null {
 
 const CRAFTSMANSHIP_WARRANTY_YEARS = 1;
 
+// Statuses a re-send leaves alone (the customer already paid, approved or signed).
+const KEEP_STATUS_ON_RESEND = ["paid", "approved", "signed"];
+
 async function notOffice(): Promise<boolean> {
   try {
     await requireOffice();
@@ -409,14 +412,16 @@ export async function sendDocumentEmail(_prev: SendDocumentState, formData: Form
     return { error: "The email didn't go out. Try again." };
   }
 
-  // Re-emailing a paid invoice (a copy for the customer's records) must not
-  // set it back to sent: the status only changes on a row that is not paid.
+  // Re-emailing a paid invoice, an approved estimate or a signed contract (a
+  // copy for the customer's records) must not set it back to sent: the status
+  // only changes on a row that hasn't reached one of those. sent_at is stamped
+  // either way.
   const sentFields = { sent_at: new Date().toISOString(), ...(email.extraUpdate ?? {}) };
   const { data: marked, error: markError } = await supabase
     .from("documents")
     .update({ status: "sent", ...sentFields })
     .eq("id", id)
-    .or("status.is.null,status.neq.paid")
+    .or(`status.is.null,status.not.in.(${KEEP_STATUS_ON_RESEND.join(",")})`)
     .select("id");
   let updateError = markError;
   if (!markError && (!marked || marked.length === 0)) {
