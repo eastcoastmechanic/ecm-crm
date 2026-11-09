@@ -1,5 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { buildPushPayload, isAllowedPushEndpoint, isGoneStatus, parseSubscription } from "../push-rules";
+import {
+  buildPushPayload,
+  isAllowedPushEndpoint,
+  isGoneStatus,
+  normalizeVapidSubject,
+  parseSubscription,
+} from "../push-rules";
+
+describe("normalizeVapidSubject", () => {
+  it("keeps a proper mailto: or https: subject as is", () => {
+    expect(normalizeVapidSubject("mailto:office@example.com")).toBe("mailto:office@example.com");
+    expect(normalizeVapidSubject("https://example.com")).toBe("https://example.com");
+    expect(normalizeVapidSubject("https://example.com/contact")).toBe("https://example.com/contact");
+  });
+  it("adds mailto: to a bare email address", () => {
+    expect(normalizeVapidSubject("office@example.com")).toBe("mailto:office@example.com");
+  });
+  it("adds https:// to a bare host", () => {
+    expect(normalizeVapidSubject("example.com")).toBe("https://example.com");
+    expect(normalizeVapidSubject("example.com:443")).toBe("https://example.com:443");
+  });
+  it("trims spaces, quotes and line breaks pasted with the value", () => {
+    expect(normalizeVapidSubject('  "office@example.com"\n')).toBe("mailto:office@example.com");
+  });
+  it("returns null for values web-push would reject", () => {
+    expect(normalizeVapidSubject(undefined)).toBeNull();
+    expect(normalizeVapidSubject("")).toBeNull();
+    expect(normalizeVapidSubject("   ")).toBeNull();
+    expect(normalizeVapidSubject("http://example.com")).toBeNull();
+    expect(normalizeVapidSubject("ftp://example.com")).toBeNull();
+    expect(normalizeVapidSubject("mailto:")).toBeNull();
+    expect(normalizeVapidSubject("mailto:nobody")).toBeNull();
+    expect(normalizeVapidSubject("office@")).toBeNull();
+    expect(normalizeVapidSubject("localhost")).toBeNull();
+    expect(normalizeVapidSubject("East Coast Mechanical")).toBeNull();
+  });
+});
 
 describe("buildPushPayload", () => {
   it("trims, collapses whitespace and caps length", () => {

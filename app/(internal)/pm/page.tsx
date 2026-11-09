@@ -6,6 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default async function PmListPage() {
   const { rows, error } = await listChecklists();
+  // Techs open this page: show a plain line, log the real error (often SQL 0048 not run).
+  if (error) console.error("[pm] listChecklists failed:", error);
 
   return (
     <div className="flex flex-col gap-6">
@@ -24,9 +26,7 @@ export default async function PmListPage() {
         </div>
       </div>
       {error && (
-        <p className={errorClass}>
-          {error}. Apply db/migrations/0048_preventive_maintenance.sql if this is a missing-table error.
-        </p>
+        <p className={errorClass}>This part isn&apos;t set up yet — tell the office.</p>
       )}
       <div className="flex flex-col divide-y divide-white/8">
         {rows.length === 0 && !error && <p className={subTextClass}>No checklists yet.</p>}

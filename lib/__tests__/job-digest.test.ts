@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { buildJobDigests, type DigestJob } from "../job-digest";
+import { buildJobDigests, digestIdempotencyKey, isDuplicateDigestError, type DigestJob } from "../job-digest";
+
+describe("digest idempotency", () => {
+  it("one key per person per New York day, case and spaces ignored", () => {
+    expect(digestIdempotencyKey("2026-11-09", " Tech@Example.com ")).toBe("job-digest/2026-11-09/tech@example.com");
+    expect(digestIdempotencyKey("2026-11-09", "a@example.com")).not.toBe(digestIdempotencyKey("2026-11-10", "a@example.com"));
+  });
+  it("treats Resend's repeat-key answers as already sent, nothing else", () => {
+    expect(isDuplicateDigestError({ name: "invalid_idempotent_request" })).toBe(true);
+    expect(isDuplicateDigestError({ name: "concurrent_idempotent_requests" })).toBe(true);
+    expect(isDuplicateDigestError({ name: "rate_limit_exceeded" })).toBe(false);
+    expect(isDuplicateDigestError(null)).toBe(false);
+  });
+});
 import { etHour } from "../tz";
 
 const OWNER = "owner@example.com";
