@@ -1,6 +1,14 @@
 import { createHash, randomBytes } from "node:crypto";
 import { supabase } from "@/lib/supabase";
-import { buildClientAssertion, graphConfigured, GRAPH_BASE } from "@/lib/graph-auth";
+import {
+  buildClientAssertion,
+  graphConfigured,
+  GRAPH_BASE,
+  GRAPH_CALL_TIMEOUT_MS,
+  MS_TOKEN_TIMEOUT_MS,
+  withTimeout,
+} from "@/lib/graph-auth";
+import { notifyOwnerOfSystemProblem } from "@/lib/notify-owner";
 import { decryptToken, encryptToken } from "@/lib/token-crypto";
 
 /**
@@ -69,7 +77,13 @@ type TokenResponse = {
   error_description?: string;
 };
 
+/**
+ * Throws when Microsoft gave no real answer (time limit hit, network drop, a
+ * 5xx, or the body cut off by the time limit), so callers never mistake an
+ * outage for a refused sign-in. Returns Microsoft's answer otherwise.
+ */
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
+  const signal = withTimeout(MS_TOKEN_TIMEOUT_MS);
   const res = await fetch(`https://login.microsoftonline.com/${tenantId()}/oauth2/v2.0/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -80,8 +94,15 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
       client_assertion: buildClientAssertion(tenantId(), clientId()),
       ...params,
     }),
+    signal,
   });
-  return (await res.json().catch(() => ({ error: `http_${res.status}` }))) as TokenResponse;
+  if (res.status >= 500) throw new Error(`Microsoft token endpoint answered ${res.status}`);
+  try {
+    return (await res.json()) as TokenResponse;
+  } catch (err) {
+    if (signal.aborted) throw err;
+    return { error: `http_${res.status}` };
+  }
 }
 
 /** Signed-in account name from the id token (read straight from Microsoft over TLS, display only). */
@@ -105,12 +126,18 @@ export async function completeSignIn(input: {
   codeVerifier: string;
   staffId: string | null;
 }): Promise<{ ok: true; account: string | null } | { ok: false; error: string }> {
-  const json = await tokenRequest({
-    grant_type: "authorization_code",
-    code: input.code,
-    redirect_uri: input.redirectUri,
-    code_verifier: input.codeVerifier,
-  });
+  let json: TokenResponse;
+  try {
+    json = await tokenRequest({
+      grant_type: "authorization_code",
+      code: input.code,
+      redirect_uri: input.redirectUri,
+      code_verifier: input.codeVerifier,
+    });
+  } catch (err) {
+    console.error("[microsoft] sign-in token request failed:", err instanceof Error ? err.name : "error");
+    return { ok: false, error: "microsoft_no_response" };
+  }
   if (!json.refresh_token || !json.access_token) {
     // Microsoft's own error code only (no tokens), so the owner can see what to fix.
     return { ok: false, error: json.error ?? "no_refresh_token" };
@@ -162,6 +189,38 @@ export async function disconnect(): Promise<void> {
 }
 
 /**
+ * Save why the saved sign-in stopped working (for /account), and tell the owner
+ * once. The alert goes out only when this flips the row from working
+ * (last_error empty) to broken, in one conditional update, so two refreshes
+ * failing at the same moment send one alert. A reconnect (completeSignIn) or a
+ * good refresh clears last_error, so the next break alerts again.
+ */
+async function markSignInBroken(connectedAt: string, message: string): Promise<void> {
+  const now = new Date().toISOString();
+  const { data: flipped, error } = await supabase
+    .from("microsoft_connections")
+    .update({ last_error: message, updated_at: now })
+    .eq("id", CONNECTION_ID)
+    .eq("connected_at", connectedAt)
+    .is("last_error", null)
+    .select("id");
+  if (!error && flipped && flipped.length > 0) {
+    await notifyOwnerOfSystemProblem({
+      title: "OneNote sign-in expired",
+      body: `Job notes are not copying to OneNote. ${message.replace(/\.? Reconnect\.$/, "")}. Reconnect at Account → Connect OneNote.`,
+      path: "/account",
+    });
+    return;
+  }
+  // Already broken (alert already sent): just keep the latest reason on the row.
+  await supabase
+    .from("microsoft_connections")
+    .update({ last_error: message, updated_at: now })
+    .eq("id", CONNECTION_ID)
+    .eq("connected_at", connectedAt);
+}
+
+/**
  * Access token as the connected person, refreshing (and rotating the stored
  * refresh token) when needed. Null when nobody is connected or the sign-in
  * has expired; the reason is saved on the row for /account to show.
@@ -187,21 +246,24 @@ export async function getDelegatedToken(attempt = 0): Promise<string | null> {
   // (matching connected_at). If the owner reconnected meanwhile, the new sign-in wins.
   const refreshToken = decryptToken(data.refresh_token_enc as string, sealSecret(), TOKEN_PURPOSE);
   if (!refreshToken) {
-    await supabase
-      .from("microsoft_connections")
-      .update({ last_error: "Stored sign-in can't be read (certificate changed?). Reconnect.", updated_at: new Date().toISOString() })
-      .eq("id", CONNECTION_ID)
-      .eq("connected_at", data.connected_at as string);
+    await markSignInBroken(data.connected_at as string, "Stored sign-in can't be read (certificate changed?). Reconnect.");
     return null;
   }
 
-  const json = await tokenRequest({ grant_type: "refresh_token", refresh_token: refreshToken });
+  let json: TokenResponse;
+  try {
+    json = await tokenRequest({ grant_type: "refresh_token", refresh_token: refreshToken });
+  } catch (err) {
+    // No real answer (time limit, network drop, Microsoft 5xx): not a refused sign-in, so the
+    // saved one stays as it is and the next call tries again. Nothing to alert.
+    console.error("[microsoft] token refresh got no answer:", err instanceof Error ? err.name : "error");
+    return null;
+  }
   if (!json.access_token) {
-    await supabase
-      .from("microsoft_connections")
-      .update({ last_error: `Microsoft refused the saved sign-in (${json.error ?? "unknown"}). Reconnect.`, updated_at: new Date().toISOString() })
-      .eq("id", CONNECTION_ID)
-      .eq("connected_at", data.connected_at as string);
+    await markSignInBroken(
+      data.connected_at as string,
+      `Microsoft refused the saved sign-in (${json.error ?? "unknown"}). Reconnect.`
+    );
     return null;
   }
 
@@ -233,5 +295,6 @@ export async function delegatedFetch(path: string, init: RequestInit = {}): Prom
   return fetch(`${GRAPH_BASE}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...init.headers },
+    signal: withTimeout(GRAPH_CALL_TIMEOUT_MS, init.signal),
   });
 }

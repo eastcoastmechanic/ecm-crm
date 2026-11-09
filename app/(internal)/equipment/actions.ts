@@ -61,7 +61,7 @@ async function officeOnly(): Promise<string | null> {
 }
 
 /**
- * Read a nameplate photo for the Add Equipment form. Office and owner only (each
+ * Read a nameplate photo for the Add Equipment, warranty and assessment forms. Office and owner only (each
  * scan is a paid Claude vision call). Returns { error } with a plain message;
  * production builds hide a thrown server action's text.
  */
@@ -78,18 +78,6 @@ export async function scanNameplateResult(
     console.error("[equipment] nameplate scan failed:", err);
     return { error: "Couldn't read that nameplate. Type the details in, or try another photo." };
   }
-}
-
-/**
- * Same read, for the warranty and assessment forms, which take the result
- * directly and catch a thrown error (they show their own plain message).
- * Office and owner only. New callers should use scanNameplateResult.
- */
-export async function scanNameplate(formData: FormData): Promise<ScannedNameplate> {
-  await requireOffice();
-  const photo = formData.get("photo");
-  if (!(photo instanceof File) || photo.size === 0) throw new Error("No photo provided");
-  return readNameplate(photo);
 }
 
 async function readNameplate(photo: File): Promise<ScannedNameplate> {
@@ -213,7 +201,9 @@ export async function scanDataPlate(equipmentId: string, formData: FormData) {
     const photoPath = await uploadPrivatePhoto(NAMEPLATE_PHOTO_BUCKET, photo, equipmentId);
     return { proposal, photoPath };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not read the plate" };
+    // The real reason stays in the server log; the office sees plain wording.
+    console.error("[equipment] data plate scan failed:", err);
+    return { error: "Couldn't read that data plate. Try another photo, or type the details in." };
   }
 }
 

@@ -7,7 +7,12 @@ import { sendWarrantyAlerts } from "@/lib/warranty-alerts";
 import { sendMaintenancePlanCharges } from "@/lib/plan-renewal";
 import { sendContractRenewalNotices } from "@/lib/renewal-notice";
 import { canText } from "@/lib/sms-consent";
-import { shouldSendJobFollowUpEmail, skipsPostJobFollowUps } from "@/lib/post-job-followups";
+import {
+  shouldSendJobFollowUpEmail,
+  skipsPostJobFollowUps,
+  surveyEmailDue,
+  surveyEmailWindow,
+} from "@/lib/post-job-followups";
 import {
   FIRST_FOLLOW_UP_DAY,
   LAST_FOLLOW_UP_DAY,
@@ -86,13 +91,19 @@ async function sendOverdueInvoiceReminders() {
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app";
 
+// "How did we do" email: any finished job 1 to 14 days old that hasn't had it,
+// so a day the cron misses is caught up the next day (lib/post-job-followups.ts).
 async function sendJobFollowUps() {
+  const now = new Date();
+  const { finishedBefore, finishedAfter } = surveyEmailWindow(now);
   const { data: jobs, error } = await supabase
     .from("jobs")
-    .select("id, completed_at, customers(name, email, phone, sms_consent, no_followups), properties(address)")
+    .select(
+      "id, completed_at, follow_up_sent_at, review_request_sent_at, customers(name, email, phone, sms_consent, no_followups), properties(address)"
+    )
     .eq("status", "complete")
-    .lte("completed_at", daysAgoISO(1))
-    .gte("completed_at", daysAgoISO(2))
+    .lte("completed_at", finishedBefore)
+    .gte("completed_at", finishedAfter)
     .is("follow_up_sent_at", null);
 
   if (error) return { sent: 0, errors: [error.message] };
@@ -101,6 +112,7 @@ async function sendJobFollowUps() {
   let sent = 0;
 
   for (const job of jobs ?? []) {
+    if (!surveyEmailDue(job, now)) continue;
     const customer = job.customers as unknown as (CustomerContact & { phone?: string | null; sms_consent?: boolean | null });
     const property = job.properties as unknown as { address: string | null } | null;
 

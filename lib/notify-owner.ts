@@ -269,6 +269,29 @@ export async function notifyOwnerOfVisitRequest(visitId: string) {
 }
 
 /**
+ * Something in the CRM's own plumbing that needs Josh to act (for example the
+ * OneNote sign-in expired). Goes to the Teams General channel and OWNER_EMAIL;
+ * whatever is not configured is skipped. Never throws.
+ */
+export async function notifyOwnerOfSystemProblem(alert: { title: string; body?: string; path?: string }) {
+  const link = alert.path ? `${APP_URL}${alert.path}` : undefined;
+  // Teams first: it never throws, so a failed email can't skip it.
+  await postToTeams("general", { title: alert.title, text: alert.body, url: link });
+  try {
+    if (OWNER_EMAIL) {
+      await resend.emails.send({
+        from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+        to: OWNER_EMAIL,
+        subject: alert.title,
+        text: [alert.title, alert.body, link].filter(Boolean).join("\n\n"),
+      });
+    }
+  } catch (err) {
+    console.error("[notify-owner] system alert email failed:", err);
+  }
+}
+
+/**
  * A money problem or result that needs Josh's eyes: a possible double payment,
  * an amount that doesn't match the invoice, a refund or card dispute, a plan
  * renewal charge, a card charge from the assistant. Goes to the private Money
