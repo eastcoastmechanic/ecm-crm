@@ -2,6 +2,7 @@ import Link from "next/link";
 import SendDocumentForm from "./SendDocumentForm";
 import { headingClass, subTextClass, buttonSecondaryClass, itemSubClass } from "../../ui";
 import DocumentDeleteButton from "../DocumentDeleteButton";
+import { formatEtDate } from "@/lib/tz";
 
 type AssessmentItem = {
   equipment_id: string | null;
@@ -63,7 +64,7 @@ export default function AssessmentDetail({
             {doc.customers?.name}
             {doc.properties?.address ? ` · ${doc.properties.address}` : ""}
             {" · "}
-            {new Date(doc.created_at).toLocaleDateString()}
+            {formatEtDate(doc.created_at)}
           </p>
         </div>
         <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">

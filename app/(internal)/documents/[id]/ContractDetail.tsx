@@ -7,6 +7,7 @@ import DepositPanel from "./DepositPanel";
 import { BrandedFormShell } from "@/lib/branded-form-shell";
 import { COMPANY_NAME, COMPANY_ADDRESS, COMPANY_PHONE, HIC_REGISTRATION_NUMBER } from "@/lib/brand";
 import type { ContractLineItems } from "@/lib/contract-terms";
+import { formatEtDate, formatEtShortDateTime } from "@/lib/tz";
 
 function formatPrice(value: number | null) {
   if (value === null) return "—";
@@ -15,7 +16,7 @@ function formatPrice(value: number | null) {
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Date(value.length === 10 ? `${value}T00:00:00` : value).toLocaleDateString("en-US", {
+  return formatEtDate(value, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -85,7 +86,7 @@ export default function ContractDetail({
         }`}
       >
         {statusLabel[doc.status] ?? doc.status}
-        {doc.status === "signed" && doc.signed_at && ` on ${new Date(doc.signed_at).toLocaleString()}`}
+        {doc.status === "signed" && doc.signed_at && ` on ${formatEtShortDateTime(doc.signed_at)}`}
       </div>
 
       <DepositPanel

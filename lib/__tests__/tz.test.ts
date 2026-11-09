@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { etDateAtHour, etLocalFromIso, moveToEtDate, toEtLocalInput } from "../tz";
+import {
+  etDateAtHour,
+  etLocalFromIso,
+  formatEtDate,
+  formatEtShortDateTime,
+  formatEtTime,
+  moveToEtDate,
+  toEtLocalInput,
+} from "../tz";
 
 // Results are compared as New York wall-clock strings, so the server's own
 // timezone (UTC on Vercel) never matters.
@@ -64,5 +72,34 @@ describe("etDateAtHour", () => {
     expect(etDateAtHour("", 8)).toBeNull();
     expect(etDateAtHour("11/10/2026", 8)).toBeNull();
     expect(etDateAtHour("2026-11-10", 24)).toBeNull();
+  });
+});
+
+// Newer ICU puts a narrow no-break space before AM/PM; compare with plain spaces.
+const plain = (s: string) => s.replace(/\s/g, " ");
+
+describe("page date formatters", () => {
+  it("prints a 9:00 AM New York job as 9:00 AM, not the UTC time", () => {
+    // 9:00 AM EST on Nov 10 is 14:00 UTC.
+    expect(plain(formatEtShortDateTime("2026-11-10T14:00:00.000Z"))).toBe("11/10/2026, 9:00 AM");
+    expect(plain(formatEtTime("2026-11-10T14:00:00.000Z"))).toBe("9:00 AM");
+  });
+
+  it("follows daylight saving time", () => {
+    // 9:00 AM EDT on Oct 20 is 13:00 UTC.
+    expect(plain(formatEtShortDateTime(new Date("2026-10-20T13:00:00.000Z")))).toBe("10/20/2026, 9:00 AM");
+  });
+
+  it("puts an evening job on its New York day", () => {
+    // 8:00 PM ET on Nov 6 is 01:00 UTC on Nov 7.
+    expect(formatEtDate("2026-11-07T01:00:00.000Z")).toBe("11/6/2026");
+    expect(formatEtDate("2026-11-07T01:00:00.000Z", { year: "numeric", month: "long", day: "numeric" })).toBe(
+      "November 6, 2026"
+    );
+  });
+
+  it("never shifts a plain date column", () => {
+    expect(formatEtDate("2026-11-07")).toBe("11/7/2026");
+    expect(formatEtDate("2026-01-01", { year: "numeric", month: "long", day: "numeric" })).toBe("January 1, 2026");
   });
 });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { headingClass, subTextClass, buttonSecondaryClass, itemSubClass } from "../../ui";
 import DocumentDeleteButton from "../DocumentDeleteButton";
+import { formatEtDate } from "@/lib/tz";
 
 type StoredLineItems = {
   sponsor: { electric: string | null; gas: string | null };
@@ -54,7 +55,7 @@ export default function MassSaveRebateDetail({
             {doc.customers?.name}
             {doc.properties?.address ? ` · ${doc.properties.address}` : ""}
             {" · "}
-            {new Date(doc.created_at).toLocaleDateString()}
+            {formatEtDate(doc.created_at)}
           </p>
         </div>
         <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">

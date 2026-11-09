@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import { formatEtDate, formatEtShortDateTime } from "@/lib/tz";
 
 const invoiceStatusClass: Record<string, string> = {
   PAID: "bg-green text-white",
@@ -137,7 +138,7 @@ export default function PaymentsList({
                   ) : (
                     row.square_customer_name ?? "Unmatched Square customer"
                   )}
-                  {row.square_created_at ? ` · ${new Date(row.square_created_at).toLocaleDateString()}` : ""}
+                  {row.square_created_at ? ` · ${formatEtDate(row.square_created_at)}` : ""}
                   {row.document_id ? (
                     <>
                       {" · "}
@@ -187,7 +188,7 @@ export default function PaymentsList({
                   ) : (
                     "No CRM customer match"
                   )}
-                  {row.square_created_at ? ` · ${new Date(row.square_created_at).toLocaleString()}` : ""}
+                  {row.square_created_at ? ` · ${formatEtShortDateTime(row.square_created_at)}` : ""}
                   {row.card_last4 ? ` · ${row.card_brand ?? "Card"} ${row.card_last4}` : ""}
                   {row.note ? ` · ${row.note}` : ""}
                 </div>

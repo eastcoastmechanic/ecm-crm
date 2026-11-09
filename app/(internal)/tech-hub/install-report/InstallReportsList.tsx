@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { inputClass, itemSubClass, itemTitleClass, subTextClass } from "../../ui";
+import { formatEtDate } from "@/lib/tz";
 
 type Report = {
   id: string;
@@ -56,7 +57,7 @@ export default function InstallReportsList({ reports }: { reports: Report[] }) {
                 {r.customers?.name ?? "No customer assigned"}
                 {r.properties?.address ? ` · ${r.properties.address}` : ""}
                 {" · "}
-                {new Date(r.created_at).toLocaleDateString()}
+                {formatEtDate(r.created_at)}
               </div>
             </div>
           </Link>

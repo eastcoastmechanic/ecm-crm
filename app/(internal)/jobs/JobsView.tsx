@@ -10,6 +10,7 @@ import CreateInvoiceForm from "./CreateInvoiceForm";
 import AssignJobForm from "./AssignJobForm";
 import JobNotebook from "./JobNotebook";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import { formatEtShortDateTime, formatEtTime } from "@/lib/tz";
 
 const statusOptions = ["requested", "scheduled", "in_progress", "complete", "cancelled"];
 
@@ -311,7 +312,7 @@ export default function JobsView({
               ← Prev
             </button>
             <div className="font-display text-lg font-bold">
-              {monthCursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+              {monthCursor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
             </div>
             <button
               onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1))}
@@ -468,9 +469,9 @@ export default function JobsView({
                   )}
                 </div>
                 <div className={itemSubClass}>
-                  {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "No date"}
+                  {job.scheduled_at ? formatEtShortDateTime(job.scheduled_at) : "No date"}
                   {job.notes ? ` · ${job.notes}` : ""}
-                  {job.on_way_at ? ` · On the way at ${new Date(job.on_way_at).toLocaleTimeString()}` : ""}
+                  {job.on_way_at ? ` · On the way at ${formatEtTime(job.on_way_at)}` : ""}
                   {job.tracked_hours
                     ? ` · Tracked: ${job.tracked_hours} hrs${
                         hourlyRate

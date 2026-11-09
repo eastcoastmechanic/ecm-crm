@@ -4,6 +4,7 @@ import { Document, Page, View, Text, Image, StyleSheet, Font, renderToBuffer } f
 import { COMPANY_NAME, COMPANY_SLOGAN, COMPANY_ADDRESS, COMPANY_PHONE, HIC_REGISTRATION_NUMBER } from "./brand";
 import { autoRenewalText, RIGHT_TO_CANCEL_NOTICE, ARBITRATION_NOTICE_TEXT, GOVERNING_TERMS_TEXT, noticeOfCancellationText } from "./contract-terms";
 import { registerBrandFonts, BODY_FONT, DISPLAY_FONT } from "./pdf-fonts";
+import { formatEtDate, formatEtShortDateTime } from "@/lib/tz";
 
 export type ContractPdfData = {
   doc_number: string | null;
@@ -61,7 +62,7 @@ async function getLogoDataUri(): Promise<string | null> {
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Date(value.length === 10 ? `${value}T00:00:00` : value).toLocaleDateString("en-US", {
+  return formatEtDate(value, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -360,7 +361,7 @@ export function ContractPdf({ doc, logo }: { doc: ContractPdfData; logo: string 
                   <Image src={doc.signature_data} style={styles.signatureImg} />
                   <Text style={styles.partyLine}>{doc.customer_name}</Text>
                   <Text style={styles.partyLine}>
-                    Signed {doc.signed_at ? new Date(doc.signed_at).toLocaleString() : ""}
+                    Signed {doc.signed_at ? formatEtShortDateTime(doc.signed_at) : ""}
                   </Text>
                 </>
               ) : (

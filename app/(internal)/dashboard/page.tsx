@@ -3,7 +3,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { getSyncedSquareRevenue, getSyncedSquareMoneyOwed } from "@/lib/square-synced";
 import { getStaffRole } from "@/lib/require-role";
-import { etDateKey, etDayRange, formatEtDateTime, formatEtTime } from "@/lib/tz";
+import { etDateKey, etDayRange, formatEtDate, formatEtDateTime, formatEtShortDateTime, formatEtTime } from "@/lib/tz";
 import { visitOverdue } from "@/lib/maintenance-visits";
 import {
   buttonClass,
@@ -266,7 +266,7 @@ export default async function DashboardPage() {
                     {job.properties?.address ? ` — ${job.properties.address}` : ""}
                   </div>
                   <div className={itemSubClass}>
-                    {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "No date"}
+                    {job.scheduled_at ? formatEtShortDateTime(job.scheduled_at) : "No date"}
                   </div>
                 </div>
                 <span
@@ -302,7 +302,7 @@ export default async function DashboardPage() {
                   <div className={itemTitleClass}>{doc.doc_number ?? doc.type}</div>
                   <div className={itemSubClass}>
                     {doc.customers?.name ?? "Unknown customer"} ·{" "}
-                    {new Date(doc.created_at).toLocaleDateString()}
+                    {formatEtDate(doc.created_at)}
                   </div>
                 </div>
                 <span className="font-mono text-sm text-white">
