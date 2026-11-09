@@ -52,14 +52,24 @@ vi.mock("@/lib/notify-owner", () => ({
   centsToMoney: (c: number) => `$${((c ?? 0) / 100).toFixed(2)}`,
 }));
 
+// lib/renewal-notice.ts sends mail and texts; the charge path only uses its pure helpers.
+vi.mock("@/lib/resend", () => ({ resend: { emails: { send: vi.fn() } }, RESEND_FROM_EMAIL: "x", RESEND_REPLY_TO: "y" }));
+vi.mock("@/lib/sms", () => ({ sendSMS: vi.fn() }));
+vi.mock("@/lib/sms-consent", () => ({ canText: vi.fn() }));
+
 import { addOneYear, sendMaintenancePlanCharges } from "../plan-renewal";
 
+// The plan ends 2026-11-10. Today (New York) is 2026-11-03, the first charge day.
+// The notice for this term went out 30 days before the end date.
+const NOW = new Date("2026-11-03T15:00:00Z");
+const NOTICE_SENT = "2026-10-11T13:00:00Z";
 const customer = { id: "cus-row", name: "Pat", email: "pat@example.test", stripe_customer_id: "cus_123" };
 const contract = (over: Record<string, unknown> = {}) => ({
   id: "c1",
   plan_name: "Annual Maintenance Plan",
   end_date: "2026-11-10",
   renewal_price_cents: 29900,
+  renewal_reminder_sent_at: NOTICE_SENT,
   stripe_payment_method_id: "pm_saved",
   customers: customer, // many-to-one: Supabase returns an object
   ...over,
@@ -87,7 +97,7 @@ describe("addOneYear", () => {
 
 describe("sendMaintenancePlanCharges", () => {
   it("only asks for active, auto-renew-authorized, priced, not-yet-billed contracts", async () => {
-    await sendMaintenancePlanCharges();
+    await sendMaintenancePlanCharges(NOW);
     const has = (method: string, ...args: unknown[]) =>
       h.calls.some((c) => c.method === method && args.every((a, i) => c.args[i] === a));
     expect(has("eq", "status", "active")).toBe(true);
@@ -100,7 +110,7 @@ describe("sendMaintenancePlanCharges", () => {
     h.selectResult.data = [contract()];
     h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "succeeded" });
 
-    const out = await sendMaintenancePlanCharges();
+    const out = await sendMaintenancePlanCharges(NOW);
 
     expect(out).toEqual({ charged: 1, skipped: 0, errors: [] });
     const [params, options] = h.stripe.paymentIntents.create.mock.calls[0];
@@ -131,7 +141,7 @@ describe("sendMaintenancePlanCharges", () => {
   it("still finds the customer if Supabase hands back a one-item list", async () => {
     h.selectResult.data = [contract({ customers: [customer] })];
     h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "succeeded" });
-    expect((await sendMaintenancePlanCharges()).charged).toBe(1);
+    expect((await sendMaintenancePlanCharges(NOW)).charged).toBe(1);
   });
 
   it("falls back to the customer's first card when the contract has none saved", async () => {
@@ -139,7 +149,7 @@ describe("sendMaintenancePlanCharges", () => {
     h.stripe.paymentMethods.list.mockResolvedValue({ data: [{ id: "pm_first" }] });
     h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "succeeded" });
 
-    await sendMaintenancePlanCharges();
+    await sendMaintenancePlanCharges(NOW);
 
     expect(h.stripe.paymentMethods.list).toHaveBeenCalledWith({ customer: "cus_123", type: "card" });
     expect(h.stripe.paymentIntents.create.mock.calls[0][0].payment_method).toBe("pm_first");
@@ -148,21 +158,21 @@ describe("sendMaintenancePlanCharges", () => {
 
   it("skips, without charging, when the customer has no Stripe record", async () => {
     h.selectResult.data = [contract({ customers: { ...customer, stripe_customer_id: null } })];
-    const out = await sendMaintenancePlanCharges();
+    const out = await sendMaintenancePlanCharges(NOW);
     expect(out).toEqual({ charged: 0, skipped: 1, errors: [] });
     expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
   });
 
   it("skips, without charging, when there is no customer on the contract", async () => {
     h.selectResult.data = [contract({ customers: null })];
-    expect((await sendMaintenancePlanCharges()).skipped).toBe(1);
+    expect((await sendMaintenancePlanCharges(NOW)).skipped).toBe(1);
     expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
   });
 
   it("skips, without charging, when there is no card to charge", async () => {
     h.selectResult.data = [contract({ stripe_payment_method_id: null })];
     h.stripe.paymentMethods.list.mockResolvedValue({ data: [] });
-    expect(await sendMaintenancePlanCharges()).toEqual({ charged: 0, skipped: 1, errors: [] });
+    expect(await sendMaintenancePlanCharges(NOW)).toEqual({ charged: 0, skipped: 1, errors: [] });
     expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
   });
 
@@ -170,7 +180,7 @@ describe("sendMaintenancePlanCharges", () => {
     h.selectResult.data = [contract()];
     h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "requires_action" });
 
-    const out = await sendMaintenancePlanCharges();
+    const out = await sendMaintenancePlanCharges(NOW);
 
     expect(out.charged).toBe(0);
     expect(out.errors[0]).toMatch(/contract c1: charge not completed \(status requires_action\)/);
@@ -182,7 +192,7 @@ describe("sendMaintenancePlanCharges", () => {
     h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "succeeded" });
     h.updateErrors = [{ message: "db down" }];
 
-    const out = await sendMaintenancePlanCharges();
+    const out = await sendMaintenancePlanCharges(NOW);
 
     expect(out.charged).toBe(1);
     expect(out.errors[0]).toMatch(/charged \(pi_1\) but term not extended: db down/);
@@ -197,7 +207,7 @@ describe("sendMaintenancePlanCharges", () => {
       .mockRejectedValueOnce(new Error("card_declined"))
       .mockResolvedValueOnce({ id: "pi_2", status: "succeeded" });
 
-    const out = await sendMaintenancePlanCharges();
+    const out = await sendMaintenancePlanCharges(NOW);
 
     expect(out.charged).toBe(1);
     expect(out.errors).toEqual(["contract bad: card_declined"]);
@@ -206,7 +216,7 @@ describe("sendMaintenancePlanCharges", () => {
 
   it("reports a failed contract read instead of charging anyone", async () => {
     h.selectResult = { data: [], error: { message: "read failed" } };
-    expect(await sendMaintenancePlanCharges()).toEqual({ charged: 0, skipped: 0, errors: ["read failed"] });
+    expect(await sendMaintenancePlanCharges(NOW)).toEqual({ charged: 0, skipped: 0, errors: ["read failed"] });
     expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
   });
 
@@ -216,7 +226,7 @@ describe("sendMaintenancePlanCharges", () => {
     it("tells Josh when a renewal is charged", async () => {
       h.selectResult.data = [contract()];
       h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "succeeded" });
-      await sendMaintenancePlanCharges();
+      await sendMaintenancePlanCharges(NOW);
       expect(alerts()).toHaveLength(1);
       expect(alerts()[0].title).toBe("Plan renewal charged: Pat, $299.00");
       expect(alerts()[0].body).toContain("pi_1");
@@ -226,7 +236,7 @@ describe("sendMaintenancePlanCharges", () => {
     it("tells Josh when a charge throws, with the reason", async () => {
       h.selectResult.data = [contract()];
       h.stripe.paymentIntents.create.mockRejectedValue(new Error("Your card was declined."));
-      await sendMaintenancePlanCharges();
+      await sendMaintenancePlanCharges(NOW);
       expect(alerts()[0].title).toBe("Plan renewal NOT charged: Pat, $299.00");
       expect(alerts()[0].body).toContain("Your card was declined.");
     });
@@ -234,14 +244,14 @@ describe("sendMaintenancePlanCharges", () => {
     it("tells Josh when Stripe does not complete the charge", async () => {
       h.selectResult.data = [contract()];
       h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "requires_action" });
-      await sendMaintenancePlanCharges();
+      await sendMaintenancePlanCharges(NOW);
       expect(alerts()[0].title).toMatch(/NOT charged/);
       expect(alerts()[0].body).toContain("requires_action");
     });
 
     it("tells Josh when there is no card to charge", async () => {
       h.selectResult.data = [contract({ customers: { ...customer, stripe_customer_id: null } })];
-      await sendMaintenancePlanCharges();
+      await sendMaintenancePlanCharges(NOW);
       expect(alerts()[0].title).toMatch(/NOT charged/);
       expect(alerts()[0].body).toMatch(/no card on file/);
     });
@@ -250,7 +260,7 @@ describe("sendMaintenancePlanCharges", () => {
       h.selectResult.data = [contract()];
       h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "succeeded" });
       h.updateErrors = [{ message: "db down" }];
-      await sendMaintenancePlanCharges();
+      await sendMaintenancePlanCharges(NOW);
       expect(alerts()[0].title).toMatch(/charged, needs a fix/);
       expect(alerts()[0].body).toMatch(/NOT moved forward/);
       expect(alerts()[0].body).not.toMatch(/AGAIN/);
@@ -260,9 +270,80 @@ describe("sendMaintenancePlanCharges", () => {
       h.selectResult.data = [contract()];
       h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "succeeded" });
       h.updateErrors = [{ message: "db down" }, { message: "still down" }];
-      const out = await sendMaintenancePlanCharges();
+      const out = await sendMaintenancePlanCharges(NOW);
       expect(out.errors).toContain("contract c1: could not mark the term billed either: still down");
       expect(alerts()[0].body).toMatch(/charged AGAIN tomorrow/);
+    });
+  });
+
+  describe("renewal notice gate", () => {
+    const alerts = () => h.notify.mock.calls.map((c) => c[0] as { title: string; body?: string; path?: string });
+
+    it("does not charge when no notice went out (no email) and tells Josh", async () => {
+      h.selectResult.data = [
+        contract({ renewal_reminder_sent_at: null, customers: { ...customer, email: null } }),
+      ];
+      const out = await sendMaintenancePlanCharges(NOW);
+      expect(out).toEqual({ charged: 0, skipped: 1, errors: [] });
+      expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
+      expect(h.updates).toEqual([]);
+      expect(alerts()).toHaveLength(1);
+      expect(alerts()[0].title).toBe("Plan renewal NOT charged: Pat, $299.00");
+      expect(alerts()[0].body).toBe(
+        "Annual Maintenance Plan for Pat renews 11/10/2026: no renewal notice could be sent (no email). Not charged. Call them or send it by hand. The plan stays active for the office to handle."
+      );
+    });
+
+    it("names a failed send when the customer has an email but no notice is recorded", async () => {
+      h.selectResult.data = [contract({ renewal_reminder_sent_at: null })];
+      await sendMaintenancePlanCharges(NOW);
+      expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
+      expect(alerts()[0].body).toMatch(/notice email has not gone out/);
+    });
+
+    it("alerts on the first charge day and the renewal day, not every day in between", async () => {
+      h.selectResult.data = [contract({ renewal_reminder_sent_at: null })];
+      await sendMaintenancePlanCharges(new Date("2026-11-06T15:00:00Z"));
+      expect(alerts()).toHaveLength(0);
+      await sendMaintenancePlanCharges(new Date("2026-11-10T15:00:00Z"));
+      expect(alerts()).toHaveLength(1);
+      expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
+    });
+
+    it("does not count last year's notice for this year's term", async () => {
+      h.selectResult.data = [contract({ renewal_reminder_sent_at: "2025-10-11T13:00:00Z" })];
+      const out = await sendMaintenancePlanCharges(NOW);
+      expect(out.charged).toBe(0);
+      expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
+      expect(alerts()[0].title).toMatch(/NOT charged/);
+    });
+
+    it("waits until the notice is 7 days old, then charges", async () => {
+      // Notice went out 2026-11-01, so the earliest charge day is 2026-11-08.
+      h.selectResult.data = [contract({ renewal_reminder_sent_at: "2026-11-01T13:00:00Z" })];
+      h.stripe.paymentIntents.create.mockResolvedValue({ id: "pi_1", status: "succeeded" });
+
+      const early = await sendMaintenancePlanCharges(new Date("2026-11-07T15:00:00Z"));
+      expect(early).toEqual({ charged: 0, skipped: 1, errors: [] });
+      expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
+      expect(alerts()).toHaveLength(0);
+
+      const onTime = await sendMaintenancePlanCharges(new Date("2026-11-08T15:00:00Z"));
+      expect(onTime.charged).toBe(1);
+      expect(h.stripe.paymentIntents.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("tells Josh on the renewal day when the notice came too late to charge", async () => {
+      h.selectResult.data = [contract({ renewal_reminder_sent_at: "2026-11-05T13:00:00Z" })];
+      await sendMaintenancePlanCharges(new Date("2026-11-10T15:00:00Z"));
+      expect(h.stripe.paymentIntents.create).not.toHaveBeenCalled();
+      expect(alerts()[0].body).toMatch(/less than 7 days ago/);
+    });
+
+    it("asks for the notice stamp along with the contract", async () => {
+      await sendMaintenancePlanCharges(NOW);
+      const select = h.calls.find((c) => c.method === "select");
+      expect(String(select?.args[0])).toContain("renewal_reminder_sent_at");
     });
   });
 });
