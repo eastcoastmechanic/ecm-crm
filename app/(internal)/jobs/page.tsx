@@ -7,6 +7,7 @@ import { listOpenPlannerTasksSafe } from "@/lib/planner-connector";
 import NewServiceCallForm from "./NewServiceCallForm";
 import { balanceDueCents, formatMoney } from "@/lib/job-invoice-rules";
 import JobsView from "./JobsView";
+import { listJobTimers } from "@/lib/time-edit";
 import { errorClass, headingClass, subTextClass } from "../ui";
 
 const JOB_SELECT = "*, customers(id, name, no_followups), properties(address), diagnostics(id), install_reports(id)";
@@ -138,10 +139,17 @@ export default async function JobsPage({
     };
   }
 
+  // Running or paused tech timers on open jobs, for the office's Pause / Resume buttons.
+  const timersByJob = await listJobTimers(openResult.data.map((j) => j.id));
+  const staffName = new Map(staff.map((s) => [s.id, s.name]));
+  const timersFor = (jobId: string) =>
+    (timersByJob.get(jobId) ?? []).map((t) => ({ ...t, name: staffName.get(t.staffId) ?? "Tech" }));
+
   // One signing call for every job's photos, not one per job.
   const signedPhotos = await resolveJobPhotoLists(jobs.map((job) => job.photos));
   const jobsWithPhotos = jobs.map((job, i) => ({
     ...job,
+    timers: timersFor(job.id),
     photos: signedPhotos[i],
     invoices: invoiceError ? undefined : (billingByJob.get(job.id) ?? []),
     invoiceHint: invoiceHintFor(job),

@@ -9,6 +9,7 @@ import SubmitButton from "../SubmitButton";
 import CreateInvoiceForm from "./CreateInvoiceForm";
 import AssignJobForm from "./AssignJobForm";
 import JobNotebook from "./JobNotebook";
+import JobTimers, { type JobTimerView } from "./JobTimers";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import { formatEtShortDateTime, formatEtTime } from "@/lib/tz";
 
@@ -42,6 +43,8 @@ type Job = {
   invoices?: { id: string; doc_number: string | null; status: string; total: number | null }[];
   /** For the Create invoice form: contract total less deposit received, when the job has a contract. */
   invoiceHint?: { suggested: string; note: string | null };
+  /** Techs' running or paused work timers on this job (open jobs only). */
+  timers?: JobTimerView[];
   job_type?: string | null;
   scheduled_at: string | null;
   status: string;
@@ -542,6 +545,8 @@ export default function JobsView({
             </form>
 
               <AssignJobForm jobId={job.id} assignedStaffId={job.assigned_staff_id ?? null} staff={staff} />
+
+              {job.timers && job.timers.length > 0 && <JobTimers jobId={job.id} timers={job.timers} />}
 
               <JobNotebook jobId={job.id} />
 

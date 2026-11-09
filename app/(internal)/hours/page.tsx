@@ -2,9 +2,13 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { buildWeekReport, type EntryRow, type ShiftRow, type StaffRow } from "@/lib/time-report";
-import { fixTimeEnd, markTimeReviewed } from "./actions";
-import { formatEtDateTime, toEtLocalInput } from "@/lib/tz";
-import { buttonSecondaryClass, inputClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import { markTimeReviewed } from "./actions";
+import { formatEtDate, formatEtDateTime, formatEtTime, toEtLocalInput } from "@/lib/tz";
+import { hoursBetween, paidShiftHours } from "@/lib/time-clock-rules";
+import { editNote, type TimeEditAction } from "@/lib/time-edit-rules";
+import TimeRowEditor, { type TimeRowView } from "./TimeRowEditor";
+import AddTimeForm from "./AddTimeForm";
+import { buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -84,16 +88,19 @@ export default async function HoursPage({
       .lt("completed_at", etMidnightUtc(end).toISOString())
       .order("completed_at", { ascending: true }),
     supabase.from("staff").select("id, name, email"),
+    // "*" so voided_at / voided_reason (SQL 0078) come back once they exist, and nothing breaks before.
     supabase
       .from("time_shifts")
-      .select("id, staff_id, started_at, ended_at, break_minutes, flagged, reviewed_at")
+      .select("*")
       .gte("started_at", fromIso)
-      .lt("started_at", toIso),
+      .lt("started_at", toIso)
+      .order("started_at", { ascending: true }),
     supabase
       .from("job_time_entries")
-      .select("id, job_id, staff_id, kind, started_at, ended_at, flagged, reviewed_at")
+      .select("*")
       .gte("started_at", fromIso)
-      .lt("started_at", toIso),
+      .lt("started_at", toIso)
+      .order("started_at", { ascending: true }),
     // Flags from any week that nobody has looked at yet.
     supabase
       .from("time_shifts")
@@ -119,6 +126,106 @@ export default async function HoursPage({
   ].sort((a, b) => b.started_at.localeCompare(a.started_at));
 
   const names = new Map((staff ?? []).map((s) => [s.id, s.name || s.email]));
+
+  // ---- Time by person: every shift and job timer this week, with Edit / Void / Add missed time ----
+  type WeekShift = ShiftRow & { voided_reason?: string | null; flag_reason?: string | null };
+  type WeekEntry = EntryRow & { voided_reason?: string | null; flag_reason?: string | null };
+  const weekShifts = (shiftRows ?? []) as WeekShift[];
+  const weekEntries = (entryRows ?? []) as WeekEntry[];
+  const rowIds = [...weekShifts.map((s) => s.id), ...weekEntries.map((e) => e.id)];
+  const entryJobIds = [...new Set(weekEntries.map((e) => e.job_id))];
+  const [{ data: editRows }, { data: entryJobs }, { data: nearbyJobs }] = await Promise.all([
+    // Before SQL 0078 this table is missing: the read fails and rows simply show no edit note.
+    rowIds.length
+      ? supabase
+          .from("time_edits")
+          .select("row_id, action, reason, edited_by, created_at")
+          .in("row_id", rowIds)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] }),
+    entryJobIds.length
+      ? supabase.from("jobs").select("id, scheduled_at, customers(name), properties(address)").in("id", entryJobIds)
+      : Promise.resolve({ data: [] }),
+    // Jobs to pick from in "Add missed time": scheduled from a week before this one to its end.
+    supabase
+      .from("jobs")
+      .select("id, scheduled_at, customers(name), properties(address)")
+      .gte("scheduled_at", etMidnightUtc(addDays(start, -7)).toISOString())
+      .lt("scheduled_at", toIso)
+      .order("scheduled_at", { ascending: false })
+      .limit(200),
+  ]);
+  type PickJob = { id: string; scheduled_at: string | null; customers: { name: string | null } | null; properties: { address: string | null } | null };
+  const jobLabel = (j: PickJob) =>
+    [j.customers?.name ?? "Customer", j.properties?.address, j.scheduled_at ? formatEtDate(j.scheduled_at) : "no date"]
+      .filter(Boolean)
+      .join(" · ");
+  const jobById = new Map<string, PickJob>();
+  for (const j of [...((nearbyJobs ?? []) as unknown as PickJob[]), ...((entryJobs ?? []) as unknown as PickJob[])]) jobById.set(j.id, j);
+  const jobChoices = [...jobById.values()].map((j) => ({ id: j.id, label: jobLabel(j) }));
+
+  type EditRow = { row_id: string; action: TimeEditAction; reason: string | null; edited_by: string | null; created_at: string };
+  const latestEdit = new Map<string, EditRow>();
+  for (const e of (editRows ?? []) as EditRow[]) if (!latestEdit.has(e.row_id)) latestEdit.set(e.row_id, e);
+  const noteFor = (id: string) => {
+    const e = latestEdit.get(id);
+    return e ? editNote(e, (e.edited_by && names.get(e.edited_by)) || "office", formatEtDate(e.created_at)) : null;
+  };
+  const span = (startedAt: string, endedAt: string | null) =>
+    `${formatEtDateTime(startedAt, { weekday: "short", month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })} to ${
+      endedAt ? formatEtTime(endedAt) : "now (running)"
+    }`;
+  const timeRowsFor = (staffId: string): TimeRowView[] => {
+    const shiftViews = weekShifts
+      .filter((s) => s.staff_id === staffId)
+      .map((s) => ({
+        sort: s.started_at,
+        view: {
+          table: "time_shifts" as const,
+          id: s.id,
+          label: "Day shift",
+          when: span(s.started_at, s.ended_at),
+          amount: s.ended_at ? `${paidShiftHours(s.started_at, s.ended_at, s.break_minutes).toFixed(2)} hrs paid` : "running",
+          startLocal: toEtLocalInput(s.started_at),
+          endLocal: s.ended_at ? toEtLocalInput(s.ended_at) : "",
+          breakMinutes: s.break_minutes,
+          kind: null,
+          voided: !!s.voided_at,
+          voidedReason: s.voided_reason ?? null,
+          flagReason: s.flagged && !s.reviewed_at ? (s.flag_reason ?? "Flagged") : null,
+          editNote: noteFor(s.id),
+        },
+      }));
+    const entryViews = weekEntries
+      .filter((e) => e.staff_id === staffId)
+      .map((e) => {
+        const job = jobById.get(e.job_id);
+        return {
+          sort: e.started_at,
+          view: {
+            table: "job_time_entries" as const,
+            id: e.id,
+            label: `Job ${e.kind === "drive" ? "drive" : "work"}: ${job ? jobLabel(job) : "job"}`,
+            when: span(e.started_at, e.ended_at),
+            amount: e.ended_at ? `${hoursBetween(e.started_at, e.ended_at).toFixed(2)} hrs` : "running",
+            startLocal: toEtLocalInput(e.started_at),
+            endLocal: e.ended_at ? toEtLocalInput(e.ended_at) : "",
+            breakMinutes: null,
+            kind: e.kind === "drive" ? ("drive" as const) : ("work" as const),
+            voided: !!e.voided_at,
+            voidedReason: e.voided_reason ?? null,
+            flagReason: e.flagged && !e.reviewed_at ? (e.flag_reason ?? "Flagged") : null,
+            editNote: noteFor(e.id),
+          },
+        };
+      });
+    return [...shiftViews, ...entryViews].sort((a, b) => a.sort.localeCompare(b.sort)).map((r) => r.view);
+  };
+  const people = ((staff ?? []) as StaffRow[])
+    .map((s) => ({ id: s.id, name: s.name?.trim() || s.email || "Staff" }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const addDay = start === mondayOf(today) ? today : start;
+
   type Group = { name: string; hours: number; jobs: JobRow[] };
   const groups = new Map<string, Group>();
   for (const job of (jobs ?? []) as unknown as JobRow[]) {
@@ -214,20 +321,13 @@ export default async function HoursPage({
                     <input type="hidden" name="id" value={f.id} />
                     <button className={buttonSecondaryClass}>It&apos;s fine</button>
                   </form>
-                  {f.ended_at && (
-                    <form action={fixTimeEnd} className="flex flex-wrap items-center gap-2">
-                      <input type="hidden" name="table" value={f.table} />
-                      <input type="hidden" name="id" value={f.id} />
-                      <input
-                        type="datetime-local"
-                        name="ended_at"
-                        defaultValue={toEtLocalInput(f.ended_at)}
-                        className={inputClass}
-                        required
-                      />
-                      <button className={buttonSecondaryClass}>Fix end time</button>
-                    </form>
-                  )}
+                  {/* Fixing happens in Time by person, for the week the row started in. */}
+                  <Link
+                    href={`/hours?week=${mondayOf(etDate(new Date(f.started_at)))}#t-${f.id}`}
+                    className={buttonSecondaryClass}
+                  >
+                    Fix it
+                  </Link>
                 </div>
               </div>
             ))}
@@ -245,6 +345,35 @@ export default async function HoursPage({
           </>
         )}
       </div>
+
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Time by person (this week)</h2>
+          <p className={subTextClass}>
+            Every day shift and job timer, New York time. Edit start, end and meal break, add time someone forgot to
+            clock, or void a wrong entry. Each change needs a short reason and is logged with who made it. Voided rows
+            stay here greyed out and are left out of payroll, the hours file and job hours.
+          </p>
+        </div>
+        {people.map((p) => {
+          const timeRows = timeRowsFor(p.id);
+          return (
+            <div key={p.id} className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/3 p-3">
+              <h3 className={itemTitleClass}>{p.name}</h3>
+              {timeRows.length === 0 ? (
+                <p className={subTextClass}>No clocked time this week.</p>
+              ) : (
+                <div className="flex flex-col divide-y divide-white/8">
+                  {timeRows.map((r) => (
+                    <TimeRowEditor key={`${r.table}-${r.id}`} row={r} />
+                  ))}
+                </div>
+              )}
+              <AddTimeForm staffId={p.id} jobs={jobChoices} defaultDay={addDay} />
+            </div>
+          );
+        })}
+      </section>
 
       {error && <p className="text-sm text-accent">Couldn&apos;t load hours: {error.message}</p>}
       {!error && rows.length === 0 && <p className={subTextClass}>No completed jobs this week.</p>}

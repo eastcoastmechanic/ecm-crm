@@ -25,14 +25,15 @@ export async function GET(request: Request) {
 
   const [staffRes, shiftsRes, entriesRes] = await Promise.all([
     supabase.from("staff").select("id, name, email"),
+    // "*" so voided_at (SQL 0078) comes back once it exists; buildWeekReport leaves voided rows out.
     supabase
       .from("time_shifts")
-      .select("id, staff_id, started_at, ended_at, break_minutes, flagged, reviewed_at")
+      .select("*")
       .gte("started_at", from.toISOString())
       .lt("started_at", to.toISOString()),
     supabase
       .from("job_time_entries")
-      .select("id, job_id, staff_id, kind, started_at, ended_at, flagged, reviewed_at")
+      .select("*")
       .gte("started_at", from.toISOString())
       .lt("started_at", to.toISOString()),
   ]);

@@ -12,6 +12,8 @@ export type ShiftRow = {
   break_minutes: number;
   flagged: boolean;
   reviewed_at: string | null;
+  /** Set when the office voided it (SQL 0078). A voided row counts for nothing. */
+  voided_at?: string | null;
 };
 export type EntryRow = {
   id: string;
@@ -22,6 +24,7 @@ export type EntryRow = {
   ended_at: string | null;
   flagged: boolean;
   reviewed_at: string | null;
+  voided_at?: string | null;
 };
 
 export type StaffWeek = {
@@ -45,8 +48,9 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 export function buildWeekReport(staff: StaffRow[], shifts: ShiftRow[], entries: EntryRow[]): StaffWeek[] {
   const rows: StaffWeek[] = [];
   for (const person of staff) {
-    const myShifts = shifts.filter((s) => s.staff_id === person.id);
-    const myEntries = entries.filter((e) => e.staff_id === person.id);
+    // A voided row stays on /hours (greyed) but counts for nothing: not paid, not a flag.
+    const myShifts = shifts.filter((s) => s.staff_id === person.id && !s.voided_at);
+    const myEntries = entries.filter((e) => e.staff_id === person.id && !e.voided_at);
     if (myShifts.length === 0 && myEntries.length === 0) continue;
 
     const closed = myShifts.filter((s) => s.ended_at);
