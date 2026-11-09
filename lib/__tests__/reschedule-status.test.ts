@@ -33,7 +33,7 @@ vi.mock("@/lib/resend", () => ({ resend: { emails: { send: vi.fn() } }, RESEND_F
 vi.mock("@/lib/sms", () => ({ sendSMS: vi.fn() }));
 vi.mock("@/lib/sms-consent", () => ({ canText: vi.fn() }));
 vi.mock("@/lib/graph-connector", () => ({ syncJobToGraph: (...a: unknown[]) => h.syncJobToGraph(...a) }));
-vi.mock("@/lib/planner-connector", () => ({ syncJobToPlanner: vi.fn() }));
+vi.mock("@/lib/planner-connector", () => ({ syncJobToPlanner: vi.fn(), noteJobStep: vi.fn() }));
 vi.mock("@/lib/tech-notice-send", () => ({ notifyTech: (...a: unknown[]) => h.notifyTech(...a) }));
 vi.mock("@/lib/job-lifecycle", () => ({
   applyJobStatus: (...a: unknown[]) => {

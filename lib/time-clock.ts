@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { noteJobStep } from "@/lib/planner-connector";
 import { clockWeek, countableShifts, etWeekRange, type ClockWeek } from "@/lib/clock-week";
 import {
   ENTRY_CAP_HOURS,
@@ -146,7 +147,10 @@ export async function pauseJobEntry(jobId: string, staffId: string): Promise<Res
     .from("job_time_entries")
     .update({ ended_at: new Date().toISOString(), note: "paused" })
     .eq("id", open.id);
-  return error ? { error: "Could not pause." } : {};
+  if (error) return { error: "Could not pause." };
+  // A dated "Paused (name)" line on the job's Planner card. Best effort, never blocks.
+  await noteJobStep(jobId, "paused", { staffId });
+  return {};
 }
 
 /**

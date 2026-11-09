@@ -194,6 +194,7 @@ export async function applyJobStatus(
   }
 
   await syncJobToGraph(id);
-  await syncJobToPlanner(id, status);
+  // A real change: the card moves and gets a dated line for the step (at the tap time for an offline tap).
+  await syncJobToPlanner(id, status, { note: true, at: stampAt });
   return { changed: true };
 }

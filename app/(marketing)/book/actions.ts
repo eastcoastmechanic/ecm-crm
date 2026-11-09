@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { supabase } from "@/lib/supabase";
 import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
+import { noteJobStep } from "@/lib/planner-connector";
 import { etDateAtHour, etDateKey } from "@/lib/tz";
 import { COMPANY_PHONE_DISPLAY } from "@/lib/brand";
 import { bookingConsentPlan, smsOptInState, startDoubleOptIn, type SmsOptInState } from "@/lib/sms-consent";
@@ -78,6 +79,7 @@ export async function bookService(_prev: BookState, formData: FormData): Promise
   }
   const consentPlan = bookingConsentPlan(smsConsent, optInState);
 
+  let newJobId: string | null = null;
   try {
     const { customerId, propertyId } = await resolveCustomerPropertyEquipment({
       customerName: name,
@@ -87,18 +89,23 @@ export async function bookService(_prev: BookState, formData: FormData): Promise
       address,
     });
 
-    const { error } = await supabase.from("jobs").insert({
-      customer_id: customerId,
-      property_id: propertyId,
-      scheduled_at: scheduledAt.toISOString(),
-      status: "requested",
-      created_via: "web_form",
-      notes: description,
-    });
+    const { data: newJob, error } = await supabase
+      .from("jobs")
+      .insert({
+        customer_id: customerId,
+        property_id: propertyId,
+        scheduled_at: scheduledAt.toISOString(),
+        status: "requested",
+        created_via: "web_form",
+        notes: description,
+      })
+      .select("id")
+      .single();
     if (error) {
       console.error("bookService: job insert failed", error.message);
       return { error: sorry };
     }
+    newJobId = (newJob?.id as string | undefined) ?? null;
   } catch (err) {
     console.error("bookService failed", err instanceof Error ? err.message : err);
     return { error: sorry };
@@ -134,6 +141,9 @@ export async function bookService(_prev: BookState, formData: FormData): Promise
   } catch (err) {
     console.error("bookService: owner alert failed", err instanceof Error ? err.message : err);
   }
+
+  // A card on the Jobs plan, labelled Lead + Website. Never throws.
+  if (newJobId) await noteJobStep(newJobId, "requested");
 
   redirect("/book?success=1");
 }

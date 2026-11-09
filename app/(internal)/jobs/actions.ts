@@ -11,7 +11,7 @@ import {
   type JobPhotoPhase,
 } from "@/lib/job-photos";
 import { syncJobToGraph } from "@/lib/graph-connector";
-import { syncJobToPlanner } from "@/lib/planner-connector";
+import { noteJobStep, syncJobToPlanner } from "@/lib/planner-connector";
 import { applyJobStatus, sendScheduleNotifications } from "@/lib/job-lifecycle";
 import { requireOffice, requireRole } from "@/lib/require-role";
 import { notifyTech } from "@/lib/tech-notice-send";
@@ -43,7 +43,7 @@ export async function createServiceCall(_prev: { error?: string } | null): Promi
 
   if (error || !job) return { error: "Couldn't start the service call. Try again." };
 
-  await syncJobToPlanner(job.id, "in_progress");
+  await syncJobToPlanner(job.id, "in_progress", { note: true });
 
   revalidatePath("/jobs");
   redirect(`/diagnostics/new?job_id=${job.id}`);
@@ -88,7 +88,7 @@ export async function scheduleJobFromContract(_prev: ScheduleJobState, formData:
     .single();
   if (error || !job) return { error: error?.message ?? "Couldn't schedule the job. Try again.", scheduledAt: typedAt };
 
-  await syncJobToPlanner(job.id, "scheduled");
+  await syncJobToPlanner(job.id, "scheduled", { note: true });
   await syncJobToGraph(job.id);
 
   revalidatePath("/jobs");
@@ -197,14 +197,14 @@ export async function rescheduleJobAt(jobId: string, localDateTime: string): Pro
   const next = parseEtLocal(localDateTime);
   if (!next) return { error: "Pick a valid date and time." };
 
-  const { data: job, error: readError } = await supabase.from("jobs").select("id, status").eq("id", jobId).maybeSingle();
+  const { data: job, error: readError } = await supabase.from("jobs").select("id, status, scheduled_at").eq("id", jobId).maybeSingle();
   if (readError) return { error: "Couldn't load the job. Try again." };
   if (!job) return { error: "Job not found." };
 
   const { error } = await supabase.from("jobs").update({ scheduled_at: next.toISOString() }).eq("id", jobId);
   if (error) return { error: "Couldn't save the new time. Try again." };
 
-  const after = await afterTimeSet(jobId, (job.status as string | null) ?? null);
+  const after = await afterTimeSet(jobId, (job.status as string | null) ?? null, timeMoved(job.scheduled_at, next));
 
   revalidatePath("/jobs");
   revalidatePath("/dispatch");
@@ -218,7 +218,7 @@ export async function rescheduleJobAt(jobId: string, localDateTime: string): Pro
  * Graph and Planner, so the notice is not sent a second time here. Any other job
  * just gets the usual "you're scheduled" notice for its new time.
  */
-async function afterTimeSet(jobId: string, previousStatus: string | null): Promise<{ error?: string }> {
+async function afterTimeSet(jobId: string, previousStatus: string | null, moved: boolean): Promise<{ error?: string }> {
   let result: { error?: string } = {};
   let notified = false;
   if (previousStatus === "requested") {
@@ -232,9 +232,16 @@ async function afterTimeSet(jobId: string, previousStatus: string | null): Promi
   if (!notified) {
     await sendScheduleNotifications(jobId);
     await syncJobToGraph(jobId);
+    // The Planner card gets the new time as a dated line (and due date) when the time really moved.
+    if (moved) await noteJobStep(jobId, "rescheduled");
   }
   await notifyAssignedTech(jobId, "rescheduled");
   return result;
+}
+
+/** True when the saved time is not the time the job already had. */
+function timeMoved(before: unknown, next: Date): boolean {
+  return typeof before !== "string" || new Date(before).getTime() !== next.getTime();
 }
 
 /**
@@ -262,7 +269,7 @@ export async function rescheduleJob(jobId: string, newDate: string): Promise<{ e
     .eq("id", jobId);
   if (error) return { error: "Couldn't save the new date. Try again." };
 
-  const after = await afterTimeSet(jobId, (existing.status as string | null) ?? null);
+  const after = await afterTimeSet(jobId, (existing.status as string | null) ?? null, timeMoved(existing.scheduled_at, next));
 
   revalidatePath("/jobs");
   revalidatePath("/dispatch");
@@ -292,6 +299,7 @@ export async function addJobPhotos(formData: FormData) {
 
 export async function markOnWay(jobId: string) {
   await requireJobAccess(jobId);
+  const { data: before } = await supabase.from("jobs").select("on_way_at").eq("id", jobId).maybeSingle();
   const { error } = await supabase
     .from("jobs")
     .update({ on_way_at: new Date().toISOString() })
@@ -299,6 +307,8 @@ export async function markOnWay(jobId: string) {
   if (error) throw new Error(error.message);
 
   await sendOnWayNotice(jobId);
+  // First On my way only: a second tap does not log the step again.
+  if (!before?.on_way_at) await noteJobStep(jobId, "on_way");
 
   revalidatePath("/jobs");
 }

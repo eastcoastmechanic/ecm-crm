@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { supabase } from "@/lib/supabase";
 import { etDateKey } from "@/lib/tz";
+import { noteJobStep } from "@/lib/planner-connector";
 import { monthName, visitDueNow, visitLabel } from "@/lib/maintenance-visits";
 
 type VisitJobInput = {
@@ -49,6 +50,8 @@ async function createJobForVisit(v: VisitJobInput): Promise<string | null> {
     // The visit stays without a job; the sweep finds it on the next run.
     if (jobError || !job) return jobError?.message ?? "job not created";
     jobId = job.id as string;
+    // The visit's card on the Jobs plan ("Requested from maintenance plan"). Never throws.
+    await noteJobStep(jobId, "requested");
   }
 
   const { error: linkError } = await supabase.from("maintenance_visits").update({ job_id: jobId }).eq("id", v.visitId);
