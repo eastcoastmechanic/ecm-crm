@@ -162,7 +162,7 @@ function EntryLinks({ entry }: { entry: LogEntryView }) {
   return (
     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
       {entry.job && (
-        <Link href={`/jobs#job-${entry.job.id}`} className="font-semibold text-accent">
+        <Link href={`/jobs?view=list#job-${entry.job.id}`} className="font-semibold text-accent">
           Job: {entry.job.label}
         </Link>
       )}

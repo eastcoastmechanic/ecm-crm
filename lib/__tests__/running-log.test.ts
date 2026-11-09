@@ -133,7 +133,7 @@ describe("buildLogTeamsCard", () => {
   it("links the job when there is one", () => {
     const card = buildLogTeamsCard({ ...base, section: "jobs", author: "Josh", jobId: JOB, jobLabel: "A — 1 Main St · 11/9/2026" });
     expect(card.text).toContain("Job: A — 1 Main St · 11/9/2026");
-    expect(card.url).toBe(`https://crm.test/jobs#job-${JOB}`);
+    expect(card.url).toBe(`https://crm.test/jobs?view=list#job-${JOB}`);
   });
 
   it("names the customer on a Texts entry", () => {

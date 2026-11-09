@@ -67,15 +67,25 @@ function toView(row: EntryRow): LogEntryView {
 }
 
 async function loadEntries(section: LogSection, folded: boolean, limit: number) {
-  const { data, error } = await supabase
-    .from("log_entries")
-    .select(ENTRY_SELECT)
-    .eq("section", section)
-    .eq("folded", folded)
-    .order("created_at", { ascending: false })
-    .limit(limit + 1);
-  if (error) return { error: error.message, entries: [] as LogEntryView[], more: false };
-  const rows = (data ?? []) as unknown as EntryRow[];
+  // Supabase returns at most 1000 rows per request, so read in pages up to limit + 1
+  // (the extra row says whether "Show older" is needed).
+  const { data, error } = await fetchAllRows<EntryRow>(
+    (from, to) =>
+      supabase
+        .from("log_entries")
+        .select(ENTRY_SELECT)
+        .eq("section", section)
+        .eq("folded", folded)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, Math.min(to, limit)) as unknown as PromiseLike<{
+        data: EntryRow[] | null;
+        error: { message: string } | null;
+      }>,
+    { maxRows: limit + 1 }
+  );
+  if (error) return { error, entries: [] as LogEntryView[], more: false };
+  const rows = data;
   return { error: null, entries: rows.slice(0, limit).map(toView), more: rows.length > limit };
 }
 
@@ -182,8 +192,8 @@ export default async function LogPage({
           label={LOG_SECTION_LABEL[section]}
           open={open.entries}
           folded={folded.entries}
-          olderOpenHref={open.more ? olderHref(section, "open") : null}
-          olderFoldedHref={folded.more ? olderHref(section, "folded") : null}
+          olderOpenHref={open.more && limits[limitParam(section, "open")] < LOG_PAGE_MAX ? olderHref(section, "open") : null}
+          olderFoldedHref={folded.more && limits[limitParam(section, "folded")] < LOG_PAGE_MAX ? olderHref(section, "folded") : null}
           jobOptions={section === "jobs" ? jobOptions : undefined}
           customerOptions={section === "texts" ? customerOptions : undefined}
         />

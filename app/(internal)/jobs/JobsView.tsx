@@ -128,14 +128,17 @@ export default function JobsView({
   tasks,
   staff,
   hourlyRate,
+  initialView = "calendar",
 }: {
   jobs: Job[];
   tasks: Task[];
   staff: { id: string; name: string }[];
   hourlyRate: number | null;
+  /** "list" when a link points at one job (/jobs?view=list#job-<id>, from the Log). */
+  initialView?: "calendar" | "list";
 }) {
   const router = useRouter();
-  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [view, setView] = useState<"calendar" | "list">(initialView);
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);

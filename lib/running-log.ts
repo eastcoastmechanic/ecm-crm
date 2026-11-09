@@ -145,7 +145,7 @@ export function buildLogTeamsCard(entry: {
   return {
     title: `Log · ${LOG_SECTION_LABEL[entry.section]}`,
     text: [entry.body, byline, link].filter(Boolean).join("\n\n"),
-    url: entry.jobId ? `${base}/jobs#job-${entry.jobId}` : `${base}/log#log-${entry.section}`,
+    url: entry.jobId ? `${base}/jobs?view=list#job-${entry.jobId}` : `${base}/log#log-${entry.section}`,
   };
 }
 
