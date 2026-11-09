@@ -1,15 +1,39 @@
 import { supabase } from "@/lib/supabase";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { addCustomer } from "./actions";
 import CustomerList from "./CustomerList";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, cardClass, errorClass, headingClass, inputClass, subTextClass } from "../ui";
 import ResultForm from "../ResultForm";
 
+type CustomerRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  billing_address: string | null;
+  no_followups: boolean | null;
+};
+type PropertyRow = { id: string; address: string; customer_id: string | null };
+
 export default async function CustomersPage() {
-  const [{ data: customers, error }, { data: properties }] = await Promise.all([
-    supabase.from("customers").select("*").order("created_at", { ascending: false }),
-    supabase.from("properties").select("id, address, customer_id").order("address"),
+  // Paged: a plain select stops at 1000 rows without saying so, and the list,
+  // search and Referred-by picker need every customer.
+  const [customersResult, { data: properties }] = await Promise.all([
+    fetchAllRows<CustomerRow>((from, to) =>
+      supabase
+        .from("customers")
+        .select("id, name, email, phone, billing_address, no_followups")
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllRows<PropertyRow>((from, to) =>
+      supabase.from("properties").select("id, address, customer_id").order("address").order("id").range(from, to)
+    ),
   ]);
+  const customers = customersResult.data;
+  const error = customersResult.error ? { message: customersResult.error } : null;
 
   return (
     <div className="flex flex-col gap-8">
