@@ -9,9 +9,9 @@ import { buttonClass, buttonSecondaryClass, errorClass, headingClass, inputClass
 const DOCS_STEP = 200;
 const DOCS_MAX = 1000;
 
-/** Keep a search term safe inside a PostgREST or() filter. */
+/** Keep a search term safe inside a PostgREST or() filter. Apostrophes stay (O'Brien). */
 function cleanSearch(raw: string | undefined) {
-  return (raw ?? "").replace(/[,()%*\\"']/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+  return (raw ?? "").replace(/[,()%*\\"]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
 }
 
 export default async function DocumentsPage({

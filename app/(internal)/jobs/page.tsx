@@ -36,7 +36,7 @@ export default async function JobsPage({
   // Supabase stops at 1000 rows without saying so. Open jobs are paged so none
   // is ever dropped; finished and cancelled jobs show the newest few hundred,
   // with a link for older ones.
-  const [openResult, finishedResult, plannerTasks, { data: staffRows }] = await Promise.all([
+  const [openResult, finishedResult, finishedCount, plannerTasks, { data: staffRows }] = await Promise.all([
     fetchAllRows<JobRow>((from, to) =>
       supabase
         .from("jobs")
@@ -46,23 +46,29 @@ export default async function JobsPage({
         .order("id")
         .range(from, to)
     ),
-    supabase
-      .from("jobs")
-      .select(JOB_SELECT, { count: "exact" })
-      .in("status", CLOSED_STATUSES)
-      .order("scheduled_at", { ascending: false })
-      .order("id")
-      .limit(finishedLimit),
+    // Paged too: past 1000 a single .limit() would still stop at 1000.
+    fetchAllRows<JobRow>(
+      (from, to) =>
+        supabase
+          .from("jobs")
+          .select(JOB_SELECT)
+          .in("status", CLOSED_STATUSES)
+          .order("scheduled_at", { ascending: false })
+          .order("id")
+          .range(from, Math.min(to, finishedLimit - 1)),
+      { maxRows: finishedLimit }
+    ),
+    supabase.from("jobs").select("id", { count: "exact", head: true }).in("status", CLOSED_STATUSES),
     listOpenPlannerTasksSafe(),
     supabase.from("staff").select("id, name, email, role").order("name"),
   ]);
   const error = openResult.error
     ? { message: openResult.error }
     : finishedResult.error
-      ? { message: finishedResult.error.message }
+      ? { message: finishedResult.error }
       : null;
-  const finishedJobs = (finishedResult.data ?? []) as JobRow[];
-  const finishedTotal = finishedResult.count ?? finishedJobs.length;
+  const finishedJobs = finishedResult.data.slice(0, finishedLimit);
+  const finishedTotal = finishedCount.count ?? finishedJobs.length;
   const jobs = [...openResult.data, ...finishedJobs].sort(byScheduledDesc);
   const staff = (staffRows ?? []).map((s) => ({ id: s.id as string, name: (s.name as string | null) || (s.email as string) }));
   const tasks = plannerTasks.tasks.map((t) => ({ id: t.id, title: t.title, notes: t.notes, due_at: t.dueDateTime }));
