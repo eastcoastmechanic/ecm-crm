@@ -55,8 +55,17 @@ export function parseSyncRequest(input: unknown): SyncRequest | { error: string 
 /** Customers get "your tech is on the way" only if the tap is this fresh when it reaches us. */
 export const ON_WAY_NOTICE_MAX_AGE_MS = 30 * 60_000;
 
-export function shouldSendOnWayNotice(tapAt: string, now: Date): boolean {
-  return now.getTime() - Date.parse(tapAt) <= ON_WAY_NOTICE_MAX_AGE_MS;
+/** Uses the phone's raw tap time (before clamping). No tap time means it came straight from a live tap. */
+export function shouldSendOnWayNotice(tapAt: string | null | undefined, now: Date): boolean {
+  if (!tapAt) return true;
+  const tapMs = Date.parse(tapAt);
+  if (!Number.isFinite(tapMs)) return false;
+  return now.getTime() - tapMs <= ON_WAY_NOTICE_MAX_AGE_MS;
+}
+
+/** The queue tags each tap with who was signed in; only that person's session may send it. */
+export function staffKeyMatches(sent: unknown, myStaffId: string | null): boolean {
+  return typeof sent === "string" && sent === (myStaffId ?? "none");
 }
 
 const UNIQUE_VIOLATION = "23505";

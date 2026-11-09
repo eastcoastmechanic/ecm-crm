@@ -5,6 +5,7 @@ import {
   isUniqueViolation,
   parseSyncRequest,
   shouldSendOnWayNotice,
+  staffKeyMatches,
 } from "../offline-sync-rules";
 
 const NOW = new Date("2026-11-09T18:00:00.000Z");
@@ -72,6 +73,19 @@ describe("on-the-way notice", () => {
   it("goes out only if the tap is at most 30 minutes old", () => {
     expect(shouldSendOnWayNotice("2026-11-09T17:45:00.000Z", NOW)).toBe(true);
     expect(shouldSendOnWayNotice("2026-11-09T17:29:00.000Z", NOW)).toBe(false);
+    // Two days old: the time stamped is clamped to now, but the notice still must not go.
+    expect(shouldSendOnWayNotice("2026-11-07T17:00:00.000Z", NOW)).toBe(false);
+    expect(shouldSendOnWayNotice("garbage", NOW)).toBe(false);
+  });
+});
+
+describe("staffKeyMatches", () => {
+  it("only the person who tapped may send it", () => {
+    expect(staffKeyMatches("staff-1", "staff-1")).toBe(true);
+    expect(staffKeyMatches("staff-1", "staff-2")).toBe(false);
+    expect(staffKeyMatches("none", null)).toBe(true);
+    expect(staffKeyMatches("staff-1", null)).toBe(false);
+    expect(staffKeyMatches(undefined, "staff-1")).toBe(false);
   });
 });
 

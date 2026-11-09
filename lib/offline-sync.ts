@@ -85,7 +85,9 @@ async function onMyWay(req: SyncRequest, now: Date): Promise<SyncResult> {
   if (!claimed || claimed.length === 0) return { ok: true, already: true };
 
   // A "your tech is on the way" that lands an hour late is worse than none.
-  if (shouldSendOnWayNotice(at, now)) {
+  // Judged on the phone's own tap time: a tap too old to use as on_way_at is clamped to now,
+  // but it is still far too late to tell the customer.
+  if (shouldSendOnWayNotice(req.createdAt, now)) {
     try {
       await sendOnWayNotice(req.jobId);
     } catch (err) {
@@ -140,17 +142,15 @@ async function startTimer(jobId: string, kind: "drive" | "work", at: string, now
     .gte("started_at", syncStartedAt);
   if (error) console.error(`[offline-sync] could not move ${kind} start back for job ${jobId}: ${error.message}`);
 
-  if (kind === "work") {
-    const { error: driveError } = await supabase
-      .from("job_time_entries")
-      .update({ ended_at: at })
-      .eq("staff_id", staffId)
-      .eq("job_id", jobId)
-      .eq("kind", "drive")
-      .gte("ended_at", syncStartedAt)
-      .lte("started_at", at);
-    if (driveError) console.error(`[offline-sync] could not end drive time at the tap for job ${jobId}: ${driveError.message}`);
-  }
+  // Whatever timer that start closed (the drive leg on this job, or a timer still running on
+  // the previous job) ends at the tap too, so the gap isn't counted twice.
+  const { error: closeError } = await supabase
+    .from("job_time_entries")
+    .update({ ended_at: at })
+    .eq("staff_id", staffId)
+    .gte("ended_at", syncStartedAt)
+    .lte("started_at", at);
+  if (closeError) console.error(`[offline-sync] could not end the earlier timer at the tap for job ${jobId}: ${closeError.message}`);
 }
 
 const NOTE_MIGRATION_MESSAGE = "Run db/migrations/0065_job_notebook.sql in Supabase to turn on the notebook.";

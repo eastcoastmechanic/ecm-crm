@@ -106,7 +106,7 @@ export default function OfflineSync({ staffKey, renderedAt }: { staffKey: string
     lines.push({ text: `${refused} update${refused === 1 ? "" : "s"} couldn't be saved. See the job card.`, tone: "warn" });
   }
   if (queue.needsSignIn && mine.length > 0) {
-    lines.push({ text: "You're signed out. Sign in again and the saved updates will send.", tone: "warn" });
+    lines.push({ text: "Signed out, or signed in as someone else. Sign in again as you and the saved updates will send.", tone: "warn" });
   }
   if (!queue.storageOk && mine.length > 0) {
     lines.push({ text: "This phone isn't letting the app save. Keep this screen open until updates send.", tone: "warn" });

@@ -135,6 +135,16 @@ describe("steps from the phone", () => {
     // The timer it opened at sync time moves back to the tap.
     const moved = h.calls.find((c) => c.table === "job_time_entries" && payload(c, "update")?.started_at === TAP);
     expect(moved).toBeTruthy();
+    // Any timer that start closed (drive leg, or the previous job) ends at the tap, on any job.
+    const closed = h.calls.find((c) => c.table === "job_time_entries" && payload(c, "update")?.ended_at === TAP);
+    expect(closed && has(closed, "eq", "staff_id", "staff-1")).toBe(true);
+    expect(closed && has(closed, "eq", "job_id")).toBe(false);
+  });
+
+  it("On my way more than a day late: no customer notice", async () => {
+    db({});
+    await applyOfflineAction(req("on_way", { createdAt: "2026-11-07T17:55:00.000Z" }), NOW);
+    expect(h.onWayNotice).not.toHaveBeenCalled();
   });
 
   it("I'm here sent twice: the second is already done and starts nothing", async () => {

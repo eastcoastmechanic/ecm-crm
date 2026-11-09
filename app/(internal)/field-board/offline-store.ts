@@ -262,6 +262,7 @@ async function send(item: QueuedAction): Promise<Outcome> {
         jobId: item.jobId,
         createdAt: item.createdAt,
         payload: item.payload,
+        staffKey: item.staffKey,
       }),
       credentials: "same-origin",
       cache: "no-store",
@@ -269,7 +270,7 @@ async function send(item: QueuedAction): Promise<Outcome> {
       redirect: "manual",
       signal: controller.signal,
     });
-    if (res.type === "opaqueredirect" || res.status === 401) return { kind: "signin" };
+    if (res.type === "opaqueredirect" || res.status === 401 || res.status === 409) return { kind: "signin" };
     if (res.status >= 500 || res.status === 429 || res.status === 408) return { kind: "retry" };
     const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
     if (!data) return { kind: "retry" };
