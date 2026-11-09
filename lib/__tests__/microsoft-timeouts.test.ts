@@ -147,6 +147,37 @@ describe("OneNote (delegated) sign-in", () => {
     await expect(delegatedFetch("/me")).resolves.toBeNull();
   });
 
+  it("a token answer whose body is cut off by the time limit is not a refused sign-in", async () => {
+    timeLimitsFireNow();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        const signal = init!.signal!;
+        const body = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{"access_'));
+            signal.addEventListener("abort", () => controller.error(signal.reason));
+          },
+        });
+        return Promise.resolve(new Response(body, { status: 200 }));
+      })
+    );
+    connection(true);
+    await expect(getDelegatedToken()).resolves.toBeNull();
+    expect(h.calls.some((c) => payload(c, "update"))).toBe(false);
+    expect(h.alert).not.toHaveBeenCalled();
+  });
+
+  it("a Microsoft outage (5xx) is not a refused sign-in", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("<html>busy</html>", { status: 503 }))));
+    connection(true);
+    await expect(getDelegatedToken()).resolves.toBeNull();
+    expect(h.calls.some((c) => payload(c, "update"))).toBe(false);
+    expect(h.alert).not.toHaveBeenCalled();
+  });
+
   it("alerts the owner once, the first time Microsoft refuses the saved sign-in", async () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json({ error: "invalid_grant" }, { status: 400 }))));
     connection(true);

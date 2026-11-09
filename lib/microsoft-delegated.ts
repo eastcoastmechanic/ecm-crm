@@ -77,7 +77,13 @@ type TokenResponse = {
   error_description?: string;
 };
 
+/**
+ * Throws when Microsoft gave no real answer (time limit hit, network drop, a
+ * 5xx, or the body cut off by the time limit), so callers never mistake an
+ * outage for a refused sign-in. Returns Microsoft's answer otherwise.
+ */
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
+  const signal = withTimeout(MS_TOKEN_TIMEOUT_MS);
   const res = await fetch(`https://login.microsoftonline.com/${tenantId()}/oauth2/v2.0/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -88,9 +94,15 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
       client_assertion: buildClientAssertion(tenantId(), clientId()),
       ...params,
     }),
-    signal: withTimeout(MS_TOKEN_TIMEOUT_MS),
+    signal,
   });
-  return (await res.json().catch(() => ({ error: `http_${res.status}` }))) as TokenResponse;
+  if (res.status >= 500) throw new Error(`Microsoft token endpoint answered ${res.status}`);
+  try {
+    return (await res.json()) as TokenResponse;
+  } catch (err) {
+    if (signal.aborted) throw err;
+    return { error: `http_${res.status}` };
+  }
 }
 
 /** Signed-in account name from the id token (read straight from Microsoft over TLS, display only). */
@@ -242,7 +254,7 @@ export async function getDelegatedToken(attempt = 0): Promise<string | null> {
   try {
     json = await tokenRequest({ grant_type: "refresh_token", refresh_token: refreshToken });
   } catch (err) {
-    // No answer in time (or the network dropped): not a refused sign-in, so the
+    // No real answer (time limit, network drop, Microsoft 5xx): not a refused sign-in, so the
     // saved one stays as it is and the next call tries again. Nothing to alert.
     console.error("[microsoft] token refresh got no answer:", err instanceof Error ? err.name : "error");
     return null;
