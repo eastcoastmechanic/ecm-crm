@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   optInStateError: null as Error | null,
   startOptInResult: "sent" as string,
   startOptInError: null as Error | null,
+  textCapAllows: true,
 }));
 
 vi.mock("@/lib/customer-intake", () => ({
@@ -53,6 +54,11 @@ vi.mock("@/lib/sms-consent", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/rate-limit-db", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/rate-limit-db")>();
+  return { ...real, allowAll: () => Promise.resolve(h.textCapAllows) };
+});
+
 import { buildWebChatTools } from "../receptionist/web-tools";
 
 type Tool = { name: string; run: (args: Record<string, unknown>) => Promise<unknown> };
@@ -75,6 +81,7 @@ beforeEach(() => {
   h.optInStateError = null;
   h.startOptInResult = "sent";
   h.startOptInError = null;
+  h.textCapAllows = true;
 });
 
 describe("website chat booking and texts", () => {
@@ -117,6 +124,16 @@ describe("website chat booking and texts", () => {
     expect(h.intake).toHaveBeenCalledWith(expect.objectContaining({ smsConsent: false }));
     expect(h.startOptIn).not.toHaveBeenCalled();
     expect(h.jobInsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("hourly cap on confirmation texts reached: booking saved, no text", async () => {
+    h.textCapAllows = false;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const reply = String(await booking().run(args({ smsConsent: true })));
+    expect(h.startOptIn).not.toHaveBeenCalled();
+    expect(h.jobInsert).toHaveBeenCalledTimes(1);
+    expect(reply).toMatch(/pending confirmation/);
+    expect(reply).not.toMatch(/reply YES/);
   });
 
   it("the Reply YES text failing does not fail the booking", async () => {

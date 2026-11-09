@@ -56,6 +56,12 @@ vi.mock("@/lib/sms-consent", async (importOriginal) => {
   };
 });
 
+// The rate limits have their own tests (rate-limit-db.test.ts); here they always allow.
+vi.mock("@/lib/rate-limit-db", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/rate-limit-db")>();
+  return { ...real, allowAll: () => Promise.resolve(true), requestIp: () => Promise.resolve("203.0.113.9") };
+});
+
 import { bookService } from "@/app/(marketing)/book/actions";
 import { bookingConsentPlan } from "@/lib/sms-consent";
 

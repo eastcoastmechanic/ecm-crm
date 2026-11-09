@@ -7,6 +7,15 @@ import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
 import { etDateAtHour, etDateKey } from "@/lib/tz";
 import { COMPANY_PHONE_DISPLAY } from "@/lib/brand";
 import { bookingConsentPlan, smsOptInState, startDoubleOptIn, type SmsOptInState } from "@/lib/sms-consent";
+import {
+  LIMITS,
+  OPT_IN_TEXTS_KEY,
+  RATE_LIMITED_MESSAGE,
+  allowAll,
+  rateKey,
+  requestIp,
+  rule,
+} from "@/lib/rate-limit-db";
 
 const WINDOW_HOURS: Record<string, number> = {
   morning: 8,
@@ -45,6 +54,13 @@ export async function bookService(_prev: BookState, formData: FormData): Promise
   const scheduledAt = date ? etDateAtHour(date, WINDOW_HOURS[window] ?? 8) : null;
   if (!scheduledAt) return { error: "Please pick a preferred date." };
   if (date < etDateKey()) return { error: "That date has passed. Please pick today or a later day." };
+
+  // Honeypot alone doesn't stop a script. Cap per visitor and per phone number.
+  const allowed = await allowAll([
+    rule(rateKey("book", "ip", await requestIp()), LIMITS.bookPerIp),
+    rule(rateKey("book", "phone", phone), LIMITS.bookPerPhone),
+  ]);
+  if (!allowed) return { error: RATE_LIMITED_MESSAGE };
 
   const description = notes ? `${serviceType} — ${notes}` : serviceType;
   const sorry = `Sorry, we couldn't save your request. Please try again, or call us at ${COMPANY_PHONE_DISPLAY}.`;
@@ -89,7 +105,15 @@ export async function bookService(_prev: BookState, formData: FormData): Promise
   }
 
   // The request is saved; a failed "Reply YES" text or owner email shouldn't make the customer retry.
-  if (consentPlan.askToConfirm) {
+  // The "Reply YES" text shares the website's hourly cap on confirmation texts.
+  // Over the cap the booking still goes through; the customer just isn't
+  // texted (they were saved without consent anyway).
+  const textAllowed =
+    consentPlan.askToConfirm && (await allowAll([rule(OPT_IN_TEXTS_KEY, LIMITS.optInTextsGlobal)]));
+  if (consentPlan.askToConfirm && !textAllowed) {
+    console.error("bookService: hourly cap on confirmation texts reached, opt-in text skipped");
+  }
+  if (textAllowed) {
     try {
       const sent = await startDoubleOptIn(phone, name);
       if (sent === "failed") console.error("bookService: opt-in text failed to send");

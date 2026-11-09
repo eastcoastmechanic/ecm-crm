@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { LIMITS, RATE_LIMITED_MESSAGE, allowAll, rateKey, requestIp, rule } from "@/lib/rate-limit-db";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -13,6 +14,9 @@ export type UnsubscribeState = { error?: string };
 export async function unsubscribe(_prev: UnsubscribeState, formData: FormData): Promise<UnsubscribeState> {
   const token = String(formData.get("token") ?? "");
   if (!UUID.test(token)) return { error: "This link isn't valid. Reply to the email and we'll take you off." };
+  if (!(await allowAll([rule(rateKey("token-link", "ip", await requestIp()), LIMITS.tokenLinkPerIp)]))) {
+    return { error: RATE_LIMITED_MESSAGE };
+  }
 
   const { error } = await supabase
     .from("customers")
