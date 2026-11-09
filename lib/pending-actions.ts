@@ -30,7 +30,11 @@ export async function createPendingAction(
   return { token: data.id, preview, expiresInMinutes: ttlMinutes };
 }
 
-export type ActionExecutor = (input: unknown) => Promise<string>;
+/**
+ * `token` is the confirmation token being run. It is the same on a retry after
+ * a failed run, so an executor can use it as an idempotency key (card charges).
+ */
+export type ActionExecutor = (input: unknown, ctx: { token: string }) => Promise<string>;
 
 export async function confirmPendingAction(
   token: string,
@@ -78,7 +82,7 @@ export async function confirmPendingAction(
 
   let result: string;
   try {
-    result = await executor(pending.tool_input);
+    result = await executor(pending.tool_input, { token });
   } catch (err) {
     // Give the token back so a failed run can be retried.
     const { error: releaseError } = await supabase

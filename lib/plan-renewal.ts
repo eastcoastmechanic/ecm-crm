@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { stripe } from "@/lib/stripe";
 import { one } from "@/lib/appointment-reminder";
+import { centsToMoney, notifyOwnerOfMoney } from "@/lib/notify-owner";
 
 type PlanCustomer = { id: string; name: string | null; email: string | null; stripe_customer_id: string | null };
 
@@ -48,8 +49,19 @@ export async function sendMaintenancePlanCharges() {
       contract.customers as unknown as PlanCustomer | PlanCustomer[] | null
     );
 
+    const price = centsToMoney(contract.renewal_price_cents as number);
+    const who = customer?.name ?? "A customer";
+    const path = customer?.id ? `/customers/${customer.id}` : undefined;
+    const notCharged = (reason: string) =>
+      notifyOwnerOfMoney({
+        title: `Plan renewal NOT charged: ${who}, ${price}`,
+        body: `${reason} The plan ends ${contract.end_date}. The cron tries again every day until then.`,
+        path,
+      });
+
     if (!customer?.stripe_customer_id) {
       skipped++;
+      await notCharged("They agreed to auto-renew, but there is no card on file with Stripe.");
       continue;
     }
 
@@ -64,6 +76,7 @@ export async function sendMaintenancePlanCharges() {
         ).data[0]?.id;
       if (!paymentMethodId) {
         skipped++;
+        await notCharged("They agreed to auto-renew, but there is no saved card to charge.");
         continue;
       }
 
@@ -84,6 +97,11 @@ export async function sendMaintenancePlanCharges() {
 
       if (intent.status !== "succeeded") {
         errors.push(`contract ${contract.id}: charge not completed (status ${intent.status})`);
+        await notCharged(
+          intent.status === "processing"
+            ? `The charge is still processing at the bank (payment ${intent.id}). Check Stripe before doing anything.`
+            : `Stripe did not complete the charge (status ${intent.status}, payment ${intent.id}). The customer may need to approve it or use another card.`
+        );
         continue;
       }
 
@@ -101,19 +119,39 @@ export async function sendMaintenancePlanCharges() {
           stripe_payment_method_id: paymentMethodId,
         })
         .eq("id", contract.id);
+      let problem: string | null = null;
       if (renewError) {
-        await supabase
+        const { error: guardError } = await supabase
           .from("service_contracts")
           .update({ auto_billed_at: billedAt, stripe_payment_method_id: paymentMethodId })
           .eq("id", contract.id);
         errors.push(
           `contract ${contract.id}: charged (${intent.id}) but term not extended: ${renewError.message}`
         );
+        problem = `The plan's end date was NOT moved forward (${renewError.message}). Fix it on the contract.`;
+        if (guardError) {
+          // Neither write landed, so tomorrow's run could pick this contract up
+          // again. The idempotency key only holds at Stripe for 24 hours.
+          errors.push(`contract ${contract.id}: could not mark the term billed either: ${guardError.message}`);
+          problem += ` It also could not be marked billed (${guardError.message}), so it may be charged AGAIN tomorrow. Fix it today.`;
+        }
       }
       console.info(`[maintenance-renewal] charged contract ${contract.id}, payment intent ${intent.id}`);
       charged++;
+      await notifyOwnerOfMoney({
+        title: problem ? `Plan renewal charged, needs a fix: ${who}, ${price}` : `Plan renewal charged: ${who}, ${price}`,
+        body: [
+          `${contract.plan_name ?? "Service plan"} renewed for a year on the saved card (payment ${intent.id}).`,
+          problem,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        path,
+      });
     } catch (err) {
-      errors.push(`contract ${contract.id}: ${err instanceof Error ? err.message : "charge failed"}`);
+      const reason = err instanceof Error ? err.message : "charge failed";
+      errors.push(`contract ${contract.id}: ${reason}`);
+      await notCharged(`The charge failed: ${reason}.`);
     }
   }
 

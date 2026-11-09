@@ -160,7 +160,9 @@ export async function updateWarranty(_prev: FormState, formData: FormData): Prom
   return { saved: true };
 }
 
-export type UpdateDocumentState = { error?: string; saved?: boolean } | null;
+const PAID_SINCE_OPENED = "This document was paid since you opened it. Reload the page.";
+
+export type UpdateDocumentState ={ error?: string; saved?: boolean } | null;
 
 /** Save line items and status from the CRM. Returns { error } so the page shows the reason. */
 export async function updateDocument(_prev: UpdateDocumentState, formData: FormData): Promise<UpdateDocumentState> {
@@ -176,6 +178,9 @@ export async function updateDocument(_prev: UpdateDocumentState, formData: FormD
     .eq("id", id)
     .single();
   if (fetchError || !existing) return { error: "Couldn't load this document. Refresh and try again." };
+  // A paid document stays paid. A form opened before the payment landed still
+  // says Draft/Sent; saving it must not undo the payment.
+  if (existing.status === "paid" && status !== "paid") return { error: PAID_SINCE_OPENED };
 
   const existingData = existing.line_items as {
     items: LineItem[];
@@ -222,12 +227,13 @@ export async function updateDocument(_prev: UpdateDocumentState, formData: FormD
   if (!tierUpdate.ok) return { error: tierUpdate.error };
   const docTotal = documentTotal(totals, tierUpdate.tier);
 
-  const { error } = await supabase
+  const changesStatus = status !== "paid";
+  const update = supabase
     .from("documents")
     .update({
       // "paid" goes through markDocumentPaid below (idempotent + post-paid steps).
       // (undefined = leave the column alone, so a concurrent webhook's "paid" is never overwritten by a stale read.)
-      status: status === "paid" ? undefined : status,
+      status: changesStatus ? status : undefined,
       line_items: {
         ...existingData,
         items,
@@ -243,7 +249,17 @@ export async function updateDocument(_prev: UpdateDocumentState, formData: FormD
     })
     .eq("id", id);
 
+  // When the save sets a status, it only matches a row that is still not paid,
+  // so a payment that lands between the read above and this write wins.
+  const { data: saved, error } = await (changesStatus
+    ? update.or("status.is.null,status.neq.paid")
+    : update
+  ).select("id");
+
   if (error) return { error: "Couldn't save the changes. Try again." };
+  if (!saved || saved.length === 0) {
+    return { error: changesStatus ? PAID_SINCE_OPENED : "Couldn't load this document. Refresh and try again." };
+  }
 
   if (status === "paid") {
     const paid = await markDocumentPaid(id, { source: "manual" });
@@ -393,10 +409,19 @@ export async function sendDocumentEmail(_prev: SendDocumentState, formData: Form
     return { error: "The email didn't go out. Try again." };
   }
 
-  const { error: updateError } = await supabase
+  // Re-emailing a paid invoice (a copy for the customer's records) must not
+  // set it back to sent: the status only changes on a row that is not paid.
+  const sentFields = { sent_at: new Date().toISOString(), ...(email.extraUpdate ?? {}) };
+  const { data: marked, error: markError } = await supabase
     .from("documents")
-    .update({ status: "sent", sent_at: new Date().toISOString(), ...(email.extraUpdate ?? {}) })
-    .eq("id", id);
+    .update({ status: "sent", ...sentFields })
+    .eq("id", id)
+    .or("status.is.null,status.neq.paid")
+    .select("id");
+  let updateError = markError;
+  if (!markError && (!marked || marked.length === 0)) {
+    ({ error: updateError } = await supabase.from("documents").update(sentFields).eq("id", id));
+  }
   revalidatePath(`/documents/${id}`);
   revalidatePath("/documents");
   if (updateError) {
