@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { clockWeek, etWeekRange, type ClockShift, type ClockWeek } from "@/lib/clock-week";
 import {
   ENTRY_CAP_HOURS,
   MEAL_BREAK_MINUTES,
@@ -277,4 +278,25 @@ export async function recomputeTrackedHours(jobId: string): Promise<void> {
   const entries = (data ?? []) as { kind: string; started_at: string; ended_at: string | null }[];
   if (!entries.some((e) => e.kind === "work")) return;
   await supabase.from("jobs").update({ tracked_hours: sumWorkHours(entries) }).eq("id", jobId);
+}
+
+/**
+ * This person's finished shifts in the current New York Monday-to-Sunday week, as clock-bar totals.
+ * Only time columns are read. The running shift is added live on the client (withOpenShift).
+ * Null when the read fails, so the bar hides the totals instead of showing a wrong number.
+ */
+export async function getFinishedWeek(staffId: string, now: Date = new Date()): Promise<ClockWeek | null> {
+  const { start, end } = etWeekRange(now);
+  const { data, error } = await supabase
+    .from("time_shifts")
+    .select("started_at, ended_at, break_minutes")
+    .eq("staff_id", staffId)
+    .gte("started_at", start.toISOString())
+    .lt("started_at", end.toISOString())
+    .not("ended_at", "is", null);
+  if (error) {
+    console.error(`[time-clock] week hours read failed: ${error.message}`);
+    return null;
+  }
+  return clockWeek((data ?? []) as ClockShift[], now);
 }

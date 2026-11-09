@@ -7,7 +7,7 @@ import PushButton from "./PushButton";
 import { finishBlockers } from "@/lib/checklist-rules";
 import { ensureChecklists, loadChecklists, unlockedJobIds } from "@/lib/job-checklist";
 import { formatEtTime } from "@/lib/tz";
-import { getClockState } from "@/lib/time-clock";
+import { getClockState, getFinishedWeek } from "@/lib/time-clock";
 import { FIELD_BOT_INSTRUCTIONS, fieldBoardSecretStatus, getFieldBoardSheet } from "@/lib/field-board";
 import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import FieldNoteForm from "./FieldNoteForm";
@@ -181,7 +181,10 @@ export default async function FieldBoardPage() {
     myStaffId,
   ]);
   // Time clock: my day shift, and which of my jobs have a running or paused timer.
-  const clock = myId ? await getClockState(myId).catch(() => null) : null;
+  // Plus my finished hours this Monday-to-Sunday week (same week as payroll) for the today and week totals.
+  const [clock, finishedWeek] = myId
+    ? await Promise.all([getClockState(myId).catch(() => null), getFinishedWeek(myId).catch(() => null)])
+    : [null, null];
   // Checklists: give each open job its list the first time it shows, then work out what blocks Finish.
   const openJobs = rawJobs.filter((job) => job.status !== "complete");
   await ensureChecklists(openJobs.map((job) => ({ id: job.id, job_type: job.job_type })));
@@ -244,6 +247,7 @@ export default async function FieldBoardPage() {
         <ClockBar
           shiftStartedAt={clock?.shiftStartedAt ?? null}
           sinceLabel={clock?.shiftStartedAt ? formatEtTime(clock.shiftStartedAt) : null}
+          finishedWeek={finishedWeek}
         />
       )}
       {myId && <PushButton />}
