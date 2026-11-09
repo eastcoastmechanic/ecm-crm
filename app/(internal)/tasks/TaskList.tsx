@@ -4,14 +4,7 @@ import { useState } from "react";
 import { completeTask } from "./actions";
 import type { OpenPlannerTask } from "@/lib/planner-connector";
 import { errorClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
-
-function formatDue(dueAt: string | null) {
-  if (!dueAt) return null;
-  const date = new Date(dueAt);
-  const isOverdue = date.getTime() < Date.now();
-  const label = date.toLocaleDateString();
-  return { label, isOverdue };
-}
+import { formatDue } from "./due-date";
 
 export default function TaskList({ tasks }: { tasks: OpenPlannerTask[] }) {
   const [completingId, setCompletingId] = useState<string | null>(null);

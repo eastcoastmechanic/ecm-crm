@@ -99,6 +99,7 @@ function form(status: string) {
 
 const updates = () => h.calls.filter((c) => c.op === "update");
 const NOT_PAID = ["or", "status.is.null,status.neq.paid"];
+const NOT_DONE = ["or", "status.is.null,status.not.in.(paid,approved,signed)"];
 
 beforeEach(() => {
   h.existing = { type: "invoice", status: "sent", line_items: { items: [] }, due_date: null, selected_tier: null };
@@ -155,9 +156,20 @@ describe("sendDocumentEmail never un-pays a document", () => {
     expect(await sendDocumentEmail(null, sendForm())).toEqual({ sent: true });
     const [u] = updates();
     expect(u.values).toMatchObject({ status: "sent" });
-    expect(u.filters).toContainEqual(NOT_PAID);
+    expect(u.filters).toContainEqual(NOT_DONE);
     expect(updates()).toHaveLength(1);
   });
+
+  for (const kept of ["approved estimate", "signed contract"]) {
+    it(`re-emailing an ${kept} keeps its status and still stamps sent_at`, async () => {
+      h.updateRows = [[]]; // the status write matched nothing: approved or signed
+      expect(await sendDocumentEmail(null, sendForm())).toEqual({ sent: true });
+      expect(h.emailSent).toHaveBeenCalledTimes(1);
+      const [, second] = updates();
+      expect(second.values).not.toHaveProperty("status");
+      expect(second.values).toHaveProperty("sent_at");
+    });
+  }
 
   it("re-emailing a paid invoice keeps it paid and still stamps sent_at", async () => {
     h.updateRows = [[]]; // the status write matched nothing: it is paid
