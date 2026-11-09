@@ -48,13 +48,24 @@ export default function WarrantyForm({
   const [scanError, setScanError] = useState<Record<number, string>>({});
   const [state, save, saving] = useActionState<WarrantyFormState, FormData>(submitWarranty, null);
 
-  // A new customer/property saved before a later step failed: point the pickers at
-  // them so pressing Save again does not create a second copy.
+  // New equipment already saved by a failed try, by row, sent back so the retry reuses it.
+  const [createdByRow, setCreatedByRow] = useState<Record<number, string>>({});
+
+  // A new customer/property/equipment saved before a later step failed: point the form
+  // at them so pressing Save again does not create a second copy. Rows cannot be
+  // added or removed while saving, so index i is still rowIds[i] here.
   const [seenState, setSeenState] = useState(state);
   if (state !== seenState) {
     setSeenState(state);
     if (state?.customerId) setCustomerId(state.customerId);
     if (state?.propertyId) setPropertyId(state.propertyId);
+    if (state?.equipmentIds) {
+      const next: Record<number, string> = { ...createdByRow };
+      state.equipmentIds.forEach((id, i) => {
+        if (id && rowIds[i] !== undefined) next[rowIds[i]] = id;
+      });
+      setCreatedByRow(next);
+    }
   }
 
   const propertyEquipment = useMemo(
@@ -156,6 +167,7 @@ export default function WarrantyForm({
                 <button
                   type="button"
                   onClick={() => removeRow(rowId)}
+                  disabled={saving}
                   className="text-xs text-g300 underline"
                 >
                   Remove
@@ -180,6 +192,7 @@ export default function WarrantyForm({
                 ))}
               </select>
               <input type="hidden" name={`equipment_id_${index}`} value={equipmentId} />
+              <input type="hidden" name={`created_equipment_id_${index}`} value={createdByRow[rowId] ?? ""} />
             </label>
 
             <div className="flex flex-col gap-2 rounded-lg border border-white/8 bg-white/3 p-3">
@@ -292,7 +305,7 @@ export default function WarrantyForm({
         );
       })}
 
-      <button type="button" onClick={addRow} className={`${buttonSecondaryClass} w-fit`}>
+      <button type="button" onClick={addRow} disabled={saving} className={`${buttonSecondaryClass} w-fit`}>
         + Add Another Piece of Equipment
       </button>
 

@@ -6,13 +6,19 @@ import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createWarrantyForCustomer, type WarrantyEquipmentInput } from "@/lib/warranty-creation";
 import { NEW_CUSTOMER_VALUE, NEW_PROPERTY_VALUE } from "../../../intake-constants";
 import { requireOffice } from "@/lib/require-role";
+import { reusableEquipmentId } from "@/lib/reuse-equipment";
 
 /**
- * customerId / propertyId come back when a new customer or property was saved but a
- * later step failed, so the form switches its pickers to them and a retry does not
+ * customerId / propertyId / equipmentIds (by row index) come back when new records
+ * were saved but a later step failed, so the form reuses them and a retry does not
  * create a second copy.
  */
-export type WarrantyFormState = { error?: string; customerId?: string; propertyId?: string } | null;
+export type WarrantyFormState = {
+  error?: string;
+  customerId?: string;
+  propertyId?: string;
+  equipmentIds?: (string | null)[];
+} | null;
 
 const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
@@ -71,10 +77,14 @@ export async function submitWarranty(_prev: WarrantyFormState, formData: FormDat
     return {
       ...(createdCustomer && customer_id !== NEW_CUSTOMER_VALUE ? { customerId: customer_id } : {}),
       ...(createdProperty && property_id !== NEW_PROPERTY_VALUE ? { propertyId: property_id } : {}),
+      ...(createdEquipment.some(Boolean) ? { equipmentIds: createdEquipment } : {}),
     };
   };
   const savedNote = () =>
-    createdCustomer || createdProperty ? " The new customer/property was saved and is picked below." : "";
+    (createdCustomer || createdProperty ? " The new customer/property was saved and is picked below." : "") +
+    (createdEquipment.some(Boolean) ? " Equipment already saved will be reused, not added twice." : "");
+  // New equipment saved so far, by row index, handed back on failure so a retry reuses it.
+  const createdEquipment: (string | null)[] = equipment.map(() => null);
 
   if (createdCustomer) {
     try {
@@ -98,6 +108,33 @@ export async function submitWarranty(_prev: WarrantyFormState, formData: FormDat
     } catch (err) {
       console.error("submitWarranty: new property failed", errText(err));
       return { ...saved(), error: `Couldn't save the new property. Try again.${savedNote()}` };
+    }
+  }
+
+  // Save new equipment here (not inside createWarrantyForCustomer) so a later failure
+  // can hand the ids back and a retry reuses them instead of adding duplicates.
+  for (let i = 0; i < equipment.length; i++) {
+    const row = equipment[i];
+    if (row.equipmentId) continue;
+    try {
+      let id = await reusableEquipmentId(formData.get(`created_equipment_id_${i}`), property_id);
+      if (!id) {
+        const resolved = await resolveCustomerPropertyEquipment({
+          customerId: customer_id,
+          propertyId: property_id,
+          equipment: {
+            type: row.newEquipmentType!.trim(),
+            brand: row.newEquipmentBrand?.trim() || null,
+            model: row.model?.trim() || null,
+          },
+        });
+        id = resolved.equipmentId;
+      }
+      row.equipmentId = id;
+      createdEquipment[i] = id;
+    } catch (err) {
+      console.error("submitWarranty: new equipment failed", errText(err));
+      return { ...saved(), error: `Couldn't save equipment ${i + 1}. Try again.${savedNote()}` };
     }
   }
 

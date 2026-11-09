@@ -10,6 +10,7 @@ import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { EQUIPMENT_LIFESPAN_REFERENCE } from "@/lib/equipment-lifespan-reference";
 import { NEW_CUSTOMER_VALUE, NEW_PROPERTY_VALUE } from "../../../intake-constants";
 import { requireOffice } from "@/lib/require-role";
+import { reusableEquipmentId } from "@/lib/reuse-equipment";
 
 const AssessmentItemSchema = z.object({
   condition_summary: z.string(),
@@ -23,11 +24,16 @@ const AssessmentResultSchema = z.object({
 });
 
 /**
- * customerId / propertyId come back when a new customer or property was saved but a
- * later step failed, so the form switches its pickers to them and a retry does not
+ * customerId / propertyId / equipmentIds (by row index) come back when new records
+ * were saved but a later step failed, so the form reuses them and a retry does not
  * create a second copy.
  */
-export type AssessmentFormState = { error?: string; customerId?: string; propertyId?: string } | null;
+export type AssessmentFormState = {
+  error?: string;
+  customerId?: string;
+  propertyId?: string;
+  equipmentIds?: (string | null)[];
+} | null;
 
 const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
@@ -183,10 +189,14 @@ Tech's observations: ${r.observations || "none noted"}`
     return {
       ...(createdCustomer && customer_id !== NEW_CUSTOMER_VALUE ? { customerId: customer_id } : {}),
       ...(createdProperty && property_id !== NEW_PROPERTY_VALUE ? { propertyId: property_id } : {}),
+      ...(createdEquipment.some(Boolean) ? { equipmentIds: createdEquipment } : {}),
     };
   };
+  // New equipment saved so far, by row index, handed back on failure so a retry reuses it.
+  const createdEquipment: (string | null)[] = rows.map(() => null);
   const savedNote = () =>
-    createdCustomer || createdProperty ? " The new customer/property was saved and is picked below." : "";
+    (createdCustomer || createdProperty ? " The new customer/property was saved and is picked below." : "") +
+    (createdEquipment.some(Boolean) ? " Equipment already saved will be reused, not added twice." : "");
 
   if (createdCustomer) {
     try {
@@ -220,12 +230,17 @@ Tech's observations: ${r.observations || "none noted"}`
     let photos: { url: string; caption: string | null }[];
     try {
       if (row.newEquipment) {
-        const resolved = await resolveCustomerPropertyEquipment({
-          customerId: customer_id,
-          propertyId: property_id,
-          equipment: row.newEquipment,
-        });
-        equipmentId = resolved.equipmentId;
+        // Reuse equipment an earlier failed try already saved for this row.
+        equipmentId = await reusableEquipmentId(formData.get(`created_equipment_id_${i}`), property_id);
+        if (!equipmentId) {
+          const resolved = await resolveCustomerPropertyEquipment({
+            customerId: customer_id,
+            propertyId: property_id,
+            equipment: row.newEquipment,
+          });
+          equipmentId = resolved.equipmentId;
+        }
+        createdEquipment[i] = equipmentId;
       }
       photos = await uploadPhotos(row.photoFiles);
     } catch (err) {
