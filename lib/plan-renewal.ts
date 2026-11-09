@@ -2,12 +2,10 @@ import { supabase } from "@/lib/supabase";
 import { stripe } from "@/lib/stripe";
 import { one } from "@/lib/appointment-reminder";
 import { centsToMoney, notifyOwnerOfMoney } from "@/lib/notify-owner";
+import { addDaysToDateKey, etDateKey, formatEtDate } from "@/lib/tz";
+import { RENEWAL_CHARGE_WINDOW_DAYS, RENEWAL_NOTICE_MIN_DAYS, renewalChargeGate } from "@/lib/renewal-notice";
 
 type PlanCustomer = { id: string; name: string | null; email: string | null; stripe_customer_id: string | null };
-
-function todayISODate() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 // Plans renew for one year; end_date is a plain YYYY-MM-DD.
 export function addOneYear(isoDate: string) {
@@ -16,15 +14,19 @@ export function addOneYear(isoDate: string) {
   return d.toISOString().slice(0, 10);
 }
 
-/** Charges each auto-renew plan's saved card the week before it ends, then rolls it forward a year. */
-export async function sendMaintenancePlanCharges() {
-  const in7Days = new Date();
-  in7Days.setDate(in7Days.getDate() + 7);
+/**
+ * Charges each auto-renew plan's saved card the week before it ends, then rolls it
+ * forward a year. Only after this term's renewal notice went out at least
+ * RENEWAL_NOTICE_MIN_DAYS earlier (lib/renewal-notice.ts). Without that, nothing is
+ * charged and the owner is told.
+ */
+export async function sendMaintenancePlanCharges(now: Date = new Date()) {
+  const today = etDateKey(now);
 
   const { data: contracts, error } = await supabase
     .from("service_contracts")
     .select(
-      "id, plan_name, end_date, renewal_price_cents, stripe_payment_method_id, customers(id, name, email, stripe_customer_id)"
+      "id, plan_name, end_date, renewal_price_cents, renewal_reminder_sent_at, stripe_payment_method_id, customers(id, name, email, stripe_customer_id)"
     )
     .eq("status", "active")
     // Only contracts where the customer agreed to automatic renewal, at a price on the
@@ -32,8 +34,8 @@ export async function sendMaintenancePlanCharges() {
     // card for every online payment.
     .not("auto_renew_authorized_at", "is", null)
     .gt("renewal_price_cents", 0)
-    .gte("end_date", todayISODate())
-    .lte("end_date", in7Days.toISOString().slice(0, 10))
+    .gte("end_date", today)
+    .lte("end_date", addDaysToDateKey(today, RENEWAL_CHARGE_WINDOW_DAYS))
     .is("auto_billed_at", null);
 
   if (error) return { charged: 0, skipped: 0, errors: [error.message] };
@@ -58,6 +60,39 @@ export async function sendMaintenancePlanCharges() {
         body: `${reason} The plan ends ${contract.end_date}. The cron tries again every day until then.`,
         path,
       });
+
+    // The contract promises a renewal email before each renewal. No notice for this
+    // term, or one too recent, means no charge. The owner hears about it the day the
+    // plan comes up for charging and again on the renewal date, not every day.
+    const gate = renewalChargeGate({
+      reminderSentAt: contract.renewal_reminder_sent_at as string | null,
+      endDate: contract.end_date,
+      now,
+    });
+    if (!gate.charge) {
+      skipped++;
+      const plan = contract.plan_name ?? "Service plan";
+      const renews = formatEtDate(contract.end_date);
+      const firstOrLastDay =
+        contract.end_date === today || contract.end_date === addDaysToDateKey(today, RENEWAL_CHARGE_WINDOW_DAYS);
+      if (gate.reason === "no_notice" && firstOrLastDay) {
+        const why = customer?.email?.trim()
+          ? "the renewal notice email has not gone out (the send failed or was not recorded)"
+          : "no renewal notice could be sent (no email)";
+        await notifyOwnerOfMoney({
+          title: `Plan renewal NOT charged: ${who}, ${price}`,
+          body: `${plan} for ${who} renews ${renews}: ${why}. Not charged. Call them or send it by hand. The plan stays active for the office to handle.`,
+          path,
+        });
+      } else if (gate.reason === "notice_too_recent" && contract.end_date === today) {
+        await notifyOwnerOfMoney({
+          title: `Plan renewal NOT charged: ${who}, ${price}`,
+          body: `${plan} for ${who} renews ${renews}: the renewal notice went out less than ${RENEWAL_NOTICE_MIN_DAYS} days ago, so the card was not charged. Call them to renew. The plan stays active for the office to handle.`,
+          path,
+        });
+      }
+      continue;
+    }
 
     if (!customer?.stripe_customer_id) {
       skipped++;

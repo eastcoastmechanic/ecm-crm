@@ -5,6 +5,7 @@ import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { movePlannerTaskForJob, createPlannerTask } from "@/lib/planner-connector";
 import { sendWarrantyAlerts } from "@/lib/warranty-alerts";
 import { sendMaintenancePlanCharges } from "@/lib/plan-renewal";
+import { sendContractRenewalNotices } from "@/lib/renewal-notice";
 import { canText } from "@/lib/sms-consent";
 import { shouldSendJobFollowUpEmail, skipsPostJobFollowUps } from "@/lib/post-job-followups";
 import {
@@ -80,52 +81,8 @@ async function sendOverdueInvoiceReminders() {
   return { sent, errors };
 }
 
-async function sendContractRenewalNotices() {
-  const in30Days = new Date();
-  in30Days.setDate(in30Days.getDate() + 30);
-
-  const { data: contracts, error } = await supabase
-    .from("service_contracts")
-    .select("id, plan_name, end_date, customers(name, email)")
-    .eq("status", "active")
-    .gte("end_date", todayISODate())
-    .lte("end_date", in30Days.toISOString().slice(0, 10))
-    .is("renewal_reminder_sent_at", null);
-
-  if (error) return { sent: 0, errors: [error.message] };
-
-  const errors: string[] = [];
-  let sent = 0;
-
-  for (const contract of contracts ?? []) {
-    const customer = contract.customers as unknown as CustomerContact;
-    const email = customer?.email;
-    if (!email) continue;
-
-    const { error: sendError } = await resend.emails.send({
-      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
-      replyTo: RESEND_REPLY_TO,
-      to: email,
-      subject: `Your service plan renews soon`,
-      text: `Hi ${customer?.name ?? ""},\n\nYour service plan${
-        contract.plan_name ? ` (${contract.plan_name})` : ""
-      } renews on ${contract.end_date}. Reach out if you'd like to review your coverage before then.\n\nEast Coast Mechanical`,
-    });
-
-    if (sendError) {
-      errors.push(`contract ${contract.id}: ${sendError.message}`);
-      continue;
-    }
-
-    await supabase
-      .from("service_contracts")
-      .update({ renewal_reminder_sent_at: new Date().toISOString() })
-      .eq("id", contract.id);
-    sent++;
-  }
-
-  return { sent, errors };
-}
+// Plan renewal notices (once per term, with the price and charge date) live in
+// lib/renewal-notice.ts; the charge in lib/plan-renewal.ts won't run without one.
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app";
 
