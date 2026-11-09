@@ -72,7 +72,7 @@ export default function PartsUsedForm({
             <input
               type="number"
               step="1"
-              min="0"
+              min="1"
               name={`qty_${i}`}
               value={row.qty}
               onChange={(e) => updateRow(row.rowId, { qty: Number(e.target.value) })}

@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { createPortalServerClient } from "@/lib/supabase-portal/server";
+import { supabase as adminDb } from "@/lib/supabase";
+import { one } from "@/lib/appointment-reminder";
+import { portalCustomerFor, requirePortalUser } from "@/lib/portal-customer";
+import { formatPortalDate, portalJobNote, portalStatusLabel } from "@/lib/portal-view";
 import { headingClass, itemSubClass, itemTitleClass, subTextClass } from "../../../(internal)/ui";
 
 function formatDate(value: string | null) {
-  if (!value) return "Unknown date";
-  return new Date(value).toLocaleDateString();
+  return formatPortalDate(value) ?? "Unknown date";
 }
 
 type TimelineEntry = {
@@ -20,36 +22,48 @@ export default async function PortalEquipmentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createPortalServerClient();
+  const user = await requirePortalUser();
+  const customer = await portalCustomerFor(user.id);
+  if (!customer) notFound();
 
-  const { data: equipment, error } = await supabase
+  // Read on the server with the service client. The equipment must sit on one
+  // of this customer's properties; only the columns this page shows are read.
+  const { data: equipment, error } = await adminDb
     .from("equipment")
-    .select("*, properties(address)")
+    .select(
+      "id, type, brand, model, install_date, warranty_expiration, serial_number, property_id, properties!inner(address, customer_id)"
+    )
     .eq("id", id)
-    .single();
+    .eq("properties.customer_id", customer.id)
+    .maybeSingle();
 
   if (error || !equipment) notFound();
 
   const propertyId = equipment.property_id as string | null;
+  const property = one(equipment.properties as { address: string | null } | { address: string | null }[] | null);
 
   const [{ data: diagnostics }, { data: jobs }, { data: documents }] = await Promise.all([
-    supabase
+    adminDb
       .from("diagnostics")
       .select("id, created_at, ai_diagnosis, suggested_fix")
       .eq("equipment_id", id)
       .order("created_at", { ascending: false }),
     propertyId
-      ? supabase
+      ? adminDb
           .from("jobs")
           .select("id, scheduled_at, completed_at, status, notes")
           .eq("property_id", propertyId)
+          .eq("customer_id", customer.id)
           .order("scheduled_at", { ascending: false })
       : Promise.resolve({ data: [] }),
+    // Drafts haven't been reviewed or sent yet: never shown in the portal.
     propertyId
-      ? supabase
+      ? adminDb
           .from("documents")
           .select("id, doc_number, type, created_at, total")
           .eq("property_id", propertyId)
+          .eq("customer_id", customer.id)
+          .neq("status", "draft")
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] }),
   ]);
@@ -62,8 +76,8 @@ export default async function PortalEquipmentPage({
     })),
     ...(jobs ?? []).map((j) => ({
       date: j.completed_at ?? j.scheduled_at,
-      title: `Service ${j.status}`,
-      detail: j.notes,
+      title: `Service ${portalStatusLabel(j.status).toLowerCase()}`,
+      detail: portalJobNote(j.status, j.notes),
     })),
     ...(documents ?? []).map((doc) => ({
       date: doc.created_at,
@@ -80,7 +94,7 @@ export default async function PortalEquipmentPage({
           {equipment.brand ? ` — ${equipment.brand}` : ""}
           {equipment.model ? ` ${equipment.model}` : ""}
         </h1>
-        <p className={subTextClass}>{equipment.properties?.address}</p>
+        <p className={subTextClass}>{property?.address}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

@@ -5,20 +5,16 @@ import { BrandedFormShell } from "@/lib/branded-form-shell";
 import { COMPANY_NAME, COMPANY_ADDRESS, COMPANY_PHONE, HIC_REGISTRATION_NUMBER } from "@/lib/brand";
 import { RIGHT_TO_CANCEL_NOTICE, ARBITRATION_NOTICE_TEXT, GOVERNING_TERMS_TEXT, noticeOfCancellationText } from "@/lib/contract-terms";
 import { autoRenewalText } from "@/lib/contract-terms";
-import type { ContractLineItems } from "@/lib/contract-terms";
+import { formatPortalDate, formatPortalDateTime, type PortalContractTerms } from "@/lib/portal-view";
 
 function formatPrice(value: number | null) {
   if (value === null) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
+// A calendar date ("2026-11-12") shows as that date; a timestamp as its New York date.
 function formatDate(value: string | null) {
-  if (!value) return "—";
-  return new Date(value.length === 10 ? `${value}T00:00:00` : value).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  return formatPortalDate(value, "long") ?? "—";
 }
 
 function PaperSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -41,7 +37,7 @@ export default function ContractView({
     signed_at: string | null;
     total: number | null;
     properties: { address: string | null } | null;
-    line_items: ContractLineItems;
+    line_items: PortalContractTerms;
   };
 }) {
   const { scopeOfWork, paymentTerms, warrantyTerms, startDate, estimatedCompletion, autoRenewPriceCents, autoRenewAuthorizedAt } =
@@ -125,7 +121,7 @@ export default function ContractView({
       {doc.status === "sent" && <ContractSignaturePad documentId={doc.id} offersAutoRenew={!!autoRenewPriceCents} />}
       {doc.status === "signed" && (
         <div className="rounded-xl border border-green/30 bg-green-l/10 p-4 text-sm text-green">
-          Signed{doc.signed_at ? ` on ${new Date(doc.signed_at).toLocaleString()}` : ""}. We&apos;ll be
+          Signed{doc.signed_at ? ` on ${formatPortalDateTime(doc.signed_at)}` : ""}. We&apos;ll be
           in touch to schedule the work.
         </div>
       )}

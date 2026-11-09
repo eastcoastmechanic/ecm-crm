@@ -4,6 +4,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { signStoredPhotos } from "@/lib/photo-urls";
 import { fetchAllPriceBookItems } from "@/lib/price-book";
+import { checkJobAccess } from "@/lib/job-access";
+import { formatEtShortDate, formatEtShortDateTime } from "@/lib/tz";
 import { CreateReportInvoiceButton, SendReportButton } from "./ReportButtons";
 import AssignCustomerForm from "./AssignCustomerForm";
 import PartsUsedForm from "./PartsUsedForm";
@@ -52,15 +54,36 @@ export default async function DiagnosticPage({
   // Techs work the report but never see money: no prices, invoice, PDF or customer email.
   const isTech = (await headers()).get("x-staff-role") === "tech";
 
+  // A tech may open only a report for a job that is theirs (or not yet assigned),
+  // the same rule the report's actions check. A report with no job is office and
+  // owner only. Checked before the report itself is read.
+  if (isTech) {
+    const { data: owner } = await supabase.from("diagnostics").select("job_id").eq("id", id).maybeSingle();
+    if (!owner) notFound();
+    const access = await checkJobAccess(owner.job_id as string | null, { allowClosedJob: true });
+    if (access.error !== undefined) notFound();
+  }
+
+  // The tech read leaves out the invoice (money) and customer email.
+  // (The cast only keeps the row type; for a tech, invoice and email are simply absent.)
+  const officeSelect =
+    "*, equipment(type, brand, model, serial_number, properties(address, customers(name, email))), jobs(id, scheduled_at, status, customers(name, email), properties(address)), invoice:documents!invoice_document_id(doc_number, status, total)";
+  const techSelect =
+    "*, equipment(type, brand, model, serial_number, properties(address, customers(name))), jobs(id, scheduled_at, status, customers(name), properties(address))";
   const { data: diagnostic, error } = await supabase
     .from("diagnostics")
-    .select(
-      "*, equipment(type, brand, model, serial_number, properties(address, customers(name, email))), jobs(id, scheduled_at, status, customers(name, email), properties(address)), invoice:documents!invoice_document_id(doc_number, status, total)"
-    )
+    .select((isTech ? techSelect : officeSelect) as typeof officeSelect)
     .eq("id", id)
     .single();
 
   if (error || !diagnostic) notFound();
+  // Saved part prices never leave the server for a tech (the parts form also gets none).
+  if (isTech) {
+    diagnostic.actual_parts_used = ((diagnostic.actual_parts_used ?? []) as Record<string, unknown>[]).map((p) => ({
+      ...p,
+      unit_price: null,
+    }));
+  }
 
   const readings = diagnostic.readings as Readings;
   const lineItems = (diagnostic.suggested_line_items ?? []) as SuggestedLineItem[];
@@ -80,7 +103,7 @@ export default async function DiagnosticPage({
     category: string | null;
     tier: string | null;
     unit_price: number | null;
-  }>(supabase, "id, name, category, tier, unit_price");
+  }>(supabase, isTech ? "id, name, category, tier" : "id, name, category, tier, unit_price");
 
   // One representative row per distinct part -- tiers are separate rows for
   // the same physical item, and "parts used" doesn't care which tier.
@@ -88,7 +111,7 @@ export default async function DiagnosticPage({
   for (const row of priceBookRows) {
     const existing = priceBookByName.get(row.name);
     if (!existing || row.tier === "better") {
-      priceBookByName.set(row.name, { id: row.id, name: row.name, category: row.category, unit_price: row.unit_price });
+      priceBookByName.set(row.name, { id: row.id, name: row.name, category: row.category, unit_price: row.unit_price ?? null });
     }
   }
   const priceBookOptions = Array.from(priceBookByName.values())
@@ -144,13 +167,14 @@ export default async function DiagnosticPage({
             {displayCustomerName ?? "No customer assigned yet"}
             {displayAddress ? ` · ${displayAddress}` : ""}
             {" · "}
-            {new Date(diagnostic.created_at).toLocaleString()}
+            {formatEtShortDateTime(diagnostic.created_at)}
           </p>
           {diagnostic.jobs && (
             <p className={subTextClass}>
               From job:{" "}
-              <Link href="/jobs" className="underline">
-                {new Date(diagnostic.jobs.scheduled_at).toLocaleDateString()} ({diagnostic.jobs.status})
+              <Link href={isTech ? "/field-board" : "/jobs"} className="underline">
+                {diagnostic.jobs.scheduled_at ? formatEtShortDate(diagnostic.jobs.scheduled_at) : "Not scheduled"}{" "}
+                ({diagnostic.jobs.status})
               </Link>
             </p>
           )}
@@ -168,7 +192,7 @@ export default async function DiagnosticPage({
           </a>
           {diagnostic.report_sent_at ? (
             <span className={subTextClass}>
-              Report sent {new Date(diagnostic.report_sent_at).toLocaleDateString()}
+              Report sent {formatEtShortDate(diagnostic.report_sent_at)}
             </span>
           ) : (
             <SendReportButton id={id} disabled={!hasEmail} />
@@ -284,7 +308,7 @@ export default async function DiagnosticPage({
         {diagnostic.completed_at ? (
           <div className="flex flex-col gap-1">
             <p className={subTextClass}>
-              Finished {new Date(diagnostic.completed_at).toLocaleString()}
+              Finished {formatEtShortDateTime(diagnostic.completed_at)}
               {diagnostic.tracked_hours !== null ? ` · ${diagnostic.tracked_hours} hrs tracked` : ""}
             </p>
             {isTech ? null : diagnostic.invoice ? (

@@ -7,14 +7,21 @@ import { selectedTier, TIER_LABEL } from "@/lib/estimate-tier";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL;
 
+const WEB_LEAD_SOURCE_LABEL = {
+  web_form: "website booking form",
+  web_chat: "AI chatbot",
+  portal: "customer portal",
+} as const;
+
 /**
- * A "requested" job from an anonymous website visitor (booking form or
- * chatbot) doesn't otherwise surface anywhere until staff happen to check
- * the Jobs list — unlike scheduled jobs, which already email OWNER_EMAIL.
- * This fires immediately so a new web lead doesn't sit unseen.
+ * A "requested" job from a website visitor (booking form or chatbot) or a
+ * signed-in customer (portal Request Service) doesn't otherwise surface
+ * anywhere until staff happen to check the Jobs list — unlike scheduled jobs,
+ * which already email OWNER_EMAIL. This fires immediately so a new request
+ * doesn't sit unseen.
  */
 export async function notifyOwnerOfWebLead(params: {
-  source: "web_form" | "web_chat";
+  source: keyof typeof WEB_LEAD_SOURCE_LABEL;
   customerName: string;
   phone: string | null;
   address: string;
@@ -24,12 +31,12 @@ export async function notifyOwnerOfWebLead(params: {
   if (!OWNER_EMAIL) return;
 
   const { source, customerName, phone, address, description, scheduledAt } = params;
-  const sourceLabel = source === "web_chat" ? "AI chatbot" : "website booking form";
+  const sourceLabel = WEB_LEAD_SOURCE_LABEL[source];
 
   await resend.emails.send({
     from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
     to: OWNER_EMAIL,
-    subject: `New web lead: ${customerName}`,
+    subject: source === "portal" ? `Portal service request: ${customerName}` : `New web lead: ${customerName}`,
     text: `New service request from the ${sourceLabel}, pending confirmation.
 
 Name: ${customerName}
@@ -175,6 +182,57 @@ export async function notifyOwnerOfEvent(kind: OwnerEvent, id: string) {
 }
 
 /**
+ * The phone/text receptionist booked a job request or moved an existing job. Both
+ * are pending: nothing is confirmed to the customer until the office sets the job
+ * to Scheduled. This puts it in front of Josh (Teams Dispatch plus email) so it
+ * doesn't sit unseen on the Jobs list. Never throws: the request is already saved.
+ */
+export async function notifyOwnerOfReceptionistRequest(params: {
+  kind: "new" | "reschedule";
+  jobId: string;
+  channel: string;
+  previousAt?: string | null;
+}) {
+  const { kind, jobId, channel, previousAt } = params;
+  try {
+    const { data: job } = await supabase
+      .from("jobs")
+      .select("scheduled_at, notes, customers(name, phone), properties(address)")
+      .eq("id", jobId)
+      .single();
+    const customer = Array.isArray(job?.customers) ? job?.customers[0] : job?.customers;
+    const property = Array.isArray(job?.properties) ? job?.properties[0] : job?.properties;
+    const who = customer?.name ?? "A caller";
+    const via = channel === "ai_voice" ? "phone" : channel === "ai_sms" ? "text" : "receptionist";
+    const when = job?.scheduled_at ? `${formatEtDateTime(job.scheduled_at)} ET` : "no time given";
+    const line =
+      kind === "new" ? `New job request by ${via}: ${who}, ${when}` : `${who} asked by ${via} to move their job to ${when}`;
+    const details = [
+      kind === "reschedule" ? `Was: ${previousAt ? `${formatEtDateTime(previousAt)} ET` : "no time set"}` : null,
+      property?.address ? `Address: ${property.address}` : null,
+      customer?.phone ? `Phone: ${customer.phone}` : "No phone on file.",
+      kind === "new" && job?.notes ? `Details: ${job.notes}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const link = `${APP_URL}/dispatch`;
+
+    await postToTeams("dispatch", { title: line, text: details, url: link });
+
+    if (OWNER_EMAIL) {
+      await resend.emails.send({
+        from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+        to: OWNER_EMAIL,
+        subject: line,
+        text: `${line}.\n\n${details}\n\nPending: the customer was told it needs confirming. Confirm or change the time on the dispatch board, which sets it to Scheduled and sends the customer their notice:\n${link}`,
+      });
+    }
+  } catch (err) {
+    console.error(`[notify-owner] receptionist ${kind} alert failed for ${jobId}:`, err);
+  }
+}
+
+/**
  * A customer tapped the link in their plan visit reminder and asked for a visit.
  * Nothing is scheduled for them: this just puts the request in front of Josh with
  * their note, so he can call or pick a day on the dispatch board.
@@ -208,4 +266,41 @@ export async function notifyOwnerOfVisitRequest(visitId: string) {
   } catch (err) {
     console.error(`[notify-owner] visit request alert failed for ${visitId}:`, err);
   }
+}
+
+/**
+ * A money problem or result that needs Josh's eyes: a possible double payment,
+ * an amount that doesn't match the invoice, a refund or card dispute, a plan
+ * renewal charge, a card charge from the assistant. Goes to the private Money
+ * Alerts Teams channel, OWNER_EMAIL and (unless `text: false`) OWNER_PHONE.
+ * Whatever is not configured is skipped.
+ *
+ * Never throws: an alert must not undo or fail the thing it reports.
+ */
+export async function notifyOwnerOfMoney(alert: { title: string; body?: string; path?: string; text?: boolean }) {
+  const link = alert.path ? `${APP_URL}${alert.path}` : undefined;
+  try {
+    // Teams first: it never throws, so a failed email or text can't skip it.
+    await postToTeams("money", { title: alert.title, text: alert.body, url: link });
+    if (OWNER_EMAIL) {
+      await resend.emails.send({
+        from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+        to: OWNER_EMAIL,
+        subject: alert.title,
+        text: [alert.title, alert.body, link].filter(Boolean).join("\n\n"),
+      });
+    }
+  } catch (err) {
+    console.error("[notify-owner] money alert email failed:", err);
+  }
+  try {
+    if (OWNER_PHONE && alert.text !== false) await sendSMS(OWNER_PHONE, `ECM: ${alert.title}`);
+  } catch (err) {
+    console.error("[notify-owner] money alert text failed:", err);
+  }
+}
+
+/** Dollars from cents, for alerts. */
+export function centsToMoney(cents: number | null | undefined) {
+  return money((cents ?? 0) / 100) ?? "$0.00";
 }

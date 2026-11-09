@@ -45,6 +45,10 @@ export default async function PaymentsPage() {
     paymentsResult.error?.message?.includes("square_payments") ||
     invoicesResult.error?.message?.includes("square_customer_id") ||
     invoicesResult.error?.message?.includes("square_invoice_id");
+  // The page shows a plain line; the real error goes to the server log (usually SQL 0040 not run).
+  if (missingTable) {
+    console.error("[payments] Square sync tables not readable:", invoicesResult.error?.message ?? paymentsResult.error?.message);
+  }
 
   const invoices: SquareInvoiceRow[] = (invoicesResult.data ?? []).map((row) => {
     const record = row as SquareInvoiceRow & { customers: RelatedCustomer };
@@ -87,9 +91,7 @@ export default async function PaymentsPage() {
         </p>
       )}
       {missingTable && (
-        <p className={errorClass}>
-          Run db/migrations/0040_square_payment_sync.sql in Supabase, then hit Sync Square.
-        </p>
+        <p className={errorClass}>This part isn&apos;t set up yet — tell the owner.</p>
       )}
       {invoicesResult.error && !missingTable && (
         <p className={errorClass}>Error loading Square invoices: {invoicesResult.error.message}</p>

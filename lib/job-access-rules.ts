@@ -33,3 +33,14 @@ export function jobAccessError(input: JobAccessInput): string | null {
   if (closed && !input.allowClosedJob) return "This job is already closed";
   return null;
 }
+
+/**
+ * Turns an error thrown by requireRole / requireJobAccess into a message for the page.
+ * "Not allowed" (wrong role, no staff row, no job) gets a plain sentence; the job rules'
+ * own messages ("This job is assigned to someone else") are already plain and pass through.
+ */
+export function jobAccessMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : "";
+  if (!message || message === "Not allowed") return "You can't work on this job.";
+  return message;
+}

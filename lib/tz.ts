@@ -91,12 +91,27 @@ export function formatEtDateTime(
   return new Date(date).toLocaleString("en-US", { timeZone: BUSINESS_TZ, ...options });
 }
 
-/**
- * Short date and time in New York, "11/9/2026, 9:00 AM". Use in place of a bare
- * `toLocaleString()`, which prints the server's (UTC) time on Vercel.
- */
-export function formatEtShortDateTime(date: Date | string): string {
-  return formatEtDateTime(date, { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+/** Short New York date for report pages, like "11/9/2026". "—" when there is no date. */
+export function formatEtShortDate(date: Date | string | null | undefined): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", { timeZone: BUSINESS_TZ, month: "numeric", day: "numeric", year: "numeric" });
+}
+
+/** Short New York date and time for report pages, like "11/9/2026, 1:20 AM". "—" when there is no date. */
+export function formatEtShortDateTime(date: Date | string | null | undefined): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-US", {
+    timeZone: BUSINESS_TZ,
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /**

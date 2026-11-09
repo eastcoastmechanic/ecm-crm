@@ -1,3 +1,9 @@
+-- DO NOT RE-RUN THIS FILE. It has already been applied. Its "internal full
+-- access" anon policies below (on pm_templates, pm_checklists,
+-- pm_checklist_items and the pm/nameplate photo storage buckets) are NOT live:
+-- the anon lockdown removed them, and they must not be re-created. The app
+-- reads and writes these tables with the service role.
+--
 -- Preventive maintenance checklists.
 --
 -- Templates live in the database so the office can edit items later without a

@@ -3,6 +3,7 @@ import {
   etDateAtHour,
   etLocalFromIso,
   formatEtDate,
+  formatEtShortDate,
   formatEtShortDateTime,
   formatEtTime,
   moveToEtDate,
@@ -72,6 +73,24 @@ describe("etDateAtHour", () => {
     expect(etDateAtHour("", 8)).toBeNull();
     expect(etDateAtHour("11/10/2026", 8)).toBeNull();
     expect(etDateAtHour("2026-11-10", 24)).toBeNull();
+  });
+});
+
+describe("formatEtShortDate / formatEtShortDateTime", () => {
+  it("shows New York time, not UTC", () => {
+    // 1:20 AM in New York on Nov 9 is 06:20 UTC.
+    expect(formatEtShortDateTime("2026-11-09T06:20:00Z")).toMatch(/^11\/9\/2026, 1:20\sAM$/);
+    // 11 PM New York on Nov 8 is already Nov 9 in UTC; the date must stay Nov 8.
+    expect(formatEtShortDate("2026-11-09T04:00:00Z")).toBe("11/8/2026");
+    // Summer (EDT, UTC-4).
+    expect(formatEtShortDateTime("2026-07-04T13:05:00Z")).toMatch(/^7\/4\/2026, 9:05\sAM$/);
+  });
+
+  it("shows a dash for a missing or bad date instead of 1970", () => {
+    for (const value of [null, undefined, "", "not a date"]) {
+      expect(formatEtShortDate(value)).toBe("—");
+      expect(formatEtShortDateTime(value)).toBe("—");
+    }
   });
 });
 

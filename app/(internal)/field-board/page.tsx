@@ -211,6 +211,8 @@ export default async function FieldBoardPage() {
   const sheetError = sheetResult.error;
 
   const tableMissing = Boolean(sheetError && /field_board_events/i.test(sheetError));
+  // Techs see a plain line; the real error goes to the server log.
+  if (tableMissing) console.error("[field-board] field_board_events not readable (SQL 0041?):", sheetError);
   const events = sheetResult.events.slice(0, 8);
 
   const today = etDate(new Date());
@@ -280,9 +282,7 @@ export default async function FieldBoardPage() {
         </p>
       )}
       {tableMissing && (
-        <p className="text-sm text-accent">
-          Field events table is not live yet. Run db/migrations/0041_field_board_events.sql in Supabase.
-        </p>
+        <p className="text-sm text-accent">This part isn&apos;t set up yet — tell the office.</p>
       )}
 
       {next ? (

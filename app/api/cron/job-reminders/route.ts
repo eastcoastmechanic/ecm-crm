@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { resend, RESEND_FROM_EMAIL } from "@/lib/resend";
 import { etDateKey, etDayRange, etHour, formatEtDateTime } from "@/lib/tz";
-import { buildJobDigests, type DigestJob } from "@/lib/job-digest";
+import { buildJobDigests, digestIdempotencyKey, isDuplicateDigestError, type DigestJob } from "@/lib/job-digest";
 import { one } from "@/lib/appointment-reminder";
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL ?? null;
@@ -15,7 +15,9 @@ type PropertyRel = { address: string | null; access_notes: string | null };
 // Morning digest: each tech gets today's jobs assigned to them, the owner gets
 // all of today's jobs. vercel.json runs this at 11:00 and 12:00 UTC so one of
 // them lands on 7:00 New York time in both EDT and EST; the other run exits.
-// ?force=1 skips the hour check for a manual test run.
+// Each send carries a per-person, per-day Resend idempotency key, so a retry in
+// the same hour does not double-send (no sent-mark column needed).
+// ?force=1 skips the hour check and the key for a manual test run.
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -76,19 +78,29 @@ export async function GET(request: Request) {
   if (!OWNER_EMAIL) errors.push("OWNER_EMAIL not configured; owner digest skipped");
 
   let sent = 0;
+  let alreadySent = 0;
   for (const email of emails) {
-    const { error: sendError } = await resend.emails.send({
-      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
-      to: email.to,
-      subject: email.subject,
-      text: email.text,
-    });
+    // Same key all day per person, so a retry can't send twice. A forced test
+    // run skips the key so it always sends.
+    const { error: sendError } = await resend.emails.send(
+      {
+        from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+        to: email.to,
+        subject: email.subject,
+        text: email.text,
+      },
+      force ? undefined : { idempotencyKey: digestIdempotencyKey(todayKey, email.to) }
+    );
     if (sendError) {
+      if (isDuplicateDigestError(sendError)) {
+        alreadySent++;
+        continue;
+      }
       errors.push(`${email.to}: ${sendError.message}`);
       continue;
     }
     sent++;
   }
 
-  return NextResponse.json({ date: todayKey, jobs: jobs.length, sent, errors });
+  return NextResponse.json({ date: todayKey, jobs: jobs.length, sent, alreadySent, errors });
 }
