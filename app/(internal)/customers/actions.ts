@@ -14,6 +14,7 @@ export async function addCustomer(formData: FormData) {
   const billing_address = (formData.get("billing_address") as string)?.trim();
   const notes = (formData.get("notes") as string)?.trim();
   const sms_consent = formData.get("sms_consent") === "on";
+  const no_followups = formData.get("no_followups") === "on";
   const referred_by_customer_id = (formData.get("referred_by_customer_id") as string)?.trim();
   const company_name = (formData.get("company_name") as string)?.trim();
   const alt_phone = (formData.get("alt_phone") as string)?.trim();
@@ -39,6 +40,7 @@ export async function addCustomer(formData: FormData) {
       notes: notes || null,
       sms_consent,
       sms_consent_at: sms_consent ? new Date().toISOString() : null,
+      no_followups,
       referred_by_customer_id: referred_by_customer_id || null,
     })
     .select("id")
@@ -73,6 +75,7 @@ export async function updateCustomer(formData: FormData) {
   const billing_address = (formData.get("billing_address") as string)?.trim();
   const notes = (formData.get("notes") as string)?.trim();
   const sms_consent = formData.get("sms_consent") === "on";
+  const no_followups = formData.get("no_followups") === "on";
   const company_name = (formData.get("company_name") as string)?.trim();
   const alt_phone = (formData.get("alt_phone") as string)?.trim();
 
@@ -105,6 +108,7 @@ export async function updateCustomer(formData: FormData) {
       notes: notes || null,
       sms_consent,
       sms_consent_at,
+      no_followups,
     })
     .eq("id", id);
 
@@ -115,6 +119,8 @@ export async function updateCustomer(formData: FormData) {
   revalidatePath(`/customers/${id}`);
   revalidatePath("/customers");
   revalidatePath("/documents", "layout");
+  revalidatePath("/jobs");
+  revalidatePath("/dispatch");
 }
 
 export async function deleteCustomer(id: string): Promise<{ error?: string }> {

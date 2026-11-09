@@ -49,7 +49,7 @@ type Job = {
   tracked_hours: number | null;
   created_via: string | null;
   assigned_staff_id?: string | null;
-  customers: { id?: string | null; name: string | null } | null;
+  customers: { id?: string | null; name: string | null; no_followups?: boolean | null } | null;
   properties: { address: string | null } | null;
   diagnostics: { id: string }[] | null;
   install_reports: { id: string }[] | null;
@@ -363,10 +363,13 @@ export default function JobsView({
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/plain", job.id)}
                       className="cursor-grab rounded bg-white/6 px-1.5 py-1 text-[11px] leading-tight hover:bg-white/10"
-                      title={job.properties?.address ?? ""}
+                      title={[job.properties?.address, job.customers?.no_followups ? "No follow-ups" : ""]
+                        .filter(Boolean)
+                        .join(" · ")}
                     >
                       <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${statusDotClass[job.status] ?? "bg-g500"}`} />
                       {job.customers?.name ?? "Unknown"}
+                      {job.customers?.no_followups ? " · no follow-ups" : ""}
                     </div>
                   ))}
                   {dayTasks.map((task) => (
@@ -445,6 +448,14 @@ export default function JobsView({
                     (job.customers?.name ?? "Unknown customer")
                   )}
                   {job.properties?.address ? ` — ${job.properties.address}` : ""}
+                  {job.customers?.no_followups && (
+                    <span
+                      className="ml-2 rounded bg-gold/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold"
+                      title="This customer does not get the after-job survey text or follow-up email."
+                    >
+                      No follow-ups
+                    </span>
+                  )}
                   {job.created_via === "ai_sms" && (
                     <span className="ml-2 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
                       via AI text

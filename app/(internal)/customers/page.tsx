@@ -89,6 +89,13 @@ export default async function CustomersPage() {
             frequency varies, msg &amp; data rates may apply, reply STOP to opt out anytime).
           </span>
         </label>
+        <label className="flex items-start gap-2 text-xs text-g300 sm:col-span-2">
+          <input type="checkbox" name="no_followups" className="mt-0.5" />
+          <span>
+            Don&apos;t send follow-up / review requests. Stops the survey text and the follow-up email after a job.
+            Appointment and scheduling texts still go out.
+          </span>
+        </label>
         <SubmitButton className={`${buttonClass} sm:col-span-2 sm:w-fit`}>Add Customer</SubmitButton>
       </form>
 

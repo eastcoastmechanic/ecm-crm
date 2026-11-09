@@ -6,6 +6,7 @@ import { movePlannerTaskForJob, createPlannerTask } from "@/lib/planner-connecto
 import { sendWarrantyAlerts } from "@/lib/warranty-alerts";
 import { sendMaintenancePlanCharges } from "@/lib/plan-renewal";
 import { canText } from "@/lib/sms-consent";
+import { shouldSendJobFollowUpEmail, skipsPostJobFollowUps } from "@/lib/post-job-followups";
 
 function todayISODate() {
   return new Date().toISOString().slice(0, 10);
@@ -19,7 +20,7 @@ function formatPrice(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-type CustomerContact = { name: string | null; email: string | null } | null;
+type CustomerContact = { name: string | null; email: string | null; no_followups?: boolean | null } | null;
 
 async function sendOverdueInvoiceReminders() {
   const { data: invoices, error } = await supabase
@@ -124,7 +125,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app";
 async function sendJobFollowUps() {
   const { data: jobs, error } = await supabase
     .from("jobs")
-    .select("id, completed_at, customers(name, email, phone, sms_consent), properties(address)")
+    .select("id, completed_at, customers(name, email, phone, sms_consent, no_followups), properties(address)")
     .eq("status", "complete")
     .lte("completed_at", daysAgoISO(1))
     .gte("completed_at", daysAgoISO(2))
@@ -138,12 +139,25 @@ async function sendJobFollowUps() {
   for (const job of jobs ?? []) {
     const customer = job.customers as unknown as (CustomerContact & { phone?: string | null; sms_consent?: boolean | null });
     const property = job.properties as unknown as { address: string | null } | null;
-    const email = customer?.email;
-    if (!email) continue;
 
-    // Customers we can text get the review request by text after the invoice is paid (review-requests
-    // cron), so they do not also get this email.
-    if (customer?.phone && customer.sms_consent === true && (await canText(customer.phone))) continue;
+    // Opt-out before the consent lookup. A shut-off customer gets neither this email nor the
+    // review text. The job is not stamped, so turning the flag off later can still send one.
+    const getsReviewText =
+      !skipsPostJobFollowUps(customer) &&
+      !!customer?.phone &&
+      customer.sms_consent === true &&
+      (await canText(customer.phone));
+    const email = customer?.email;
+    if (
+      !email ||
+      !shouldSendJobFollowUpEmail({
+        email,
+        noFollowups: customer?.no_followups,
+        getsReviewText,
+      })
+    ) {
+      continue;
+    }
 
     const { error: sendError } = await resend.emails.send({
       from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
