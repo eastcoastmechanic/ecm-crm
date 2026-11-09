@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createPortalServerClient } from "@/lib/supabase-portal/server";
+import { supabase as adminDb } from "@/lib/supabase";
+import { claimPortalCustomer, portalCustomerFor, requirePortalUser } from "@/lib/portal-customer";
+import { formatPortalDate, formatPortalDateTime, portalJobNote, portalStatusLabel } from "@/lib/portal-view";
 import { signOut } from "./actions";
 import SubmitButton from "../(internal)/SubmitButton";
 import {
@@ -42,31 +43,23 @@ function warrantyStatus(expiration: string | null) {
   if (!expiration) return { label: "Unknown", active: false };
   const expires = new Date(expiration);
   const active = expires.getTime() > Date.now();
+  const date = formatPortalDate(expiration);
   return {
-    label: active ? `Active until ${expires.toLocaleDateString()}` : `Expired ${expires.toLocaleDateString()}`,
+    label: active ? `Active until ${date}` : `Expired ${date}`,
     active,
   };
 }
 
 export default async function PortalDashboard() {
-  const supabase = await createPortalServerClient();
+  const user = await requirePortalUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/portal/login");
+  // Covers the code-entry login path, which never hits /portal/auth/callback.
+  // No-op if already linked; only links a row that is still unclaimed.
+  await claimPortalCustomer(user);
 
-  if (user.email) {
-    // Covers the code-entry login path, which never hits /portal/auth/callback.
-    // No-op if already claimed (RLS only allows this while unclaimed).
-    await supabase
-      .from("customers")
-      .update({ auth_user_id: user.id })
-      .eq("email", user.email)
-      .is("auth_user_id", null);
-  }
-
-  const { data: customer } = await supabase.from("customers").select("*").limit(1).maybeSingle();
+  // Everything below is read on the server with the service client, scoped to
+  // this customer, and only the columns this page shows.
+  const customer = await portalCustomerFor(user.id);
 
   if (!customer) {
     return (
@@ -83,27 +76,35 @@ export default async function PortalDashboard() {
     );
   }
 
-  const { data: properties } = await supabase
+  const { data: properties } = await adminDb
     .from("properties")
-    .select("*")
+    .select("id")
     .eq("customer_id", customer.id);
 
-  const propertyIds = (properties ?? []).map((p) => p.id);
+  const propertyIds = (properties ?? []).map((p) => p.id as string);
 
   const [{ data: equipment }, { data: contracts }, { data: documents }, { data: jobs }] =
     await Promise.all([
       propertyIds.length > 0
-        ? supabase.from("equipment").select("*").in("property_id", propertyIds)
+        ? adminDb
+            .from("equipment")
+            .select("id, type, brand, model, install_date, warranty_expiration")
+            .in("property_id", propertyIds)
         : Promise.resolve({ data: [] }),
-      supabase.from("service_contracts").select("*").eq("customer_id", customer.id),
-      supabase
+      adminDb
+        .from("service_contracts")
+        .select("id, plan_name, status, end_date")
+        .eq("customer_id", customer.id),
+      // Drafts haven't been reviewed or sent yet: never shown in the portal.
+      adminDb
         .from("documents")
-        .select("*")
+        .select("id, doc_number, type, status, total, created_at")
         .eq("customer_id", customer.id)
+        .neq("status", "draft")
         .order("created_at", { ascending: false }),
-      supabase
+      adminDb
         .from("jobs")
-        .select("*")
+        .select("id, scheduled_at, status, notes")
         .eq("customer_id", customer.id)
         .order("scheduled_at", { ascending: false }),
     ]);
@@ -128,17 +129,18 @@ export default async function PortalDashboard() {
       </div>
       <div className="flex flex-col divide-y divide-white/8 -mt-4">
         {jobs?.length === 0 && <p className={subTextClass}>No service requests yet.</p>}
-        {jobs?.map((job) => (
-          <div key={job.id} className="py-3">
-            <div className={itemTitleClass}>
-              {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "Date pending"}
+        {jobs?.map((job) => {
+          const note = portalJobNote(job.status, job.notes);
+          return (
+            <div key={job.id} className="py-3">
+              <div className={itemTitleClass}>{formatPortalDateTime(job.scheduled_at) ?? "Date pending"}</div>
+              <div className={itemSubClass}>
+                {portalStatusLabel(job.status)}
+                {note ? ` · ${note}` : ""}
+              </div>
             </div>
-            <div className={itemSubClass}>
-              {job.status}
-              {job.notes ? ` · ${job.notes}` : ""}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <section className="flex flex-col gap-2">
@@ -178,8 +180,8 @@ export default async function PortalDashboard() {
             <div key={contract.id} className="py-3">
               <div className={itemTitleClass}>{contract.plan_name ?? "Service Plan"}</div>
               <div className={itemSubClass}>
-                {contract.status}
-                {contract.end_date ? ` · through ${new Date(contract.end_date).toLocaleDateString()}` : ""}
+                {portalStatusLabel(contract.status)}
+                {contract.end_date ? ` · through ${formatPortalDate(contract.end_date)}` : ""}
               </div>
             </div>
           ))}
@@ -203,7 +205,7 @@ export default async function PortalDashboard() {
                   {doc.doc_number ?? typeLabel[doc.type]}
                   <span className={`ml-2 ${itemSubClass}`}>{typeLabel[doc.type]}</span>
                 </div>
-                <div className={itemSubClass}>{new Date(doc.created_at).toLocaleDateString()}</div>
+                <div className={itemSubClass}>{formatPortalDate(doc.created_at)}</div>
               </div>
               <div className="flex flex-shrink-0 items-center gap-3">
                 <span className="font-mono text-sm text-white">{formatPrice(doc.total)}</span>
@@ -212,7 +214,7 @@ export default async function PortalDashboard() {
                     statusClass[doc.status] ?? "bg-white/8 text-g300"
                   }`}
                 >
-                  {doc.status}
+                  {portalStatusLabel(doc.status)}
                 </span>
               </div>
             </Link>
