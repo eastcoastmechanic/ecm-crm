@@ -102,6 +102,13 @@ describe("ensureFinishInvoice (runs when a job becomes complete)", () => {
     expect(out).toMatchObject({ kind: "created", priced: false });
   });
 
+  it("a deposit that covers the whole total: no draft, and the alert says why (not 'no price')", async () => {
+    db({ linked: { ...CONTRACT, deposit_received_cents: 1000000 } });
+    const out = await ensureFinishInvoice("j1");
+    expect(h.createInvoice).not.toHaveBeenCalled();
+    expect(out).toEqual({ kind: "none", reason: expect.stringMatching(/deposit received covers the full total/) });
+  });
+
   it("an estimate the customer has not approved gives no price", async () => {
     db({ linked: { doc_number: "E-1", type: "estimate", status: "sent", total: 900, deposit_received_cents: null } });
     await ensureFinishInvoice("j1");

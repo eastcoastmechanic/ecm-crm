@@ -268,9 +268,20 @@ async function createReportInvoice(
   if (room.error) return { error: room.error };
 
   try {
-    const result = await createInvoiceDirect({ customerId, propertyId, items, jobId: diagnostic.job_id ?? undefined });
+    const result = await createInvoiceDirect({
+      customerId,
+      propertyId,
+      items,
+      jobId: diagnostic.job_id ?? undefined,
+      // Takes the job's one invoice slot (unique index, SQL 0058), so a Finish draft made at the
+      // same moment can't land beside it: whichever is second is refused by the database.
+      extra: diagnostic.job_id ? { balance_for_job_id: diagnostic.job_id } : undefined,
+    });
     return { documentId: result.documentId };
   } catch (err) {
+    if (/documents_one_balance_invoice_per_job_idx/.test(errText(err))) {
+      return { error: "This job got an invoice just now. Refresh, then open it from Documents." };
+    }
     console.error("createReportInvoice failed", errText(err));
     return { error: "Couldn't create the invoice. Try again." };
   }

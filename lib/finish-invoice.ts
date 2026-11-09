@@ -128,6 +128,10 @@ export async function ensureFinishInvoice(jobId: string): Promise<FinishInvoiceO
     if (!row.customer_id) return { kind: "none", reason: "the job has no customer. Add one, then use Create invoice." };
 
     const line = balanceLineFor(await loadLinkedDoc(row.document_id));
+    // The deposit already covers the whole price: nothing left to bill, so no empty draft.
+    if (line.cents === 0) {
+      return { kind: "none", reason: "the deposit received covers the full total, so there is no balance to bill." };
+    }
     const result = await createJobBalanceInvoice({ ...row, customer_id: row.customer_id }, line.cents, line);
     if ("exists" in result) {
       const raced = await findLiveJobInvoice(row.id, row.document_id);
