@@ -8,6 +8,7 @@ import {
   SERVICE_REPORT_LIST_SELECT,
   clampReportLimit,
   filterServiceReports,
+  reportCustomerId,
   type ServiceReportRow,
 } from "@/lib/service-report-list";
 
@@ -58,13 +59,30 @@ const listServiceReportsTool = betaZodTool({
       const byId = new Map<string, ServiceReportRow>();
       for (const r of results) for (const row of (r.data ?? []) as unknown as ServiceReportRow[]) byId.set(row.id, row);
       rows = [...byId.values()].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+    } else if (unassignedOnly) {
+      // Unassigned is worked out per row (equipment's property or the job), so
+      // page back through reports until enough are found or the scan cap is hit.
+      const PAGE = 200;
+      const SCAN_CAP = 5000;
+      rows = [];
+      for (let from = 0; from < SCAN_CAP; from += PAGE) {
+        const { data, error } = await supabase
+          .from("diagnostics")
+          .select(SERVICE_REPORT_LIST_SELECT)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, from + PAGE - 1);
+        if (error) return `Failed to list service reports: ${error.message}`;
+        const page = (data ?? []) as unknown as ServiceReportRow[];
+        rows.push(...page.filter((r) => !reportCustomerId(r)));
+        if (rows.length >= max || page.length < PAGE) break;
+      }
     } else {
-      // Unassigned is worked out per row, so read a wider window and filter.
       const { data, error } = await supabase
         .from("diagnostics")
         .select(SERVICE_REPORT_LIST_SELECT)
         .order("created_at", { ascending: false })
-        .limit(unassignedOnly ? 200 : max);
+        .limit(max);
       if (error) return `Failed to list service reports: ${error.message}`;
       rows = (data ?? []) as unknown as ServiceReportRow[];
     }

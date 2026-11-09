@@ -5,8 +5,8 @@
 //   - second: 10 to 16 days after sent_at, if the only one so far went out
 //             before day 10 (or none did)
 // After day 16 nothing goes out. documents.last_reminder_sent_at records the
-// last follow-up; one older than sent_at belongs to an earlier sending (the
-// estimate was sent again) and does not count.
+// last follow-up. Saving a sent estimate rewrites sent_at, so a follow-up older
+// than sent_at stops further ones (never a restart): the cap of two holds.
 
 import { etDateKey } from "@/lib/tz";
 
@@ -41,11 +41,14 @@ export function estimateFollowUp(input: EstimateFollowUpInput, now: Date = new D
   const age = etDaysBetween(input.sentAt, now.toISOString());
   if (age === null || age < FIRST_FOLLOW_UP_DAY || age > LAST_FOLLOW_UP_DAY) return { send: false };
 
-  const sentMs = new Date(input.sentAt).getTime();
-  const lastMs = input.lastReminderAt ? new Date(input.lastReminderAt).getTime() : NaN;
-  const reminded = Number.isFinite(lastMs) && lastMs >= sentMs;
+  if (!input.lastReminderAt) return { send: true, number: age >= SECOND_FOLLOW_UP_DAY ? 2 : 1, first: true };
 
-  if (!reminded) return { send: true, number: age >= SECOND_FOLLOW_UP_DAY ? 2 : 1, first: true };
+  const sentMs = new Date(input.sentAt).getTime();
+  const lastMs = new Date(input.lastReminderAt).getTime();
+  // Saving an estimate while it is "sent" stamps sent_at again, so a follow-up
+  // older than sent_at does not mean it was re-sent. We can't tell how many went
+  // out, so send no more rather than start over.
+  if (!Number.isFinite(lastMs) || lastMs < sentMs) return { send: false };
 
   const remindedOnDay = etDaysBetween(input.sentAt, input.lastReminderAt as string);
   if (remindedOnDay === null || remindedOnDay >= SECOND_FOLLOW_UP_DAY) return { send: false }; // second already went

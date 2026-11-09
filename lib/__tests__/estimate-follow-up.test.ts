@@ -55,12 +55,14 @@ describe("estimateFollowUp", () => {
     expect(estimateFollowUp({ sentAt: SENT, lastReminderAt: null }, day(12))).toEqual({ send: true, number: 2, first: true });
     expect(estimateFollowUp({ sentAt: SENT, lastReminderAt: iso(12) }, day(13))).toEqual({ send: false });
   });
-  it("ignores a follow-up from before the estimate was sent again", () => {
-    expect(estimateFollowUp({ sentAt: SENT, lastReminderAt: "2026-10-01T15:00:00Z" }, day(3))).toEqual({
-      send: true,
-      number: 1,
-      first: true,
-    });
+  it("does not start over when saving the estimate moved sent_at past the last follow-up", () => {
+    // Follow-ups went out, then an office save stamped sent_at again.
+    for (const n of [3, 10, 12, 16]) {
+      expect(estimateFollowUp({ sentAt: SENT, lastReminderAt: "2026-10-25T15:00:00Z" }, day(n))).toEqual({ send: false });
+    }
+  });
+  it("sends nothing for an unreadable follow-up time", () => {
+    expect(estimateFollowUp({ sentAt: SENT, lastReminderAt: "garbage" }, day(10))).toEqual({ send: false });
   });
 });
 
