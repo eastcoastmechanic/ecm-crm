@@ -6,7 +6,7 @@ import { sendSMS } from "@/lib/sms";
 import { canText } from "@/lib/sms-consent";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { syncLeadToGraph, deleteLeadFromGraph } from "@/lib/graph-connector";
-import { createPlannerTask } from "@/lib/planner-connector";
+import { createLeadCard, noteLeadStage } from "@/lib/planner-connector";
 import { requireOffice } from "@/lib/require-role";
 
 export async function updateLeadDraft(formData: FormData): Promise<{ error?: string }> {
@@ -27,6 +27,7 @@ export async function markContacted(formData: FormData): Promise<{ error?: strin
   await requireOffice();
   const id = formData.get("id") as string;
 
+  const { data: before } = await supabase.from("leads").select("status").eq("id", id).maybeSingle();
   const { error } = await supabase
     .from("leads")
     .update({ status: "contacted", contacted_at: new Date().toISOString() })
@@ -34,6 +35,7 @@ export async function markContacted(formData: FormData): Promise<{ error?: strin
   if (error) return { error: "Couldn't save. Try again." };
 
   await syncLeadToGraph(id);
+  if (before && before.status !== "contacted") await noteLeadStage(id, "contacted");
 
   revalidatePath("/leads");
   return {};
@@ -43,6 +45,7 @@ export async function dismissLead(formData: FormData): Promise<{ error?: string 
   await requireOffice();
   const id = formData.get("id") as string;
 
+  const { data: before } = await supabase.from("leads").select("status").eq("id", id).maybeSingle();
   const { error } = await supabase
     .from("leads")
     .update({ status: "dismissed", dismissed_at: new Date().toISOString() })
@@ -50,6 +53,7 @@ export async function dismissLead(formData: FormData): Promise<{ error?: string 
   if (error) return { error: "Couldn't save. Try again." };
 
   await syncLeadToGraph(id);
+  if (before && before.status !== "dismissed") await noteLeadStage(id, "dismissed");
 
   revalidatePath("/leads");
   return {};
@@ -91,12 +95,8 @@ export async function addManualLead(formData: FormData): Promise<{ error?: strin
     // Manual entry means a human is walking this through the sales pipeline
     // by hand (see 0024_lead_radar_pipeline.sql) -- unlike an automated
     // sweep's draft-and-auto-send leads, this one needs a person to actually
-    // do something next, so it gets a Planner card.
-    await createPlannerTask({
-      title: [contact_name, town].filter(Boolean).join(" — ") || "New lead",
-      notes: summary ?? undefined,
-      bucket: "tasks",
-    });
+    // do something next, so it gets a Planner card. Never throws.
+    await createLeadCard(lead.id);
   }
 
   revalidatePath("/leads");
@@ -117,10 +117,13 @@ export async function setLeadStage(formData: FormData): Promise<{ error?: string
   if (status === "contacted") update.contacted_at = new Date().toISOString();
   if (status === "lost") update.dismissed_at = new Date().toISOString();
 
+  const { data: before } = await supabase.from("leads").select("status").eq("id", id).maybeSingle();
   const { error } = await supabase.from("leads").update(update).eq("id", id);
   if (error) return { error: "Couldn't save the stage. Try again." };
 
   await syncLeadToGraph(id);
+  // Only a real move logs a line on the lead's Planner card (won, lost close it).
+  if (before && before.status !== status) await noteLeadStage(id, status);
 
   revalidatePath("/leads");
   return {};
@@ -217,6 +220,7 @@ export async function sendLeadOutreach(formData: FormData): Promise<{ error?: st
   if (updateError) return { error: "The message went out, but the lead didn't save as sent. Don't resend; refresh the page." };
 
   await syncLeadToGraph(id);
+  await noteLeadStage(id, "sent");
 
   revalidatePath("/leads");
   return {};

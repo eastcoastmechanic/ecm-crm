@@ -36,7 +36,13 @@ vi.mock("@/lib/supabase", () => ({
     },
     from: (table: string) => {
       h.from(table);
-      return { insert: () => Promise.resolve({ error: null }) };
+      // Awaited directly, or with .select("id").single() for a new job's id.
+      return {
+        insert: () =>
+          Object.assign(Promise.resolve({ error: null }), {
+            select: () => ({ single: () => Promise.resolve({ data: { id: "job-1" }, error: null }) }),
+          }),
+      };
     },
   },
 }));

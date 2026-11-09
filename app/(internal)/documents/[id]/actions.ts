@@ -13,6 +13,7 @@ import { renderContractPdf } from "@/lib/contract-pdf";
 import { sendPmReportToCustomer } from "@/lib/pm/send";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { markDocumentPaid } from "@/lib/document-paid";
+import { noteJobStep } from "@/lib/planner-connector";
 import { requireOffice } from "@/lib/require-role";
 import { documentTotal, officeTierUpdate, tierTotals } from "@/lib/estimate-tier";
 
@@ -371,7 +372,11 @@ export async function sendDocumentEmail(_prev: SendDocumentState, formData: Form
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Missing document. Refresh and try again." };
 
-  const { data: docType } = await supabase.from("documents").select("type").eq("id", id).maybeSingle();
+  const { data: docType } = await supabase
+    .from("documents")
+    .select("type, status, job_id, doc_number")
+    .eq("id", id)
+    .maybeSingle();
   if (!docType) return { error: "Couldn't find this document. Refresh and try again." };
 
   if (docType.type === "pm_report") {
@@ -430,6 +435,11 @@ export async function sendDocumentEmail(_prev: SendDocumentState, formData: Form
   let updateError = markError;
   if (!markError && (!marked || marked.length === 0)) {
     ({ error: updateError } = await supabase.from("documents").update(sentFields).eq("id", id));
+  }
+  // First send of a job's invoice: a dated "Invoice sent" line on the job's Planner card (no amount).
+  // A resend, or an invoice already sent or paid, adds nothing.
+  if (docType.type === "invoice" && docType.job_id && docType.status !== "sent" && marked && marked.length > 0) {
+    await noteJobStep(docType.job_id as string, "invoice_sent", { docNumber: (docType.doc_number as string | null) ?? null });
   }
   revalidatePath(`/documents/${id}`);
   revalidatePath("/documents");

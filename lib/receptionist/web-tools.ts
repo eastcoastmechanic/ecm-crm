@@ -5,6 +5,7 @@ import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
 import { checkAvailabilityTool } from "./tools";
 import { parseEtLocal } from "@/lib/tz";
+import { noteJobStep } from "@/lib/planner-connector";
 import { bookingConsentPlan, smsOptInState, startDoubleOptIn, type SmsOptInState } from "@/lib/sms-consent";
 import { LIMITS, OPT_IN_TEXTS_KEY, allowAll, rule } from "@/lib/rate-limit-db";
 
@@ -64,15 +65,21 @@ const createWebBookingRequest = betaZodTool({
       return `Failed to set up customer/property: ${err instanceof Error ? err.message : "unknown error"}`;
     }
 
-    const { error: jobError } = await supabase.from("jobs").insert({
-      customer_id: customerId,
-      property_id: propertyId,
-      scheduled_at: scheduledAt.toISOString(),
-      status: "requested",
-      created_via: "web_chat",
-      notes: description,
-    });
+    const { data: newJob, error: jobError } = await supabase
+      .from("jobs")
+      .insert({
+        customer_id: customerId,
+        property_id: propertyId,
+        scheduled_at: scheduledAt.toISOString(),
+        status: "requested",
+        created_via: "web_chat",
+        notes: description,
+      })
+      .select("id")
+      .single();
     if (jobError) return `Failed to create job request: ${jobError.message}`;
+    // A card on the Jobs plan, labelled Lead + Chat. Never throws.
+    if (newJob?.id) await noteJobStep(newJob.id as string, "requested");
 
     // The request is saved; a failed "Reply YES" text shouldn't fail the booking.
     // Shares the website's hourly cap on confirmation texts with /sms-signup and

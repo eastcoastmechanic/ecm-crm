@@ -6,6 +6,7 @@ import { supabase as adminDb } from "@/lib/supabase";
 import { portalCustomerFor, requirePortalUser } from "@/lib/portal-customer";
 import { validateServiceRequest } from "@/lib/portal-view";
 import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
+import { noteJobStep } from "@/lib/planner-connector";
 import { etDateKey } from "@/lib/tz";
 
 export type RequestState = { error?: string } | null;
@@ -42,19 +43,26 @@ export async function requestService(_prev: RequestState, formData: FormData): P
   );
   if (!checked.ok) return { error: checked.error };
 
-  const { error } = await adminDb.from("jobs").insert({
-    customer_id: customer.id,
-    property_id: checked.propertyId,
-    scheduled_at: checked.scheduledAt.toISOString(),
-    status: "requested",
-    created_via: "portal",
-    notes: checked.notes,
-  });
+  const { data: newJob, error } = await adminDb
+    .from("jobs")
+    .insert({
+      customer_id: customer.id,
+      property_id: checked.propertyId,
+      scheduled_at: checked.scheduledAt.toISOString(),
+      status: "requested",
+      created_via: "portal",
+      notes: checked.notes,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error("requestService: insert failed", error.message);
     return { error: "Couldn't send your request. Please try again, or call us." };
   }
+
+  // A card on the Jobs plan, labelled Lead + Portal. Never throws.
+  if (newJob?.id) await noteJobStep(newJob.id as string, "requested");
 
   // The request is saved; a failed owner email shouldn't make the customer retry.
   try {

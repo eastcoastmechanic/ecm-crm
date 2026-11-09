@@ -31,7 +31,7 @@ vi.mock("@/lib/supabase", () => ({
     from: () => ({
       insert: (row: unknown) => {
         h.jobInsert(row);
-        return Promise.resolve({ error: null });
+        return { select: () => ({ single: () => Promise.resolve({ data: { id: "job-1" }, error: null }) }) };
       },
     }),
   },

@@ -7,6 +7,7 @@ import { fetchAllPriceBookItems, formatPriceBookForPrompt, type PriceBookRowWith
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { buildFileContentBlocks } from "@/lib/vision-extract";
 import { syncDocumentToGraph } from "@/lib/graph-connector";
+import { noteJobStep } from "@/lib/planner-connector";
 import { tierTotals } from "@/lib/estimate-tier";
 import { nextDocNumberOrThrow } from "@/lib/doc-number";
 
@@ -294,6 +295,7 @@ ${input.rawRequest}`;
     if (error) throw new Error(error.message);
 
     await syncDocumentToGraph(document.id);
+    if (input.type === "invoice" && input.jobId) await noteJobStep(input.jobId, "invoice_created", { docNumber });
 
     results.push({ documentId: document.id, docNumber, optionLabel: doc.option_label, totals, pricingMode });
   }
@@ -401,6 +403,8 @@ export async function createInvoiceDirect(input: {
   if (error) throw new Error(error.message);
 
   await syncDocumentToGraph(document.id);
+  // A dated "Invoice created" line on the job's Planner card (number only, no amount). Never throws.
+  if (input.jobId) await noteJobStep(input.jobId, "invoice_created", { docNumber });
 
   return { documentId: document.id, docNumber, total };
 }

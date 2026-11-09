@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { flagReferralRewardIfEligible } from "@/lib/referral";
-import { movePlannerTaskForJob } from "@/lib/planner-connector";
+import { noteJobStep } from "@/lib/planner-connector";
 import { syncDocumentToGraph } from "@/lib/graph-connector";
 import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 
@@ -35,7 +35,7 @@ export async function markDocumentPaid(
       .update(values)
       .eq("id", documentId)
       .or("status.is.null,status.neq.paid")
-      .select("type, customer_id, job_id");
+      .select("type, customer_id, job_id, doc_number");
   }
 
   let { data, error } = await run(full);
@@ -51,7 +51,8 @@ export async function markDocumentPaid(
   // Post-paid steps. A failure here must not undo or fail the payment record.
   try {
     if (doc.customer_id) await flagReferralRewardIfEligible(doc.customer_id, doc.type);
-    if (doc.type === "invoice" && doc.job_id) await movePlannerTaskForJob(doc.job_id, "billed");
+    // Moves the job's card to Billed with a dated "Invoice paid" line (no amount: techs see Planner).
+    if (doc.type === "invoice" && doc.job_id) await noteJobStep(doc.job_id, "paid", { docNumber: doc.doc_number ?? null });
     await syncDocumentToGraph(documentId);
     if (doc.type === "invoice") await notifyOwnerOfEvent("invoice_paid", documentId);
   } catch (err) {
