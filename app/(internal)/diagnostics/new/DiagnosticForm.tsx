@@ -19,9 +19,12 @@ type Equipment = {
 export default function DiagnosticForm({
   equipment,
   jobId,
+  isTech = false,
 }: {
   equipment: Equipment[];
   jobId?: string;
+  /** A tech's report goes on the job's customer: no new customer, consent or unit fields. */
+  isTech?: boolean;
 }) {
   const [extracted, setExtracted] = useState<ScannedReadings | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -103,7 +106,11 @@ export default function DiagnosticForm({
             value={equipmentId}
             onChange={(e) => setEquipmentId(e.target.value)}
           >
-            <option value="">No equipment on file yet (fill in details below, or leave blank)</option>
+            <option value="">
+              {isTech
+                ? "No equipment on file yet (leave blank)"
+                : "No equipment on file yet (fill in details below, or leave blank)"}
+            </option>
             {equipment?.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.type}
@@ -130,7 +137,14 @@ export default function DiagnosticForm({
         </label>
       </section>
 
-      {!equipmentId && (
+      {isTech && (
+        <p className="text-xs text-g300">
+          This report goes on the job&apos;s customer and address. New customer details or a new unit: ask the
+          office to add them.
+        </p>
+      )}
+
+      {!isTech && !equipmentId && (
         <section className="flex flex-col gap-3 rounded-xl border border-white/8 bg-white/3 p-4">
           <h2 className="text-xs font-bold uppercase tracking-wide text-g300">
             Customer Info (optional — can fill in later instead)

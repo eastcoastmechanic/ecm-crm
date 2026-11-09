@@ -20,7 +20,9 @@ import { tokenMatches } from "@/lib/bearer-auth";
  * app/api/copilot-actions/[action]/route.ts already uses, just wrapped in
  * the MCP SDK's calling convention instead of one-route-per-action.
  */
-export const maxDuration = 60;
+// 300 s is the plan default. A slow tool call (several Graph or Claude calls in
+// one tool) gets the full window instead of being cut off at 60 s.
+export const maxDuration = 300;
 
 const passthroughInput = z.record(z.string(), z.unknown());
 
@@ -55,7 +57,18 @@ const handler = createMcpHandler(
       );
     }
   },
-  { serverInfo: { name: "ecm-crm", version: "1.0.0" } }
+  {
+    serverInfo: { name: "ecm-crm", version: "1.0.0" },
+    // No subscriptions/listen streams. A 2026-07-28 client opens one as a POST
+    // that stays open (an SSE stream with keep-alives) until the function is
+    // killed, then opens the next one: that was the steady "Task timed out
+    // after 60 seconds" on /api/mcp, one about every 61 s while a client was
+    // connected. The stream could never carry anything useful here anyway:
+    // each Vercel instance has its own in-memory event bus and this server
+    // sends no list-changed or resource notifications. 0 answers listen with a
+    // JSON-RPC error straight away instead of opening a stream.
+    maxSubscriptions: 0,
+  }
 );
 
 const verifyToken = async (_req: Request, bearerToken?: string): Promise<AuthInfo | undefined> => {
