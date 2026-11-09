@@ -1,6 +1,7 @@
 import { Document, Page, View, Text, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { COMPANY_SLOGAN } from "./brand";
 import { registerBrandFonts, BODY_FONT, DISPLAY_FONT } from "./pdf-fonts";
+import { formatEtDate } from "@/lib/tz";
 
 export type WarrantyReportItem = {
   equipment_label: string;
@@ -52,7 +53,7 @@ const colors = {
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
+  return formatEtDate(value, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -146,11 +147,7 @@ export function WarrantyReportPdf({ doc }: { doc: WarrantyReportPdfData }) {
           <View>
             <Text style={styles.docTitle}>{doc.doc_number ?? ""} — Warranty Registration</Text>
             <Text style={styles.docMeta}>
-              {new Date(doc.created_at).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {formatEtDate(doc.created_at, { year: "numeric", month: "long", day: "numeric" })}
             </Text>
           </View>
         </View>

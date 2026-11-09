@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { headingClass, subTextClass } from "../../ui";
 import NewPmForm from "./NewPmForm";
+import { formatEtDate } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export default async function NewPmPage({ searchParams }: { searchParams: Promis
     .map((job) => {
       const customer = first(job.customers);
       const property = first(job.properties);
-      const when = job.scheduled_at ? new Date(job.scheduled_at).toLocaleDateString() : "Unscheduled";
+      const when = job.scheduled_at ? formatEtDate(job.scheduled_at) : "Unscheduled";
       return {
         id: job.id,
         job_type: job.job_type,

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import { formatEtDate } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function MassSavePage() {
                       <div className={itemTitleClass}>
                         {doc.doc_number} — {customers?.[0]?.name ?? "Unknown"}
                       </div>
-                      <div className={itemSubClass}>{new Date(doc.created_at).toLocaleDateString()}</div>
+                      <div className={itemSubClass}>{formatEtDate(doc.created_at)}</div>
                     </div>
                     <div className="font-mono text-sm text-white">{formatPrice(doc.total)}</div>
                   </Link>

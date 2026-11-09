@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { deleteDocument } from "./actions";
 import { errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import { formatEtDate } from "@/lib/tz";
 
 const typeLabel: Record<string, string> = {
   estimate: "Estimate",
@@ -94,7 +95,7 @@ export default function DocumentsList({ documents }: { documents: Document[] }) 
                 <div className={itemSubClass}>
                   {doc.customers?.name ?? "Unknown customer"}
                   {" · "}
-                  {new Date(doc.created_at).toLocaleDateString()}
+                  {formatEtDate(doc.created_at)}
                 </div>
                 {errors[doc.id] && <p className={`mt-1 ${errorClass}`}>{errors[doc.id]}</p>}
               </div>

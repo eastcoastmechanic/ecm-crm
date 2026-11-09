@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { createPurchaseOrder, updatePoStatus, deletePurchaseOrder } from "./actions";
 import SubmitButton from "../SubmitButton";
 import { inputClass, itemSubClass, itemTitleClass, subTextClass, buttonClass, errorClass } from "../ui";
+import { formatEtDate } from "@/lib/tz";
 
 export type JobOption = {
   id: string;
@@ -46,7 +47,7 @@ function formatPrice(value: number | null) {
 function jobLabel(job: JobOption | null) {
   if (!job) return null;
   const who = [job.customers?.name, job.properties?.address].filter(Boolean).join(" — ");
-  const date = job.scheduled_at ? new Date(job.scheduled_at).toLocaleDateString() : null;
+  const date = job.scheduled_at ? formatEtDate(job.scheduled_at) : null;
   return [who, date].filter(Boolean).join(" · ") || null;
 }
 
@@ -186,7 +187,7 @@ function PurchaseOrderCard({
             )}
           </div>
           <div className={itemSubClass}>
-            {[label, new Date(po.created_at).toLocaleDateString()].filter(Boolean).join(" · ")}
+            {[label, formatEtDate(po.created_at)].filter(Boolean).join(" · ")}
           </div>
           {item && (item.description || item.qty || item.unit_cost) && (
             <p className="mt-2 text-sm text-white">

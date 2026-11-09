@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { getFieldBoardSheet } from "@/lib/field-board";
+import { formatEtDate, formatEtDateTime } from "@/lib/tz";
 
 export type FieldSheetLine = {
   id: string;
@@ -42,7 +43,7 @@ function startOfToday() {
 
 function formatStamp(value: string | null) {
   if (!value) return null;
-  return new Date(value).toLocaleString("en-US", {
+  return formatEtDateTime(value, {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -134,7 +135,7 @@ export async function getFieldSheetPayload(): Promise<FieldSheetPayload> {
 
   return {
     printedAt: new Date().toISOString(),
-    dateLabel: today.toLocaleDateString("en-US", {
+    dateLabel: formatEtDate(new Date(), {
       weekday: "short",
       month: "short",
       day: "numeric",

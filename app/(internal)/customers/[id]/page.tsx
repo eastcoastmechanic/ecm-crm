@@ -6,6 +6,7 @@ import EditCustomerForm from "./EditCustomerForm";
 import PropertiesEquipmentSection from "./PropertiesEquipmentSection";
 import DeleteRecordButton from "../../DeleteRecordButton";
 import { deleteCustomer } from "../actions";
+import { formatEtDate, formatEtShortDateTime } from "@/lib/tz";
 
 export default async function CustomerProfilePage({
   params,
@@ -170,7 +171,7 @@ export default async function CustomerProfilePage({
           {(jobs ?? []).map((job) => (
             <div key={job.id} className="py-2">
               <div className={itemTitleClass}>
-                {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "No date"}
+                {job.scheduled_at ? formatEtShortDateTime(job.scheduled_at) : "No date"}
                 <span className={`ml-2 ${itemSubClass}`}>({job.status})</span>
               </div>
               {job.notes && <div className={itemSubClass}>{job.notes}</div>}
@@ -218,7 +219,7 @@ export default async function CustomerProfilePage({
                   {d.equipment?.brand ? ` — ${d.equipment.brand}` : ""}
                 </span>
               </div>
-              <div className={itemSubClass}>{new Date(d.created_at).toLocaleDateString()}</div>
+              <div className={itemSubClass}>{formatEtDate(d.created_at)}</div>
             </Link>
           ))}
         </div>

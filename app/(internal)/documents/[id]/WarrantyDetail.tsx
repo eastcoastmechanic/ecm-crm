@@ -3,6 +3,7 @@ import SendDocumentForm from "./SendDocumentForm";
 import WarrantyItemsEditor from "./WarrantyItemsEditor";
 import { headingClass, subTextClass, buttonSecondaryClass, itemSubClass } from "../../ui";
 import DocumentDeleteButton from "../DocumentDeleteButton";
+import { formatEtDate } from "@/lib/tz";
 
 export type WarrantyItem = {
   equipment_label: string;
@@ -24,7 +25,7 @@ export type WarrantyItem = {
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Date(`${value}T00:00:00`).toLocaleDateString();
+  return formatEtDate(value);
 }
 
 const MANUFACTURER_COVERAGE_TEXT =
@@ -60,7 +61,7 @@ export default function WarrantyDetail({
             {doc.customers?.name}
             {doc.properties?.address ? ` · ${doc.properties.address}` : ""}
             {" · "}
-            {new Date(doc.created_at).toLocaleDateString()}
+            {formatEtDate(doc.created_at)}
             {technician_name ? ` · Installed by ${technician_name}` : ""}
           </p>
         </div>

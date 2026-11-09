@@ -3,6 +3,7 @@ import { readFile } from "fs/promises";
 import { Document, Page, View, Text, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { COMPANY_SLOGAN } from "./brand";
 import { registerBrandFonts, BODY_FONT, DISPLAY_FONT } from "./pdf-fonts";
+import { formatEtDate } from "@/lib/tz";
 
 export type PdfLineItem = {
   category: string;
@@ -421,11 +422,7 @@ export function DocumentPdf({ doc, logo }: { doc: PdfDocumentData; logo: string 
             <Text style={styles.docTypePill}>{typeLabel[doc.type].toUpperCase()}</Text>
             <Text style={styles.docNumber}>{doc.doc_number ?? ""}</Text>
             <Text style={styles.docMeta}>
-              {new Date(doc.created_at).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {formatEtDate(doc.created_at, { year: "numeric", month: "long", day: "numeric" })}
             </Text>
           </View>
         </View>

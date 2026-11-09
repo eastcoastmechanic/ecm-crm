@@ -114,6 +114,21 @@ export function formatEtShortDateTime(date: Date | string | null | undefined): s
   });
 }
 
+/**
+ * Calendar date in New York, "11/9/2026" by default. Use in place of a bare
+ * `toLocaleDateString()`. A plain "YYYY-MM-DD" value (a date column) is already a
+ * calendar date, so it prints as that date and is never shifted a day.
+ */
+export function formatEtDate(
+  date: Date | string,
+  options: Intl.DateTimeFormatOptions = { month: "numeric", day: "numeric", year: "numeric" }
+): string {
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { ...options, timeZone: "UTC" });
+  }
+  return new Date(date).toLocaleDateString("en-US", { timeZone: BUSINESS_TZ, ...options });
+}
+
 /** A datetime-local input value ("2026-10-22T09:30") for an instant, in New York time. */
 export function toEtLocalInput(date: Date | string): string {
   const d = new Date(date);

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import { formatEtDate } from "@/lib/tz";
 
 type Diagnostic = {
   id: string;
@@ -66,7 +67,7 @@ export default function DiagnosticsList({ diagnostics }: { diagnostics: Diagnost
                   {customerName ?? "No customer assigned yet"}
                   {address ? ` · ${address}` : ""}
                   {" · "}
-                  {new Date(d.created_at).toLocaleDateString()}
+                  {formatEtDate(d.created_at)}
                 </div>
               </div>
             </Link>

@@ -14,6 +14,7 @@ import EditCustomerForm from "../../customers/[id]/EditCustomerForm";
 import DocumentDeleteButton from "../DocumentDeleteButton";
 import { headingClass, subTextClass, buttonSecondaryClass } from "../../ui";
 import { selectedTier, TIER_LABEL } from "@/lib/estimate-tier";
+import { formatEtDate, formatEtShortDateTime } from "@/lib/tz";
 
 type LineItem = {
   category: string;
@@ -208,7 +209,7 @@ export default async function DocumentPage({
             )}
             {doc.properties?.address ? ` · ${doc.properties.address}` : ""}
             {" · "}
-            {new Date(doc.created_at).toLocaleDateString()}
+            {formatEtDate(doc.created_at)}
           </p>
           {doc.customers?.id && <EditCustomerForm customer={doc.customers} />}
         </div>
@@ -238,7 +239,7 @@ export default async function DocumentPage({
         </div>
       </div>
       {doc.status === "sent" && doc.sent_at && (
-        <p className={subTextClass}>Sent {new Date(doc.sent_at).toLocaleString()}</p>
+        <p className={subTextClass}>Sent {formatEtShortDateTime(doc.sent_at)}</p>
       )}
 
       {lineData.mass_save_eligible && (

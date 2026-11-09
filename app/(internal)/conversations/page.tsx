@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { headingClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
+import { formatEtShortDateTime } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export default async function ConversationsPage() {
                     {channelLabel[conv.channel] ?? conv.channel}
                   </span>
                 </div>
-                <div className={itemSubClass}>{new Date(conv.updated_at).toLocaleString()}</div>
+                <div className={itemSubClass}>{formatEtShortDateTime(conv.updated_at)}</div>
               </div>
               <div className={itemSubClass}>{conv.status}</div>
             </Link>

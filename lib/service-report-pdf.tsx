@@ -1,6 +1,7 @@
 import { Document, Page, View, Text, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { COMPANY_SLOGAN } from "./brand";
 import { registerBrandFonts, BODY_FONT, DISPLAY_FONT } from "./pdf-fonts";
+import { formatEtDate } from "@/lib/tz";
 
 export type ServiceReportReadings = {
   outdoor_temp: number | null;
@@ -172,11 +173,7 @@ export function ServiceReportPdf({ doc }: { doc: ServiceReportPdfData }) {
           <View>
             <Text style={styles.docTitle}>{doc.doc_number ?? ""} — Service Report</Text>
             <Text style={styles.docMeta}>
-              {new Date(doc.created_at).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {formatEtDate(doc.created_at, { year: "numeric", month: "long", day: "numeric" })}
             </Text>
           </View>
         </View>
