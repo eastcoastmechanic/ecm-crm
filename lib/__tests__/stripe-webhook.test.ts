@@ -94,7 +94,7 @@ vi.mock("@/lib/supabase", () => ({
         maybeSingle: done,
         then: (res: (v: Result) => unknown, rej: (e: unknown) => unknown) => done().then(res, rej),
       };
-      for (const m of ["eq", "is", "not", "or", "limit"]) {
+      for (const m of ["eq", "in", "is", "not", "or", "limit"]) {
         b[m] = (...args: unknown[]) => {
           call.filters.push([m, ...args]);
           return b;
@@ -304,10 +304,22 @@ describe("stripe webhook", () => {
       session({ metadata: { document_id: "doc1", customer_id: "c1", replace_stripe_customer: "cus_dead" } });
       expect((await POST(req())).status).toBe(200);
       const [u] = updates("customers");
-      expect(u.filters).toContainEqual(["eq", "stripe_customer_id", "cus_dead"]);
+      // Matches the dead id, or the new one on a retry after a failed cleanup.
+      expect(u.filters).toContainEqual(["in", "stripe_customer_id", ["cus_dead", "cus_1"]]);
       const [pm] = updates("service_contracts");
       expect(pm.values).toEqual({ stripe_payment_method_id: null });
       expect(pm.filters).toContainEqual(["eq", "customer_id", "c1"]);
+    });
+
+    it("returns 500 when clearing the old card fails, so Stripe retries the cleanup", async () => {
+      h.contractError = { message: "db down" };
+      session({ metadata: { document_id: "doc1", customer_id: "c1", replace_stripe_customer: "cus_dead" } });
+      expect((await POST(req())).status).toBe(500);
+      // The retry still matches the row (now holding cus_1) and clears the card again.
+      h.contractError = null;
+      h.calls = [];
+      expect((await POST(req())).status).toBe(200);
+      expect(updates("service_contracts")).toHaveLength(1);
     });
 
     it("leaves the saved card alone when the dead id was already replaced", async () => {

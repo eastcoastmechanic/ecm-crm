@@ -158,9 +158,12 @@ async function saveStripeCustomer(session: Stripe.Checkout.Session, customerId: 
 
   const deadId = session.metadata?.[REPLACE_STRIPE_CUSTOMER];
   const base = supabase.from("customers").update({ stripe_customer_id: stripeCustomerId }).eq("id", customerId);
-  const { data, error } = await (deadId ? base.eq("stripe_customer_id", deadId) : base.is("stripe_customer_id", null)).select(
-    "id"
-  );
+  // When replacing, also match a row already holding the new id: that is a
+  // Stripe retry after the card cleanup below failed, and it must run again.
+  // (Clearing is safe to repeat; renewals fall back to the customer's cards.)
+  const { data, error } = await (
+    deadId ? base.in("stripe_customer_id", [deadId, stripeCustomerId]) : base.is("stripe_customer_id", null)
+  ).select("id");
   if (error) return `Could not save the Stripe customer: ${error.message}`;
 
   if (deadId && data && data.length > 0) {
