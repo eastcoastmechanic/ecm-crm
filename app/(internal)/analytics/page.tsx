@@ -105,9 +105,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   let leadsQuery = supabase.from("leads").select("source, status, created_at");
   if (sinceIso) leadsQuery = leadsQuery.gte("created_at", sinceIso);
 
+  // "*" so voided_at (SQL 0078) comes back once it exists; voided time is left out below.
   let entriesQuery = supabase
     .from("job_time_entries")
-    .select("job_id, staff_id, kind, started_at, ended_at")
+    .select("*")
     .not("ended_at", "is", null);
   if (sinceIso) entriesQuery = entriesQuery.gte("started_at", sinceIso);
 
@@ -140,11 +141,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         .select("id, type, status, total, paid_at, job_id, balance_for_job_id, line_items")
         .or(filters.join(","))
         .neq("status", "void"),
-      supabase.from("job_time_entries").select("job_id, started_at, ended_at").in("job_id", jobIds).not("ended_at", "is", null),
+      // "*" so voided_at (SQL 0078) comes back once it exists; voided time is not labor.
+      supabase.from("job_time_entries").select("*").in("job_id", jobIds).not("ended_at", "is", null),
     ]);
     if (docsRes.error || timeRes.error) loadError = true;
     linkedDocs.push(...((docsRes.data ?? []) as DocRow[]));
-    jobEntries = timeRes.data ?? [];
+    jobEntries = ((timeRes.data ?? []) as (typeof jobEntries[number] & { voided_at?: string | null })[]).filter((e) => !e.voided_at);
 
     // A contract keeps no line items; its parts list is on the estimate it was made from.
     const fromIds = linkedDocs
@@ -218,7 +220,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const staffName = new Map((staffRes.data ?? []).map((s) => [s.id, s.name || s.email || "Unnamed"]));
   const hoursByStaff = new Map<string, { work: number; drive: number }>();
   for (const e of entriesRes.data ?? []) {
-    if (!e.ended_at || !inPeriod(e.started_at)) continue;
+    if (!e.ended_at || e.voided_at || !inPeriod(e.started_at)) continue;
     const row = hoursByStaff.get(e.staff_id) ?? { work: 0, drive: 0 };
     const h = (new Date(e.ended_at).getTime() - new Date(e.started_at).getTime()) / 3_600_000;
     if (e.kind === "drive") row.drive += h;

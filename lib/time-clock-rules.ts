@@ -36,12 +36,12 @@ export function paidShiftHours(startedAt: Date | string, endedAt: Date | string,
   return Math.max(0, Math.round((hoursBetween(startedAt, endedAt) - Math.max(0, breakMinutes) / 60) * 100) / 100);
 }
 
-export type Entry = { kind: string; started_at: string; ended_at: string | null };
+export type Entry = { kind: string; started_at: string; ended_at: string | null; voided_at?: string | null };
 
-/** Total closed 'work' hours across entries. Open entries and drive time are not counted. */
+/** Total closed 'work' hours across entries. Open, voided (SQL 0078) and drive entries are not counted. */
 export function sumWorkHours(entries: Entry[]): number {
   const total = entries
-    .filter((e) => e.kind === "work" && e.ended_at)
+    .filter((e) => e.kind === "work" && e.ended_at && !e.voided_at)
     .reduce((sum, e) => sum + hoursBetween(e.started_at, e.ended_at as string), 0);
   return Math.round(total * 100) / 100;
 }
