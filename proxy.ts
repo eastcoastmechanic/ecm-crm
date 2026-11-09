@@ -229,6 +229,8 @@ export const config = {
     "/procurement/:path*",
     "/campaigns/:path*",
     "/campaigns",
+    "/log/:path*",
+    "/log",
     "/procurement",
     "/pm/:path*",
     "/pm",
