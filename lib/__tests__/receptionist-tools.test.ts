@@ -81,7 +81,7 @@ describe("reschedule_job_request", () => {
     // 10:00 AM New York on Nov 12 is 15:00 UTC. The status is not written directly.
     expect(payload(update, "update")).toEqual({ scheduled_at: "2026-11-12T15:00:00.000Z", created_via: "ai_voice" });
     expect(has(update, "in", "status")).toBe(true);
-    expect(h.applyJobStatus).toHaveBeenCalledWith("j1", "requested");
+    expect(h.applyJobStatus).toHaveBeenCalledWith("j1", "requested", { onlyFrom: "scheduled" });
     expect(h.notifyOwner).toHaveBeenCalledWith({
       kind: "reschedule",
       jobId: "j1",

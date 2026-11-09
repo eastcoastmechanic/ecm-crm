@@ -233,7 +233,8 @@ async function afterTimeSet(jobId: string, previousStatus: string | null): Promi
   let notified = false;
   if (previousStatus === "requested") {
     try {
-      notified = (await applyJobStatus(jobId, "scheduled")).changed;
+      // Only from requested: a job finished or cancelled since the read above stays as it is.
+      notified = (await applyJobStatus(jobId, "scheduled", { onlyFrom: "requested" })).changed;
     } catch {
       result = { error: "Saved the new time, but couldn't mark the job Scheduled. Set the status on the Jobs list." };
     }

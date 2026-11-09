@@ -91,8 +91,16 @@ export async function sendScheduleNotifications(jobId: string) {
  * The update only lands if the job still has the status we read, so two taps on
  * Finish (or two people pressing at once) can't both win: the second one updates
  * nothing and skips every side effect. Returns whether this call made the change.
+ *
+ * `onlyFrom` limits the move to a job still in that status, for callers that
+ * decided on an earlier read (giving a requested job a time must not drag a job
+ * someone just finished or cancelled back to scheduled).
  */
-export async function applyJobStatus(id: string, status: string): Promise<{ changed: boolean }> {
+export async function applyJobStatus(
+  id: string,
+  status: string,
+  opts: { onlyFrom?: string } = {}
+): Promise<{ changed: boolean }> {
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
     .select("status, completed_at, on_way_at, arrived_at, assigned_staff_id")
@@ -102,6 +110,8 @@ export async function applyJobStatus(id: string, status: string): Promise<{ chan
 
   // Already there: nothing changes, so nothing is sent or synced again.
   if (existing.status === status) return { changed: false };
+  // Moved on since the caller looked: leave it alone.
+  if (opts.onlyFrom !== undefined && existing.status !== opts.onlyFrom) return { changed: false };
 
   const completed_at =
     status === "complete" ? existing.completed_at ?? new Date().toISOString() : existing.completed_at;

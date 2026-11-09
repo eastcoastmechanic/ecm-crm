@@ -185,7 +185,7 @@ export function buildReceptionistTools(params: {
 
       // Back to pending through the lifecycle, so the calendar and Planner sync see it.
       try {
-        await applyJobStatus(jobId, "requested");
+        await applyJobStatus(jobId, "requested", { onlyFrom: job.status as string });
       } catch (err) {
         console.error(`[receptionist] could not set job ${jobId} back to requested:`, err);
       }

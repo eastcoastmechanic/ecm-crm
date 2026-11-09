@@ -136,6 +136,23 @@ describe("applyJobStatus", () => {
     expect((customerEmails[0][0] as { text: string }).text).toContain("Thursday, November 12 at 9:00 AM");
   });
 
+  it("onlyFrom leaves a job alone that moved on since the caller read it", async () => {
+    // Office gave a requested job a time, but a tech finished it in between.
+    const row: JobRow = { id: "j1", status: "complete", completed_at: "2026-11-09T15:00:00.000Z", arrived_at: null, on_way_at: null };
+    jobsTable(row);
+    expect(await applyJobStatus("j1", "scheduled", { onlyFrom: "requested" })).toEqual({ changed: false });
+    expect(row.status).toBe("complete");
+    expect(h.calls.some((c) => payload(c, "update"))).toBe(false);
+    expect(h.planner).not.toHaveBeenCalled();
+  });
+
+  it("onlyFrom still moves a job in that status", async () => {
+    const row: JobRow = { id: "j1", status: "requested", completed_at: null, arrived_at: null, on_way_at: null };
+    jobsTable(row);
+    expect(await applyJobStatus("j1", "scheduled", { onlyFrom: "requested" })).toEqual({ changed: true });
+    expect(row.status).toBe("scheduled");
+  });
+
   it("a job with no status yet is claimed with an is-null filter", async () => {
     const row: JobRow = { id: "j1", status: null, completed_at: null, arrived_at: null, on_way_at: null };
     h.handler = (call) => {

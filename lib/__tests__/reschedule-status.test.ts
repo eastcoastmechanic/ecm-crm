@@ -66,7 +66,7 @@ describe("rescheduleJobAt (dispatch, route optimizer, assistant)", () => {
     jobIs("requested");
     expect(await rescheduleJobAt("j1", "2026-11-12T09:00")).toEqual({});
     expect(savedTime()).toEqual({ scheduled_at: "2026-11-12T14:00:00.000Z" });
-    expect(h.applyJobStatus).toHaveBeenCalledWith("j1", "scheduled");
+    expect(h.applyJobStatus).toHaveBeenCalledWith("j1", "scheduled", { onlyFrom: "requested" });
     // The status change sends the notice and syncs Graph, so neither runs a second time here.
     expect(h.sendScheduleNotifications).not.toHaveBeenCalled();
     expect(h.syncJobToGraph).not.toHaveBeenCalled();
@@ -101,7 +101,7 @@ describe("rescheduleJob (jobs list date box)", () => {
     jobIs("requested");
     expect(await rescheduleJob("j1", "2026-11-12")).toEqual({});
     expect(savedTime()).toEqual({ scheduled_at: "2026-11-12T14:00:00.000Z" });
-    expect(h.applyJobStatus).toHaveBeenCalledWith("j1", "scheduled");
+    expect(h.applyJobStatus).toHaveBeenCalledWith("j1", "scheduled", { onlyFrom: "requested" });
     expect(h.sendScheduleNotifications).not.toHaveBeenCalled();
   });
 
