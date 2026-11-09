@@ -6,6 +6,7 @@ import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
 import { checkAvailabilityTool } from "./tools";
 import { parseEtLocal } from "@/lib/tz";
 import { bookingConsentPlan, smsOptInState, startDoubleOptIn, type SmsOptInState } from "@/lib/sms-consent";
+import { LIMITS, OPT_IN_TEXTS_KEY, allowAll, rule } from "@/lib/rate-limit-db";
 
 // Unlike the SMS/voice tools, a website visitor is never a "recognized
 // customer" (no phone-number channel to match against), so there's no
@@ -74,8 +75,15 @@ const createWebBookingRequest = betaZodTool({
     if (jobError) return `Failed to create job request: ${jobError.message}`;
 
     // The request is saved; a failed "Reply YES" text shouldn't fail the booking.
+    // Shares the website's hourly cap on confirmation texts with /sms-signup and
+    // /book. Over the cap the booking still goes through, without the text.
     let confirmTextSent = false;
-    if (consentPlan.askToConfirm) {
+    const textAllowed =
+      consentPlan.askToConfirm && (await allowAll([rule(OPT_IN_TEXTS_KEY, LIMITS.optInTextsGlobal)]));
+    if (consentPlan.askToConfirm && !textAllowed) {
+      console.error("web chat booking: hourly cap on confirmation texts reached, opt-in text skipped");
+    }
+    if (textAllowed) {
       try {
         const sent = await startDoubleOptIn(phone, name);
         if (sent === "failed") console.error("web chat booking: opt-in text failed to send");
