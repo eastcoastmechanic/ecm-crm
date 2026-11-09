@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { DEFAULT_VISIT_MONTHS } from "@/lib/maintenance-visits";
 import { headers } from "next/headers";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
-import { stripe } from "@/lib/stripe";
+import { createInvoiceCheckoutSession } from "@/lib/invoice-checkout";
 import { supabase as adminDb } from "@/lib/supabase";
 import type { ContractLineItems } from "@/lib/contract-terms";
 import { etDateKey } from "@/lib/tz";
@@ -41,32 +41,11 @@ export async function createCheckoutSession(_prev: PayState, formData: FormData)
 
   let checkoutUrl: string | null = null;
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            unit_amount: Math.round(doc.total * 100),
-            product_data: {
-              name: `Invoice ${doc.doc_number ?? doc.id} — East Coast Mechanical`,
-            },
-          },
-          quantity: 1,
-        },
-      ],
-      // Saves the card against a Stripe customer so future maintenance-plan
-      // renewals can be charged off-session without asking again.
-      customer_creation: "always",
-      payment_intent_data: {
-        setup_future_usage: "off_session",
-      },
-      metadata: {
-        document_id: doc.id,
-        customer_id: doc.customer_id,
-      },
-      success_url: `${origin}/portal/documents/${doc.id}?paid=1`,
-      cancel_url: `${origin}/portal/documents/${doc.id}`,
+    // Shared with the staff payment link. Reuses the customer's Stripe record
+    // when they have one, so the card that plan renewals charge stays on it.
+    const session = await createInvoiceCheckoutSession(doc, {
+      success: `${origin}/portal/documents/${doc.id}?paid=1`,
+      cancel: `${origin}/portal/documents/${doc.id}`,
     });
     checkoutUrl = session.url;
   } catch (err) {

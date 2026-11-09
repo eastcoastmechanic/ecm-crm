@@ -322,9 +322,10 @@ const executors: Record<string, ActionExecutor> = {
     if (result?.error) throw new Error(result.error);
     return `Sent service report ${diagnosticId}.`;
   },
-  charge_customer: async (input) => {
+  charge_customer: async (input, { token }) => {
     const { customerId, amountDollars, reason } = input as { customerId: string; amountDollars: number; reason: string };
-    return chargeCustomerCard(customerId, amountDollars, reason);
+    // Same token on a retried confirm, so Stripe never charges one approval twice.
+    return chargeCustomerCard(customerId, amountDollars, reason, `assistant-charge-${token}`);
   },
 };
 

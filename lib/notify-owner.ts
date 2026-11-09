@@ -216,3 +216,40 @@ export async function notifyOwnerOfVisitRequest(visitId: string) {
     console.error(`[notify-owner] visit request alert failed for ${visitId}:`, err);
   }
 }
+
+/**
+ * A money problem or result that needs Josh's eyes: a possible double payment,
+ * an amount that doesn't match the invoice, a refund or card dispute, a plan
+ * renewal charge, a card charge from the assistant. Goes to the private Money
+ * Alerts Teams channel, OWNER_EMAIL and (unless `text: false`) OWNER_PHONE.
+ * Whatever is not configured is skipped.
+ *
+ * Never throws: an alert must not undo or fail the thing it reports.
+ */
+export async function notifyOwnerOfMoney(alert: { title: string; body?: string; path?: string; text?: boolean }) {
+  const link = alert.path ? `${APP_URL}${alert.path}` : undefined;
+  try {
+    // Teams first: it never throws, so a failed email or text can't skip it.
+    await postToTeams("money", { title: alert.title, text: alert.body, url: link });
+    if (OWNER_EMAIL) {
+      await resend.emails.send({
+        from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
+        to: OWNER_EMAIL,
+        subject: alert.title,
+        text: [alert.title, alert.body, link].filter(Boolean).join("\n\n"),
+      });
+    }
+  } catch (err) {
+    console.error("[notify-owner] money alert email failed:", err);
+  }
+  try {
+    if (OWNER_PHONE && alert.text !== false) await sendSMS(OWNER_PHONE, `ECM: ${alert.title}`);
+  } catch (err) {
+    console.error("[notify-owner] money alert text failed:", err);
+  }
+}
+
+/** Dollars from cents, for alerts. */
+export function centsToMoney(cents: number | null | undefined) {
+  return money((cents ?? 0) / 100) ?? "$0.00";
+}

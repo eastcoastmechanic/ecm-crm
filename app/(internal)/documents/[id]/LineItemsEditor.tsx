@@ -250,9 +250,14 @@ export default function LineItemsEditor({
             onChange={(e) => setStatusValue(e.target.value)}
             className={inputClass}
           >
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="approved">Approved</option>
+            {/* A paid document stays paid: the server refuses to change it, so don't offer it. */}
+            {status !== "paid" && (
+              <>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="approved">Approved</option>
+              </>
+            )}
             <option value="paid">Paid</option>
           </select>
         </label>

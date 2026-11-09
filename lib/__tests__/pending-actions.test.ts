@@ -75,6 +75,12 @@ describe("confirmPendingAction", () => {
     expect(table.row?.result).toBe("Deleted x.");
   });
 
+  it("hands the executor its token (card charges use it as the Stripe idempotency key)", async () => {
+    const run = vi.fn(async () => "ok");
+    await confirmPendingAction("tok-1", { delete_thing: run });
+    expect(run).toHaveBeenCalledWith(table.row?.tool_input, { token: "tok-1" });
+  });
+
   it("lets only one of two simultaneous confirms run", async () => {
     const run = vi.fn(async () => "Deleted x.");
     const [a, b] = await Promise.all([
