@@ -9,6 +9,7 @@ import {
   type SquareInvoice,
 } from "@/lib/square";
 import { markDocumentPaid } from "@/lib/document-paid";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export type SquareSyncResult = {
   invoicesUpserted: number;
@@ -156,13 +157,25 @@ export async function syncSquarePayments(): Promise<SquareSyncResult> {
 
   const squareCustomers = await bulkRetrieveSquareCustomers([...squareCustomerIds]);
 
+  // Paged: a single select stops at 1000 rows without saying so, and a customer
+  // or invoice past that point would never match.
   const [{ data: crmCustomers, error: customerError }, { data: crmDocuments, error: documentError }] =
     await Promise.all([
-      supabase.from("customers").select("id, name, email, phone, square_customer_id"),
-      supabase
-        .from("documents")
-        .select("id, doc_number, type, status, total, customer_id, square_invoice_id, paid_at")
-        .in("type", ["invoice", "estimate"]),
+      fetchAllRows<CrmCustomer>((from, to) =>
+        supabase
+          .from("customers")
+          .select("id, name, email, phone, square_customer_id")
+          .order("id")
+          .range(from, to)
+      ),
+      fetchAllRows<CrmDocument>((from, to) =>
+        supabase
+          .from("documents")
+          .select("id, doc_number, type, status, total, customer_id, square_invoice_id, paid_at")
+          .in("type", ["invoice", "estimate"])
+          .order("id")
+          .range(from, to)
+      ),
     ]);
 
   if (customerError) {
@@ -171,7 +184,7 @@ export async function syncSquarePayments(): Promise<SquareSyncResult> {
       paymentsUpserted: 0,
       customersLinked: 0,
       documentsUpdated: 0,
-      error: customerError.message,
+      error: customerError,
     };
   }
   if (documentError) {
@@ -180,12 +193,12 @@ export async function syncSquarePayments(): Promise<SquareSyncResult> {
       paymentsUpserted: 0,
       customersLinked: 0,
       documentsUpdated: 0,
-      error: documentError.message,
+      error: documentError,
     };
   }
 
-  const customers = (crmCustomers ?? []) as CrmCustomer[];
-  const documents = (crmDocuments ?? []) as CrmDocument[];
+  const customers = crmCustomers;
+  const documents = crmDocuments;
   const now = new Date().toISOString();
 
   let customersLinked = 0;

@@ -84,6 +84,29 @@ export async function resolveJobPhotos(photos: unknown): Promise<ResolvedJobPhot
   return signStoredPhotos(photos as ResolvedJobPhoto[], { defaultBucket: JOB_PHOTO_BUCKET });
 }
 
+/**
+ * Sign the photos of many jobs at once: one signing call per bucket for the
+ * whole list instead of one per job. Returns one array per input, in order.
+ */
+export async function resolveJobPhotoLists(lists: unknown[]): Promise<ResolvedJobPhoto[][]> {
+  const flat: ResolvedJobPhoto[] = [];
+  const sizes = lists.map((photos) => {
+    if (!isJobPhotoArray(photos)) return 0;
+    flat.push(...(photos as ResolvedJobPhoto[]));
+    return photos.length;
+  });
+  if (flat.length === 0) return lists.map(() => []);
+
+  const signed = await signStoredPhotos(flat, { defaultBucket: JOB_PHOTO_BUCKET });
+  const out: ResolvedJobPhoto[][] = [];
+  let at = 0;
+  for (const size of sizes) {
+    out.push(signed.slice(at, at + size));
+    at += size;
+  }
+  return out;
+}
+
 /** Append to a job's photo array. Reads first because jsonb has no push. */
 export async function appendJobPhotos(jobId: string, additions: JobPhoto[]): Promise<number> {
   if (additions.length === 0) return 0;

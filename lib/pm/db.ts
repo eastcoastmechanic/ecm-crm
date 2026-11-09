@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { signStoredPhotos } from "@/lib/photo-urls";
+import { allocateDocNumber } from "@/lib/doc-number";
 import { BUSINESS_TZ } from "@/lib/tz";
 import { NAMEPLATE_PHOTO_BUCKET, PM_PHOTO_BUCKET } from "@/lib/pm/photos";
 import {
@@ -254,14 +255,6 @@ export async function saveChecklist(id: string, payload: unknown): Promise<{ err
   return {};
 }
 
-async function nextPmNumber(): Promise<string> {
-  const { count } = await supabase
-    .from("documents")
-    .select("id", { count: "exact", head: true })
-    .eq("type", "pm_report");
-  return `PM-${1001 + (count ?? 0)}`;
-}
-
 export async function completeChecklist(id: string, payload: unknown): Promise<{ error?: string; documentId?: string }> {
   const saved = await saveChecklist(id, payload);
   if (saved.error) return saved;
@@ -300,7 +293,9 @@ export async function completeChecklist(id: string, payload: unknown): Promise<{
       .eq("id", documentId);
     if (updateError) return { error: updateError.message };
   } else {
-    const docNumber = await nextPmNumber();
+    const numbered = await allocateDocNumber("pm_report");
+    if (numbered.error !== undefined) return { error: numbered.error };
+    const docNumber = numbered.docNumber;
     const { data: doc, error: insertError } = await supabase
       .from("documents")
       .insert({

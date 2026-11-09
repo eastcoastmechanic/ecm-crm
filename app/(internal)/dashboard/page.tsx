@@ -5,6 +5,7 @@ import { getSyncedSquareRevenue, getSyncedSquareMoneyOwed } from "@/lib/square-s
 import { getStaffRole } from "@/lib/require-role";
 import { etDateKey, etDayRange, formatEtDateTime, formatEtTime } from "@/lib/tz";
 import { visitOverdue } from "@/lib/maintenance-visits";
+import { documentMoneyTotals } from "@/lib/document-totals";
 import {
   buttonClass,
   buttonSecondaryClass,
@@ -101,8 +102,7 @@ export default async function DashboardPage() {
     { count: estimatesToReview },
     { count: totalCustomers },
     { count: activeJobs },
-    { data: outstandingInvoices },
-    { data: paidDocuments },
+    { totals: moneyTotals },
     { count: contractsRenewing },
     { data: upcomingJobs },
     { data: recentDocuments },
@@ -126,8 +126,8 @@ export default async function DashboardPage() {
       .from("jobs")
       .select("*", { count: "exact", head: true })
       .in("status", ["requested", "scheduled", "in_progress"]),
-    supabase.from("documents").select("total").eq("type", "invoice").eq("status", "sent"),
-    supabase.from("documents").select("total").eq("status", "paid"),
+    // One SQL sum, not a row fetch that stops at 1000 rows.
+    documentMoneyTotals(),
     supabase
       .from("service_contracts")
       .select("*", { count: "exact", head: true })
@@ -149,8 +149,8 @@ export default async function DashboardPage() {
     supabase.from("maintenance_visits").select("due_year, due_month").eq("status", "due"),
   ]);
 
-  const outstandingTotal = (outstandingInvoices ?? []).reduce((sum, doc) => sum + (doc.total ?? 0), 0);
-  const revenueTotal = (paidDocuments ?? []).reduce((sum, doc) => sum + (doc.total ?? 0), 0);
+  const outstandingTotal = moneyTotals.outstandingTotal;
+  const revenueTotal = moneyTotals.paidTotal;
 
   const overduePlanVisits = (openPlanVisits ?? []).filter((v) =>
     visitOverdue(v.due_year as number, v.due_month as number, etDateKey())
@@ -162,7 +162,7 @@ export default async function DashboardPage() {
     {
       label: "Outstanding Invoices",
       value: formatPrice(outstandingTotal),
-      sub: `${outstandingInvoices?.length ?? 0} unpaid`,
+      sub: `${moneyTotals.outstandingCount} unpaid`,
     },
     { label: "Revenue Collected", value: formatPrice(revenueTotal) },
     { label: "Contracts Renewing", value: contractsRenewing ?? 0, sub: "next 30 days" },

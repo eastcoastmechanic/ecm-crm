@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { allocateDocNumber } from "@/lib/doc-number";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { findCustomerByPhone } from "@/lib/receptionist/customer-lookup";
 import { syncCustomerToGraph, syncDocumentToGraph, syncJobToGraph } from "@/lib/graph-connector";
@@ -89,15 +90,6 @@ export type IngestQuoteResult = IngestQuoteSuccess | IngestQuoteFailure;
 
 function money(n: number) {
   return Math.round(n * 100) / 100;
-}
-
-async function nextDocNumber(type: string) {
-  const { count } = await supabase
-    .from("documents")
-    .select("id", { count: "exact", head: true })
-    .eq("type", type);
-  const seq = 1001 + (count ?? 0);
-  return `${DOC_PREFIX[type] ?? "DOC"}-${seq}`;
 }
 
 async function findCustomerByEmail(email: string): Promise<string | null> {
@@ -270,7 +262,11 @@ export async function ingestQuote(body: IngestQuoteBody): Promise<IngestQuoteRes
       await syncJobToGraph(job.id);
     }
 
-    const docNumber = await nextDocNumber(type);
+    const numbered = await allocateDocNumber(type);
+    if (numbered.error !== undefined) {
+      return { ok: false, error: numbered.error, status: 500 };
+    }
+    const docNumber = numbered.docNumber;
     const rawRequest =
       docIn.rawRequest?.trim() ||
       docIn.notes?.trim() ||

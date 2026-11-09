@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { pageLimit } from "@/lib/fetch-all";
 import { isSquareConfigured, getSquareLocationId } from "@/lib/square";
 import PaymentsList, { type SquareInvoiceRow, type SquarePaymentRow } from "./PaymentsList";
 import SyncSquareButton from "./SyncSquareButton";
@@ -15,30 +17,46 @@ function relatedName(value: RelatedCustomer) {
   return Array.isArray(value) ? (value[0]?.name ?? null) : value.name;
 }
 
-export default async function PaymentsPage() {
+/** Rows per list per "Show older" step. Supabase stops at 1000 rows without saying so. */
+const PAYMENTS_STEP = 250;
+const PAYMENTS_MAX = 1000;
+
+export default async function PaymentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
   const isOwner = (await getStaffRole()) === "owner";
   const configured = isSquareConfigured();
   const hasLocation = Boolean(getSquareLocationId());
+  const limit = pageLimit((await searchParams).show, PAYMENTS_STEP, PAYMENTS_MAX);
 
   const [invoicesResult, paymentsResult] = configured
     ? await Promise.all([
         supabase
           .from("square_invoices")
           .select(
-            "square_invoice_id, invoice_number, title, status, total_cents, amount_paid_cents, amount_due_cents, public_url, square_customer_name, customer_id, document_id, square_created_at, customers(name)"
+            "square_invoice_id, invoice_number, title, status, total_cents, amount_paid_cents, amount_due_cents, public_url, square_customer_name, customer_id, document_id, square_created_at, customers(name)",
+            { count: "exact" }
           )
-          .order("square_created_at", { ascending: false }),
+          .order("square_created_at", { ascending: false })
+          .limit(limit),
         supabase
           .from("square_payments")
           .select(
-            "square_payment_id, status, total_cents, source_type, card_brand, card_last4, receipt_url, note, customer_id, square_created_at, customers(name)"
+            "square_payment_id, status, total_cents, source_type, card_brand, card_last4, receipt_url, note, customer_id, square_created_at, customers(name)",
+            { count: "exact" }
           )
-          .order("square_created_at", { ascending: false }),
+          .order("square_created_at", { ascending: false })
+          .limit(limit),
       ])
     : [
-        { data: [] as never[], error: null },
-        { data: [] as never[], error: null },
+        { data: [] as never[], error: null, count: 0 },
+        { data: [] as never[], error: null, count: 0 },
       ];
+  const invoicesTotal = invoicesResult.count ?? invoicesResult.data?.length ?? 0;
+  const paymentsTotal = paymentsResult.count ?? paymentsResult.data?.length ?? 0;
+  const moreToShow = invoicesTotal > (invoicesResult.data?.length ?? 0) || paymentsTotal > (paymentsResult.data?.length ?? 0);
 
   const missingTable =
     invoicesResult.error?.message?.includes("square_invoices") ||
@@ -99,6 +117,18 @@ export default async function PaymentsPage() {
       )}
 
       {!missingTable && <PaymentsList invoices={invoices} payments={payments} />}
+
+      {!missingTable && moreToShow && (
+        <p className={subTextClass}>
+          Showing the newest {invoices.length} of {invoicesTotal} Square invoices and {payments.length} of{" "}
+          {paymentsTotal} payments.{" "}
+          {limit < PAYMENTS_MAX && (
+            <Link href={`/payments?show=${limit + PAYMENTS_STEP}`} className="font-semibold text-accent">
+              Show older
+            </Link>
+          )}
+        </p>
+      )}
     </div>
   );
 }

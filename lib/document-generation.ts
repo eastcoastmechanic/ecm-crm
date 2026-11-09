@@ -8,6 +8,7 @@ import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { buildFileContentBlocks } from "@/lib/vision-extract";
 import { syncDocumentToGraph } from "@/lib/graph-connector";
 import { tierTotals } from "@/lib/estimate-tier";
+import { nextDocNumberOrThrow } from "@/lib/doc-number";
 
 const LineItemSchema = z.object({
   category: z.string(),
@@ -53,15 +54,6 @@ const DOC_PREFIX: Record<string, string> = {
   invoice: "INV",
   proposal: "PROP",
 };
-
-async function nextDocNumber(type: string) {
-  const { count } = await supabase
-    .from("documents")
-    .select("id", { count: "exact", head: true })
-    .eq("type", type);
-  const seq = 1001 + (count ?? 0);
-  return `${DOC_PREFIX[type]}-${seq}`;
-}
 
 async function uploadDocumentPhotos(files: File[]) {
   const uploaded: { url: string; name: string }[] = [];
@@ -257,9 +249,8 @@ ${input.rawRequest}`;
 
   const results: GenerateDocumentResult[] = [];
 
-  // Sequential, not Promise.all: nextDocNumber() counts existing rows of this
-  // type, so concurrent calls could read the same count and collide on the
-  // same doc_number before either insert lands.
+  // Sequential, so the options come out in order (EST-1042, EST-1043). The
+  // numbers come from next_doc_number() (SQL 0071) and can't repeat.
   for (const doc of parsed.documents) {
     const totals = tierTotals(doc.line_items);
     // Internal-only: attach unit cost by matching the price book item Claude
@@ -270,7 +261,7 @@ ${input.rawRequest}`;
       cost: item.price_book_item_name ? (costLookup.get(item.price_book_item_name) ?? null) : null,
     }));
 
-    const docNumber = await nextDocNumber(input.type);
+    const docNumber = await nextDocNumberOrThrow(input.type);
 
     const { data: document, error } = await supabase
       .from("documents")
@@ -374,7 +365,7 @@ export async function createInvoiceDirect(input: {
     cost: item.cost ?? null,
   }));
 
-  const docNumber = await nextDocNumber("invoice");
+  const docNumber = await nextDocNumberOrThrow("invoice");
 
   const { data: document, error } = await supabase
     .from("documents")

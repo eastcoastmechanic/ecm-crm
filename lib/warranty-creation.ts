@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { syncDocumentToGraph } from "@/lib/graph-connector";
+import { nextDocNumberOrThrow } from "@/lib/doc-number";
 
 const CRAFTSMANSHIP_WARRANTY_YEARS = 1;
 
@@ -8,14 +9,6 @@ function addYears(dateStr: string, years: number): string {
   const d = new Date(`${dateStr}T00:00:00`);
   d.setFullYear(d.getFullYear() + years);
   return d.toISOString().slice(0, 10);
-}
-
-async function nextWarrantyNumber() {
-  const { count } = await supabase
-    .from("documents")
-    .select("id", { count: "exact", head: true })
-    .eq("type", "warranty");
-  return `WTY-${1001 + (count ?? 0)}`;
 }
 
 export type WarrantyEquipmentInput = {
@@ -154,7 +147,7 @@ export async function createWarrantyForCustomer(
     });
   }
 
-  const doc_number = await nextWarrantyNumber();
+  const doc_number = await nextDocNumberOrThrow("warranty");
 
   const { data: document, error } = await supabase
     .from("documents")
