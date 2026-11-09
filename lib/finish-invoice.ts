@@ -139,7 +139,10 @@ export async function ensureFinishInvoice(jobId: string): Promise<FinishInvoiceO
     }
     if ("error" in result) return { kind: "none", reason: result.error };
 
-    // TODO(planner): once the Planner/lead-intake PR lands, call noteJobStep(jobId, "invoice_created") here.
+    // Planner: the dated "Invoice created" line (number only, never throws) is already added by
+    // createInvoiceDirect via noteJobStep(jobId, "invoice_created", { docNumber }), and only when a
+    // draft was really inserted. Not repeated here, so the card doesn't get the line twice.
+    // Sending it from the Finish panel goes through sendDocumentEmail, which notes "invoice_sent".
     return {
       kind: "created",
       priced: result.total > 0,

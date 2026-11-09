@@ -178,15 +178,6 @@ export async function applyJobStatus(
   }
 
   if (status === "complete") {
-    // Office sends, tech never sees money: make sure the job has an invoice (a draft, never
-    // sent), then one owner alert that says which. Nothing here reaches the caller, so a tech's
-    // Finish (button or phone queue) gets no invoice data back.
-    const invoice = await ensureFinishInvoice(id);
-    await notifyOwnerOfEvent("job_completed", id, {
-      invoiceLine: finishInvoiceAlertLine(invoice),
-      invoiceId: invoice.kind === "none" ? undefined : invoice.invoice.id,
-    });
-
     // A finished plan visit is done in the plan too. Best effort: never blocks the job.
     const { error: visitError } = await supabase
       .from("maintenance_visits")
@@ -205,5 +196,18 @@ export async function applyJobStatus(
   await syncJobToGraph(id);
   // A real change: the card moves and gets a dated line for the step (at the tap time for an offline tap).
   await syncJobToPlanner(id, status, { note: true, at: stampAt });
+
+  if (status === "complete") {
+    // Office sends, tech never sees money: make sure the job has an invoice (a draft, never
+    // sent), then one owner alert that says which. Nothing here reaches the caller, so a tech's
+    // Finish (button or phone queue) gets no invoice data back. Runs after the Planner sync so
+    // the card exists and its "Invoice created" line (added by createInvoiceDirect) lands after
+    // "Finished": invoice steps never make a card on their own.
+    const invoice = await ensureFinishInvoice(id);
+    await notifyOwnerOfEvent("job_completed", id, {
+      invoiceLine: finishInvoiceAlertLine(invoice),
+      invoiceId: invoice.kind === "none" ? undefined : invoice.invoice.id,
+    });
+  }
   return { changed: true };
 }

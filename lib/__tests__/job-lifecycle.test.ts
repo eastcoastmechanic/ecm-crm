@@ -125,6 +125,14 @@ describe("applyJobStatus", () => {
     expect(h.ensureInvoice).toHaveBeenCalledTimes(1);
   });
 
+  it("the Finish draft is made after the Planner sync, so its card line follows Finished", async () => {
+    const row: JobRow = { id: "j1", status: "in_progress", completed_at: null, arrived_at: null, on_way_at: null };
+    jobsTable(row);
+    await applyJobStatus("j1", "complete");
+    expect(h.planner.mock.invocationCallOrder[0]).toBeLessThan(h.ensureInvoice.mock.invocationCallOrder[0]);
+    expect(h.ensureInvoice.mock.invocationCallOrder[0]).toBeLessThan(h.notifyOwner.mock.invocationCallOrder[0]);
+  });
+
   it("only Finish looks at the invoice", async () => {
     const row: JobRow = { id: "j1", status: "scheduled", completed_at: null, arrived_at: null, on_way_at: null };
     jobsTable(row);
