@@ -2,7 +2,7 @@ import { z } from "zod";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { supabase } from "@/lib/supabase";
 import { updateJobStatus, rescheduleJobAt } from "@/app/(internal)/jobs/actions";
-import { etLocalFromIso, formatEtDateTime, parseEtLocal } from "@/lib/tz";
+import { etDateKey, etDayRange, etLocalFromIso, formatEtDateTime, parseEtLocal } from "@/lib/tz";
 import { setLeadStage, addManualLead, dismissLead, deleteLead } from "@/app/(internal)/leads/actions";
 import { adjustInventoryQty } from "@/app/(internal)/inventory/actions";
 import { sendDocumentEmail } from "@/app/(internal)/documents/[id]/actions";
@@ -452,8 +452,10 @@ const jobPhotoStatusTool = betaZodTool({
 
 // ---------------------------------------------------------------- daily brief
 
+// "Today" is the New York calendar day, not the server's (UTC) day: after 8 PM ET
+// the UTC date is already tomorrow.
 function todayISODate() {
-  return new Date().toISOString().slice(0, 10);
+  return etDateKey();
 }
 
 function daysAgoISO(n: number) {
@@ -467,14 +469,14 @@ const getDailyBriefTool = betaZodTool({
   inputSchema: z.object({}),
   run: async () => {
     const today = todayISODate();
-    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const todayRange = etDayRange(today);
 
     const [jobsToday, newLeads, overdueInvoices, staleMassSave, openTasks] = await Promise.all([
       supabase
         .from("jobs")
         .select("id, scheduled_at, status, customers(name), properties(address)")
-        .gte("scheduled_at", today)
-        .lt("scheduled_at", tomorrow)
+        .gte("scheduled_at", todayRange.start.toISOString())
+        .lt("scheduled_at", todayRange.end.toISOString())
         .neq("status", "cancelled")
         .order("scheduled_at", { ascending: true }),
       supabase

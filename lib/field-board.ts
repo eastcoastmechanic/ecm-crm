@@ -15,6 +15,7 @@ Use today's morning field sheet on that board.
 Then push the same update into CRM so the hub stays current.
 Do not invent customers, prices, or job details.
 If a CRM job id is known, include it. If it is not known, still log the field note — do not create a fake customer.
+crm_status only changes a job when job_id is sent (take it from the CRM sheet). Without job_id the note is logged and the status is left alone.
 CRM sheet (read): ${CRM_HUB_URL}/api/field-board/sheet
 CRM events (write): ${CRM_HUB_URL}/api/field-board/events
 Auth: Authorization: Bearer <this bot's own key from CRM Account → Bot keys>
@@ -119,24 +120,30 @@ function searchToken(value: string) {
 
 type ResolvedJob = {
   id: string;
-  // True when the job is certain: the caller named it, or this external_ref was
-  // already matched to it, or the fuzzy match left exactly one open job.
-  // Status only changes on a confident match.
+  // True only when the job is certain: the caller named it by job_id, or this
+  // same source already tied this external_ref to it. A match on the customer's
+  // name in the text is never certain (two Sullivans, a typo, a note about a
+  // neighbour): it may attach the note, but it never changes the job's status.
   confident: boolean;
 };
 
-async function resolveJob(input: FieldBoardEventBody): Promise<ResolvedJob | null> {
+async function resolveJob(input: FieldBoardEventBody, source: string): Promise<ResolvedJob | null> {
   const direct = input.job_id?.trim();
   if (direct) {
     const { data: job } = await supabase.from("jobs").select("id").eq("id", direct).maybeSingle();
     if (job?.id) return { id: job.id, confident: true };
   }
 
+  // Another bot's refs mean nothing here: only this source's earlier event counts.
+  // (Today a repeat of source + external_ref is caught as a duplicate before this
+  // runs, so in practice a status change needs job_id. Kept so it stays safe if
+  // the duplicate rule ever changes.)
   const ref = input.external_ref?.trim();
   if (ref) {
     const { data: prior } = await supabase
       .from("field_board_events")
       .select("job_id")
+      .eq("source", source)
       .eq("external_ref", ref)
       .not("job_id", "is", null)
       .order("created_at", { ascending: false })
@@ -169,8 +176,8 @@ async function resolveJob(input: FieldBoardEventBody): Promise<ResolvedJob | nul
     .limit(10);
   const open = (jobs ?? []).filter((job) => job.status !== "complete");
   // Several open jobs for this customer: we can't tell which one the note is
-  // about, so log it unattached instead of guessing.
-  if (open.length === 1) return { id: open[0].id, confident: true };
+  // about, so log it unattached instead of guessing. One match gets the note only.
+  if (open.length === 1) return { id: open[0].id, confident: false };
   if (open.length === 0 && jobs?.[0]) return { id: jobs[0].id, confident: false };
   return null;
 }
@@ -243,7 +250,7 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
   const existing = await findDuplicate();
   if (existing) return result(existing, { duplicate: true });
 
-  let resolved = await resolveJob(input);
+  let resolved = await resolveJob(input, source);
   let job: { id: string; notes: string | null; status: string } | null = null;
   if (resolved) {
     const { data } = await supabase.from("jobs").select("id, notes, status").eq("id", resolved.id).maybeSingle();
@@ -276,6 +283,12 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
 
   let statusApplied = false;
   let statusError: string | null = null;
+  const crmStatus = input.crm_status?.trim();
+  // A status asked for without a certain job is not applied. Say so, so a bot can resend with job_id.
+  const statusSkipped =
+    crmStatus && JOB_STATUSES.has(crmStatus) && !resolved?.confident
+      ? "Status not changed: send the CRM job_id to change a job's status."
+      : null;
   if (job && resolved) {
     let noteWritten = false;
     try {
@@ -288,10 +301,9 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
 
       // Status goes through the same lifecycle as the Jobs page so arrived_at,
       // completed_at, tracked_hours, Planner/Graph sync and notifications run.
-      const crmStatus = input.crm_status?.trim();
+      // Only on a certain job (job_id, or this source's own external_ref).
       if (resolved.confident && crmStatus && JOB_STATUSES.has(crmStatus) && crmStatus !== job.status) {
-        await applyJobStatus(job.id, crmStatus);
-        statusApplied = true;
+        statusApplied = (await applyJobStatus(job.id, crmStatus)).changed;
       }
     } catch (err) {
       if (noteWritten) {
@@ -318,5 +330,5 @@ export async function ingestFieldBoardEvent(input: FieldBoardEventBody) {
     boardStatus: input.board_status?.trim() || null,
   });
 
-  return result(event, { status_applied: statusApplied });
+  return result(event, { status_applied: statusApplied, ...(statusSkipped ? { status_skipped: statusSkipped } : {}) });
 }

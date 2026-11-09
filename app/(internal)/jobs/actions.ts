@@ -207,20 +207,43 @@ export async function rescheduleJobAt(jobId: string, localDateTime: string): Pro
   const next = parseEtLocal(localDateTime);
   if (!next) return { error: "Pick a valid date and time." };
 
-  const { data: job, error: readError } = await supabase.from("jobs").select("id").eq("id", jobId).maybeSingle();
+  const { data: job, error: readError } = await supabase.from("jobs").select("id, status").eq("id", jobId).maybeSingle();
   if (readError) return { error: "Couldn't load the job. Try again." };
   if (!job) return { error: "Job not found." };
 
   const { error } = await supabase.from("jobs").update({ scheduled_at: next.toISOString() }).eq("id", jobId);
   if (error) return { error: "Couldn't save the new time. Try again." };
 
-  await sendScheduleNotifications(jobId);
-  await syncJobToGraph(jobId);
-  await notifyAssignedTech(jobId, "rescheduled");
+  const after = await afterTimeSet(jobId, (job.status as string | null) ?? null);
 
   revalidatePath("/jobs");
   revalidatePath("/dispatch");
-  return {};
+  return after;
+}
+
+/**
+ * After the office saves a job's time: a "requested" job (web, portal or phone
+ * booking, plan visit) now has a time, so it becomes "scheduled" through the
+ * lifecycle. That status change sends the customer's schedule notice and syncs
+ * Graph and Planner, so the notice is not sent a second time here. Any other job
+ * just gets the usual "you're scheduled" notice for its new time.
+ */
+async function afterTimeSet(jobId: string, previousStatus: string | null): Promise<{ error?: string }> {
+  let result: { error?: string } = {};
+  let notified = false;
+  if (previousStatus === "requested") {
+    try {
+      notified = (await applyJobStatus(jobId, "scheduled")).changed;
+    } catch {
+      result = { error: "Saved the new time, but couldn't mark the job Scheduled. Set the status on the Jobs list." };
+    }
+  }
+  if (!notified) {
+    await sendScheduleNotifications(jobId);
+    await syncJobToGraph(jobId);
+  }
+  await notifyAssignedTech(jobId, "rescheduled");
+  return result;
 }
 
 /**
@@ -233,7 +256,7 @@ export async function rescheduleJob(jobId: string, newDate: string): Promise<{ e
 
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
-    .select("scheduled_at")
+    .select("scheduled_at, status")
     .eq("id", jobId)
     .maybeSingle();
   if (fetchError) return { error: "Couldn't load the job. Try again." };
@@ -248,12 +271,11 @@ export async function rescheduleJob(jobId: string, newDate: string): Promise<{ e
     .eq("id", jobId);
   if (error) return { error: "Couldn't save the new date. Try again." };
 
-  await sendScheduleNotifications(jobId);
-  await syncJobToGraph(jobId);
-  await notifyAssignedTech(jobId, "rescheduled");
+  const after = await afterTimeSet(jobId, (existing.status as string | null) ?? null);
 
   revalidatePath("/jobs");
-  return {};
+  revalidatePath("/dispatch");
+  return after;
 }
 
 export async function addJobPhotos(formData: FormData) {

@@ -84,13 +84,24 @@ export async function sendScheduleNotifications(jobId: string) {
   }
 }
 
-export async function applyJobStatus(id: string, status: string) {
+/**
+ * Move a job to `status` and fire what goes with it (schedule notices, owner alert,
+ * plan visit, tech notice, Graph/Planner sync) exactly once.
+ *
+ * The update only lands if the job still has the status we read, so two taps on
+ * Finish (or two people pressing at once) can't both win: the second one updates
+ * nothing and skips every side effect. Returns whether this call made the change.
+ */
+export async function applyJobStatus(id: string, status: string): Promise<{ changed: boolean }> {
   const { data: existing, error: fetchError } = await supabase
     .from("jobs")
     .select("status, completed_at, on_way_at, arrived_at, assigned_staff_id")
     .eq("id", id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
+
+  // Already there: nothing changes, so nothing is sent or synced again.
+  if (existing.status === status) return { changed: false };
 
   const completed_at =
     status === "complete" ? existing.completed_at ?? new Date().toISOString() : existing.completed_at;
@@ -106,41 +117,52 @@ export async function applyJobStatus(id: string, status: string) {
   // silently re-basing old jobs would move numbers someone has already costed.
   const clockStart = arrived_at ?? existing.on_way_at;
 
+  const firstFinish = status === "complete" && !existing.completed_at;
+
   const legacy_hours =
-    status === "complete" && clockStart && !existing.completed_at
+    firstFinish && clockStart
       ? Math.round(
           ((new Date(completed_at!).getTime() - new Date(clockStart).getTime()) / 3600000) * 100
         ) / 100
       : undefined;
 
-  // Jobs worked with the time clock have work entries: their hours are the sum of those
-  // (pauses and drive time excluded). Older jobs, and jobs the office finishes without a
-  // timer, keep the arrived-to-finished number above.
-  const entry_hours =
-    status === "complete" && !existing.completed_at ? await finalizeJobTime(id, completed_at!) : null;
-  const tracked_hours = entry_hours ?? legacy_hours;
-
-  const { error } = await supabase
+  // Claim the transition: the update only lands where the status is still the one we read.
+  const update = supabase
     .from("jobs")
     .update({
       status,
       completed_at,
       ...(arrived_at !== existing.arrived_at ? { arrived_at } : {}),
-      ...(tracked_hours !== undefined ? { tracked_hours } : {}),
+      ...(legacy_hours !== undefined ? { tracked_hours: legacy_hours } : {}),
     })
     .eq("id", id);
+  const { data: claimed, error } = await (existing.status == null
+    ? update.is("status", null)
+    : update.eq("status", existing.status)
+  ).select("id");
 
   if (error) throw new Error(error.message);
+  // Someone else changed the job first (a second tap, another person). Their call sends the notices.
+  if (!claimed || claimed.length === 0) return { changed: false };
 
-  if (status === "scheduled" && existing.status !== "scheduled") {
+  // Jobs worked with the time clock have work entries: their hours are the sum of those
+  // (pauses and drive time excluded). Older jobs, and jobs the office finishes without a
+  // timer, keep the arrived-to-finished number above. Runs once, after the claim.
+  if (firstFinish) {
+    const entry_hours = await finalizeJobTime(id, completed_at!);
+    if (entry_hours !== null) {
+      const { error: hoursError } = await supabase.from("jobs").update({ tracked_hours: entry_hours }).eq("id", id);
+      if (hoursError) console.error(`Could not save clocked hours for job ${id}: ${hoursError.message}`);
+    }
+  }
+
+  if (status === "scheduled") {
     await sendScheduleNotifications(id);
   }
 
-  if (status === "complete" && existing.status !== "complete") {
+  if (status === "complete") {
     await notifyOwnerOfEvent("job_completed", id);
-  }
 
-  if (status === "complete" && existing.status !== "complete") {
     // A finished plan visit is done in the plan too. Best effort: never blocks the job.
     const { error: visitError } = await supabase
       .from("maintenance_visits")
@@ -151,11 +173,12 @@ export async function applyJobStatus(id: string, status: string) {
   }
 
   // A cancelled job tells the tech it was assigned to. Best effort.
-  if ((status === "cancelled" || status === "canceled") && existing.status !== status) {
+  if (status === "cancelled" || status === "canceled") {
     await closeJobEntries(id, new Date().toISOString());
     await notifyTech({ jobId: id, staffId: existing.assigned_staff_id as string | null, kind: "cancelled" });
   }
 
   await syncJobToGraph(id);
   await syncJobToPlanner(id, status);
+  return { changed: true };
 }
