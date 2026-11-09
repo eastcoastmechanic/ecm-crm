@@ -10,6 +10,21 @@ import { randomUUID, sign } from "crypto";
 
 export const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 
+/**
+ * Time limits for Microsoft calls. Every Graph sync (Planner, Copilot index,
+ * job folders, OneNote) runs inside a user action such as I'm here or Finish,
+ * so a hung Microsoft request must give up and be logged, never hold the button.
+ * Same idea as the 5 second limit on Teams posts (lib/teams.ts).
+ */
+export const MS_TOKEN_TIMEOUT_MS = 8_000;
+export const GRAPH_CALL_TIMEOUT_MS = 10_000;
+
+/** The time limit, joined with any signal the caller passed. */
+export function withTimeout(ms: number, signal?: AbortSignal | null): AbortSignal {
+  const limit = AbortSignal.timeout(ms);
+  return signal ? AbortSignal.any([signal, limit]) : limit;
+}
+
 export function graphConfigured(): boolean {
   return Boolean(
     process.env.MS_GRAPH_TENANT_ID &&
@@ -62,6 +77,7 @@ export async function getGraphToken(): Promise<string> {
       client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
       client_assertion: buildClientAssertion(tenantId, clientId),
     }),
+    signal: withTimeout(MS_TOKEN_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Graph token request failed: ${res.status} ${await res.text()}`);
 
@@ -75,6 +91,7 @@ export async function graphFetch(path: string, init: RequestInit = {}): Promise<
   return fetch(`${GRAPH_BASE}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...init.headers },
+    signal: withTimeout(GRAPH_CALL_TIMEOUT_MS, init.signal),
   });
 }
 
@@ -84,7 +101,8 @@ function sleep(ms: number): Promise<void> {
 
 // Graph 502s/504s under load, not because the request is bad -- a short
 // retry clears it. 4xx errors are real problems (bad payload, auth, stale
-// etag) and retrying won't help, so those fail immediately.
+// etag) and retrying won't help, so those fail immediately. A timeout throws
+// and is not retried: three 10 second waits would hold the user action too long.
 export async function graphFetchWithRetry(path: string, init: RequestInit): Promise<Response> {
   let lastRes: Response | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {

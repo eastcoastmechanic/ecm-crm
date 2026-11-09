@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useMemo, useState } from "react";
 import { submitWarranty, type WarrantyFormState } from "./actions";
-import { scanNameplate, type ScannedNameplate } from "../../../equipment/actions";
+import { scanNameplateResult, type ScannedNameplate } from "../../../equipment/actions";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, subTextClass } from "../../../ui";
 import CustomerPicker from "../../../CustomerPicker";
 import PropertyPicker from "../../../PropertyPicker";
@@ -100,13 +100,19 @@ export default function WarrantyForm({
     try {
       const formData = new FormData();
       formData.set("photo", file);
-      const result = await scanNameplate(formData);
-      setScanned((prev) => ({ ...prev, [rowId]: result }));
-      if (result.model) setModelByRow((prev) => ({ ...prev, [rowId]: result.model! }));
-      if (result.serial_number)
-        setSerialByRow((prev) => ({ ...prev, [rowId]: result.serial_number! }));
+      const result = await scanNameplateResult(formData);
+      if (result.error !== undefined) {
+        const message = result.error;
+        setScanError((prev) => ({ ...prev, [rowId]: message }));
+        return;
+      }
+      const nameplate = result.nameplate;
+      setScanned((prev) => ({ ...prev, [rowId]: nameplate }));
+      if (nameplate.model) setModelByRow((prev) => ({ ...prev, [rowId]: nameplate.model! }));
+      if (nameplate.serial_number)
+        setSerialByRow((prev) => ({ ...prev, [rowId]: nameplate.serial_number! }));
     } catch {
-      // Production hides a thrown server message, so say it plainly here.
+      // Network drop or similar; production hides a thrown server message anyway.
       setScanError((prev) => ({
         ...prev,
         [rowId]: "Couldn't read that nameplate. Type the details in, or try another photo.",
