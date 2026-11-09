@@ -1,9 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  INTERNAL_REQUEST_HEADERS,
+  STAFF_ROLE_HEADER,
+  STAFF_ROLE_PROOF_HEADER,
+  signStaffRole,
+} from "@/lib/staff-role-proof";
 
 const PUBLIC_PORTAL_PATHS = ["/portal/login", "/portal/auth"];
 
-const INTERNAL_PATH_PREFIXES = [
+export const INTERNAL_PATH_PREFIXES = [
   "/dashboard",
   "/account",
   "/customers",
@@ -54,7 +60,7 @@ function techMayAccess(pathname: string) {
 
 const INTERNAL_API_PATHS = ["/api/internal-chat", "/api/dispatch/optimize", "/api/microsoft/connect", "/api/microsoft/callback"];
 
-function isInternalPath(pathname: string) {
+export function isInternalPath(pathname: string) {
   if (INTERNAL_API_PATHS.includes(pathname)) return true;
   return INTERNAL_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
@@ -65,15 +71,39 @@ function isPreviewPath(pathname: string) {
 }
 
 // No shared Basic-auth login: every internal page needs a staff sign-in, so
-// each person has their own password and role. Machine callers (ingest) use
-// their own bearer key inside the route, not this gate.
+// each person has their own password and role. Machine callers (ingest, cron,
+// webhooks, bots, MCP, OAuth) check their own key inside the route, not here:
+// on those paths the proxy only strips the internal headers and passes them on.
 
-async function checkStaffSession(
-  request: NextRequest
-): Promise<{ role: string | null; response: NextResponse }> {
-  let response = NextResponse.next({ request });
+/**
+ * A copy of the request headers with every proxy-only header removed. Every
+ * response below forwards headers through NextResponse.next({ request: { headers } }),
+ * which makes Next replace the forwarded set with exactly these, so a
+ * client-sent `x-staff-role` never reaches a page or route.
+ */
+export function stripInternalHeaders(source: Headers): Headers {
+  const cleaned = new Headers(source);
+  for (const name of INTERNAL_REQUEST_HEADERS) cleaned.delete(name);
+  return cleaned;
+}
 
-  const supabase = createServerClient(
+function forward(requestHeaders: Headers) {
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
+
+/** Forward with the verified role and its proof. No server secret means no role (fails closed). */
+async function forwardWithRole(cleaned: Headers, role: string) {
+  const requestHeaders = new Headers(cleaned);
+  const proof = await signStaffRole(role);
+  if (proof) {
+    requestHeaders.set(STAFF_ROLE_HEADER, role);
+    requestHeaders.set(STAFF_ROLE_PROOF_HEADER, proof);
+  }
+  return forward(requestHeaders);
+}
+
+function supabaseFor(request: NextRequest, cleaned: Headers, onResponse: (response: NextResponse) => void) {
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -83,14 +113,27 @@ async function checkStaffSession(
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          // Keep the forwarded cookie line in step with the refreshed session.
+          cleaned.set("cookie", request.headers.get("cookie") ?? "");
+          const response = forward(cleaned);
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
+          onResponse(response);
         },
       },
     }
   );
+}
+
+async function checkStaffSession(
+  request: NextRequest,
+  cleaned: Headers
+): Promise<{ role: string | null; response: NextResponse }> {
+  let response = forward(cleaned);
+  const supabase = supabaseFor(request, cleaned, (next) => {
+    response = next;
+  });
 
   const {
     data: { user },
@@ -106,19 +149,25 @@ async function checkStaffSession(
   return { role: staff?.role ?? null, response };
 }
 
+function isPortalPath(pathname: string) {
+  return pathname === "/portal" || pathname.startsWith("/portal/");
+}
+
 export async function proxy(request: NextRequest) {
-  if (isInternalPath(request.nextUrl.pathname)) {
-    if (isPreviewPath(request.nextUrl.pathname)) {
-      const previewHeaders = new Headers(request.headers);
-      previewHeaders.set("x-staff-role", "owner");
-      return NextResponse.next({ request: { headers: previewHeaders } });
+  const { pathname } = request.nextUrl;
+  // Every request, public or not: drop any proxy-only header the caller sent.
+  const cleaned = stripInternalHeaders(request.headers);
+
+  if (isInternalPath(pathname)) {
+    if (isPreviewPath(pathname)) {
+      return forwardWithRole(cleaned, "owner");
     }
-    const { role, response } = await checkStaffSession(request);
+    const { role, response } = await checkStaffSession(request, cleaned);
     if (!role) {
-      if (INTERNAL_API_PATHS.includes(request.nextUrl.pathname)) {
+      if (INTERNAL_API_PATHS.includes(pathname)) {
         return new NextResponse("Authentication required", { status: 401 });
       }
-      const redirectTarget = request.nextUrl.pathname + request.nextUrl.search;
+      const redirectTarget = pathname + request.nextUrl.search;
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.search = "";
@@ -126,8 +175,8 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    if (role === "tech" && !techMayAccess(request.nextUrl.pathname)) {
-      if (request.nextUrl.pathname.startsWith("/api/")) {
+    if (role === "tech" && !techMayAccess(pathname)) {
+      if (pathname.startsWith("/api/")) {
         return new NextResponse("Forbidden", { status: 403 });
       }
       const url = request.nextUrl.clone();
@@ -136,108 +185,43 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-staff-role", role);
-    const finalResponse = NextResponse.next({ request: { headers: requestHeaders } });
+    const finalResponse = await forwardWithRole(cleaned, role);
     response.cookies.getAll().forEach((cookie) => finalResponse.cookies.set(cookie));
     return finalResponse;
   }
 
-  let response = NextResponse.next({ request });
+  if (isPortalPath(pathname)) {
+    let response = forward(cleaned);
+    const supabase = supabaseFor(request, cleaned, (next) => {
+      response = next;
+    });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const isPublicPortalPath = PUBLIC_PORTAL_PATHS.some((path) => pathname.startsWith(path));
+
+    if (!user && !isPublicPortalPath) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/portal/login";
+      return NextResponse.redirect(url);
     }
-  );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const isPublicPortalPath = PUBLIC_PORTAL_PATHS.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  );
-
-  if (!user && request.nextUrl.pathname.startsWith("/portal") && !isPublicPortalPath) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/portal/login";
-    return NextResponse.redirect(url);
+    return response;
   }
 
-  return response;
+  // Website, login, survey, unsubscribe, and API routes that check their own
+  // key: no sign-in lookup, just the stripped headers.
+  return forward(cleaned);
 }
 
 export const config = {
+  // Runs on every app route, so a new page can't be missed. Skipped only for
+  // build output (_next/static, _next/image), the public asset folders, and
+  // root-level files such as /favicon.ico, /logo.png, /sw.js, /robots.txt.
+  // A file-like name below a folder (/customers/x.png) still goes through.
   matcher: [
-    "/portal/:path*",
-    "/dashboard/:path*",
-    "/dashboard",
-    "/account/:path*",
-    "/account",
-    "/customers/:path*",
-    "/customers",
-    "/properties/:path*",
-    "/properties",
-    "/equipment/:path*",
-    "/equipment",
-    "/price-book/:path*",
-    "/price-book",
-    "/catalog/:path*",
-    "/catalog",
-    "/documents/:path*",
-    "/documents",
-    "/diagnostics/:path*",
-    "/diagnostics",
-    "/jobs/:path*",
-    "/jobs",
-    "/leads/:path*",
-    "/leads",
-    "/tasks/:path*",
-    "/tasks",
-    "/inventory/:path*",
-    "/inventory",
-    "/analytics/:path*",
-    "/analytics",
-    "/hours/:path*",
-    "/hours",
-    "/dispatch/:path*",
-    "/dispatch",
-    "/mass-save/:path*",
-    "/mass-save",
-    "/conversations/:path*",
-    "/conversations",
-    "/payments/:path*",
-    "/payments",
-    "/field-board/:path*",
-    "/field-board",
-    "/tech-hub/:path*",
-    "/tech-hub",
-    "/procurement/:path*",
-    "/campaigns/:path*",
-    "/campaigns",
-    "/log/:path*",
-    "/log",
-    "/procurement",
-    "/pm/:path*",
-    "/pm",
-    "/api/twilio/recordings/:path*",
-    "/api/internal-chat",
-    "/api/dispatch/optimize",
-    "/api/microsoft/connect",
-    "/api/microsoft/callback",
+    "/((?!_next/static/|_next/image|fonts/|icons/|site/|forms/|[^/]+\\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|js|json|txt|xml|webmanifest|ttf|woff2?|pdf|map)$).*)",
   ],
 };
