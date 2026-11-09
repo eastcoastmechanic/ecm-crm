@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { clockWeek, etWeekRange, type ClockShift, type ClockWeek } from "@/lib/clock-week";
+import { clockWeek, countableShifts, etWeekRange, type ClockWeek } from "@/lib/clock-week";
 import {
   ENTRY_CAP_HOURS,
   MEAL_BREAK_MINUTES,
@@ -291,7 +291,8 @@ export async function getFinishedWeek(staffId: string, now: Date = new Date()): 
   const { start, end } = etWeekRange(now);
   const { data, error } = await supabase
     .from("time_shifts")
-    .select("started_at, ended_at, break_minutes")
+    // "*" so this works before and after SQL 0078 adds voided_at.
+    .select("*")
     .eq("staff_id", staffId)
     .gte("started_at", start.toISOString())
     .lt("started_at", end.toISOString())
@@ -300,5 +301,5 @@ export async function getFinishedWeek(staffId: string, now: Date = new Date()): 
     console.error(`[time-clock] week hours read failed: ${error.message}`);
     return null;
   }
-  return clockWeek((data ?? []) as ClockShift[], now);
+  return clockWeek(countableShifts(data ?? []), now);
 }
