@@ -2,6 +2,8 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { checkJobAccess } from "@/lib/job-access";
+import { formatEtShortDate, formatEtShortDateTime } from "@/lib/tz";
 import { headingClass, subTextClass, itemSubClass } from "../../../ui";
 
 type CheckItem = { item: string; result: "yes" | "no" | "na" };
@@ -11,7 +13,7 @@ function fmt(value: number | null, unit: string) {
 }
 
 function dt(value: string | null) {
-  return value ? new Date(value).toLocaleString() : "—";
+  return formatEtShortDateTime(value);
 }
 
 const resultLabel: Record<string, string> = { yes: "Yes", no: "No", na: "N/A" };
@@ -29,9 +31,20 @@ export default async function InstallReportDetailPage({
   const { id } = await params;
   const isTech = (await headers()).get("x-staff-role") === "tech";
 
+  // A tech may open only a report for a job that is theirs (or not yet assigned),
+  // the same rule as the save action. A report with no job is office and owner
+  // only. Checked before the report itself is read.
+  if (isTech) {
+    const { data: owner } = await supabase.from("install_reports").select("job_id").eq("id", id).maybeSingle();
+    if (!owner) notFound();
+    const access = await checkJobAccess(owner.job_id as string | null, { allowClosedJob: true });
+    if (access.error !== undefined) notFound();
+  }
+
+  // Only the customer's name is shown; no email is read.
   const { data: report, error } = await supabase
     .from("install_reports")
-    .select("*, customers(name, email), properties(address), jobs(id, scheduled_at, status)")
+    .select("*, customers(name), properties(address), jobs(id, scheduled_at, status)")
     .eq("id", id)
     .single();
 
@@ -62,13 +75,14 @@ export default async function InstallReportDetailPage({
           {report.customers?.name ?? "No customer assigned"}
           {report.properties?.address ? ` · ${report.properties.address}` : ""}
           {" · "}
-          {new Date(report.created_at).toLocaleString()}
+          {formatEtShortDateTime(report.created_at)}
         </p>
         {report.jobs && (
           <p className={subTextClass}>
             From job:{" "}
             <Link href={isTech ? "/field-board" : "/jobs"} className="underline">
-              {new Date(report.jobs.scheduled_at).toLocaleDateString()} ({report.jobs.status})
+              {report.jobs.scheduled_at ? formatEtShortDate(report.jobs.scheduled_at) : "Not scheduled"}{" "}
+              ({report.jobs.status})
             </Link>
           </p>
         )}
@@ -168,7 +182,7 @@ export default async function InstallReportDetailPage({
           <div>Tech: {report.tech_sign_name ?? "—"}</div>
           <div>Customer: {report.customer_sign_name ?? "Not yet signed"}</div>
         </div>
-        {report.signed_at && <div className={itemSubClass}>Signed {new Date(report.signed_at).toLocaleString()}</div>}
+        {report.signed_at && <div className={itemSubClass}>Signed {formatEtShortDateTime(report.signed_at)}</div>}
       </section>
 
       <Link href={isTech ? "/field-board" : "/tech-hub/install-report"} className={subTextClass}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { jobAccessError } from "../job-access-rules";
+import { jobAccessError, jobAccessMessage } from "../job-access-rules";
 
 const me = "staff-me";
 const other = "staff-other";
@@ -50,5 +50,33 @@ describe("jobAccessError", () => {
 
   it("fails closed when the job is missing", () => {
     expect(jobAccessError({ role: "tech", myStaffId: me, job: null })).not.toBeNull();
+  });
+
+  it("lets a tech add a report to their own finished job, never someone else's", () => {
+    // Service, install and PM reports check with allowClosedJob: a tech often files after Finish.
+    expect(jobAccessError({ role: "tech", myStaffId: me, job: open(me, "complete"), allowClosedJob: true })).toBeNull();
+    expect(jobAccessError({ role: "tech", myStaffId: me, job: open(null, "complete"), allowClosedJob: true })).toBeNull();
+    expect(
+      jobAccessError({ role: "tech", myStaffId: me, job: open(other, "complete"), allowClosedJob: true })
+    ).not.toBeNull();
+  });
+});
+
+describe("jobAccessMessage", () => {
+  it("turns a bare Not allowed into a plain sentence", () => {
+    expect(jobAccessMessage(new Error("Not allowed"))).toBe("You can't work on this job.");
+  });
+
+  it("keeps the job rule's own message", () => {
+    expect(jobAccessMessage(new Error("This job is assigned to someone else"))).toBe(
+      "This job is assigned to someone else"
+    );
+    expect(jobAccessMessage(new Error("Job not found"))).toBe("Job not found");
+  });
+
+  it("never shows a blank or odd thrown value", () => {
+    expect(jobAccessMessage("boom")).toBe("You can't work on this job.");
+    expect(jobAccessMessage(undefined)).toBe("You can't work on this job.");
+    expect(jobAccessMessage(new Error(""))).toBe("You can't work on this job.");
   });
 });

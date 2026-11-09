@@ -7,7 +7,9 @@ import { renderServiceReportPdf } from "@/lib/service-report-pdf";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createInvoiceDirect, type DirectLineItem } from "@/lib/document-generation";
-import { getStaffRole, requireOffice } from "@/lib/require-role";
+import { requireOffice } from "@/lib/require-role";
+import { checkJobAccess } from "@/lib/job-access";
+import { parsePartsUsed } from "@/lib/parts-used";
 import { etLocalFromIso, parseEtLocal } from "@/lib/tz";
 
 export type ReportState = { error?: string; saved?: boolean } | null;
@@ -23,8 +25,12 @@ async function notOffice(): Promise<boolean> {
 
 const errText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-/** Attach a service report to a customer. Returns { error } so the form shows the reason. */
+/**
+ * Attach a service report to a customer. Office and owner only: it can create a
+ * customer and set their text consent. Returns { error } so the form shows the reason.
+ */
 export async function assignCustomer(_prev: ReportState, formData: FormData): Promise<ReportState> {
+  if (await notOffice()) return { error: "Only the office or owner can assign a customer." };
   const diagnosticId = formData.get("diagnostic_id") as string;
   const customerId = (formData.get("customer_id") as string) || null;
   const customerName = (formData.get("customer_name") as string)?.trim() || null;
@@ -98,28 +104,39 @@ export async function assignCustomer(_prev: ReportState, formData: FormData): Pr
   return { saved: true };
 }
 
+/**
+ * Save the parts used on a report and move truck inventory by the difference.
+ * A tech may do this only on a report for a job that is theirs (or not yet
+ * assigned); a report with no job is office and owner only.
+ */
 export async function recordPartsUsed(_prev: ReportState, formData: FormData): Promise<ReportState> {
-  const diagnosticId = formData.get("diagnostic_id") as string;
-  const count = Number(formData.get("item_count")) || 0;
+  const diagnosticId = String(formData.get("diagnostic_id") ?? "");
+  if (!diagnosticId) return { error: "Missing service report. Refresh and try again." };
 
-  const parts: { price_book_item_name: string; qty: number; unit_price: number | null }[] = [];
-  for (let i = 0; i < count; i++) {
-    const name = (formData.get(`name_${i}`) as string)?.trim();
-    const qty = Number(formData.get(`qty_${i}`));
-    if (!name || !qty) continue;
-    const unitPriceRaw = formData.get(`unit_price_${i}`) as string;
-    parts.push({
-      price_book_item_name: name,
-      qty,
-      unit_price: unitPriceRaw ? Number(unitPriceRaw) : null,
-    });
-  }
+  // What this report already took out of inventory, so saving again only moves
+  // the difference instead of deducting the whole list a second time.
+  const { data: before, error: beforeError } = await supabase
+    .from("diagnostics")
+    .select("job_id, actual_parts_used")
+    .eq("id", diagnosticId)
+    .maybeSingle();
+  // Without the saved list we cannot tell what was already deducted, so stop
+  // rather than take the whole list out of inventory again.
+  if (beforeError) return { error: "Couldn't load the saved parts, so nothing was changed. Try again." };
+  if (!before) return { error: "Couldn't find this service report. Refresh and try again." };
+
+  const access = await checkJobAccess(before.job_id as string | null, { allowClosedJob: true });
+  if (access.error !== undefined) return { error: access.error };
+
+  const parsed = parsePartsUsed(formData);
+  if (parsed.error !== undefined) return { error: parsed.error };
+  const parts = parsed.parts;
 
   // Prices come from the price book on the server. A tech's submitted prices are
   // ignored entirely (they never see prices, and must not be able to set them);
   // for office, a price already on the form is kept. Where a part has several tier
   // rows, the "better" tier wins, matching what the office form shows.
-  const isTech = (await getStaffRole()) === "tech";
+  const isTech = access.role === "tech";
   for (const part of parts) {
     if (isTech) part.unit_price = null;
     if (part.unit_price !== null) continue;
@@ -132,18 +149,8 @@ export async function recordPartsUsed(_prev: ReportState, formData: FormData): P
     if (priced?.unit_price != null) part.unit_price = Number(priced.unit_price);
   }
 
-  // What this report already took out of inventory, so saving again only moves
-  // the difference instead of deducting the whole list a second time.
-  const { data: before, error: beforeError } = await supabase
-    .from("diagnostics")
-    .select("actual_parts_used")
-    .eq("id", diagnosticId)
-    .maybeSingle();
-  // Without the saved list we cannot tell what was already deducted, so stop
-  // rather than take the whole list out of inventory again.
-  if (beforeError) return { error: "Couldn't load the saved parts, so nothing was changed. Try again." };
   const previousQty = new Map<string, number>();
-  for (const p of (before?.actual_parts_used ?? []) as { price_book_item_name?: string; qty?: number }[]) {
+  for (const p of (before.actual_parts_used ?? []) as { price_book_item_name?: string; qty?: number }[]) {
     if (!p?.price_book_item_name) continue;
     previousQty.set(p.price_book_item_name, (previousQty.get(p.price_book_item_name) ?? 0) + Number(p.qty || 0));
   }
@@ -326,6 +333,14 @@ export async function finishServiceReport(_prev: ReportState, formData: FormData
     .maybeSingle();
   if (fetchError || !diagnostic) return { error: "Couldn't load this service report. Refresh and try again." };
 
+  // A tech finishes only a report for a job that is theirs (or not yet assigned).
+  // A report with no job is office and owner only.
+  const access = await checkJobAccess(diagnostic.job_id as string | null, { allowClosedJob: true });
+  if (access.error !== undefined) return { error: access.error };
+  // The page hides Finish once a report is finished. Refuse a second finish so the
+  // saved times and hours can't be overwritten after the office invoiced it.
+  if (diagnostic.completed_at) return { error: "This report is already finished. Refresh the page." };
+
   const customerId = diagnostic.equipment?.properties?.customer_id ?? diagnostic.jobs?.customer_id ?? null;
   const propertyId = diagnostic.equipment?.properties?.id ?? diagnostic.jobs?.property_id ?? null;
 
@@ -333,7 +348,7 @@ export async function finishServiceReport(_prev: ReportState, formData: FormData
   let invoiceDocumentId: string | null = diagnostic.invoice_document_id ?? null;
 
   if (createInvoice && !invoiceDocumentId) {
-    if (await notOffice()) return { error: "Only the office or owner can create invoices. Untick the invoice box." };
+    if (access.role === "tech") return { error: "Only the office or owner can create invoices. Untick the invoice box." };
     if (!customerId) return { error: "Assign a customer before creating an invoice, or untick the invoice box." };
 
     const result = await createReportInvoice(diagnostic, customerId, propertyId, trackedHours);

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireOffice } from "@/lib/require-role";
+import { checkJobAccess, type JobAccessResult } from "@/lib/job-access";
 import { signStoredPhotos } from "@/lib/photo-urls";
 import {
   attachItemPhoto,
@@ -23,6 +24,18 @@ function refresh(id?: string) {
   }
 }
 
+/**
+ * Owner, office or tech; a tech only on a checklist whose job is theirs (or not
+ * yet assigned). Same rule as the truck screen (requireJobAccess). A finished job
+ * still takes its checklist, as with service and install reports.
+ */
+async function checklistAccess(checklistId: string): Promise<JobAccessResult> {
+  const { data, error } = await supabase.from("pm_checklists").select("job_id").eq("id", checklistId).maybeSingle();
+  if (error) return { error: "Couldn't load the checklist. Try again." };
+  if (!data) return { error: "Checklist not found." };
+  return checkJobAccess(data.job_id as string | null, { allowClosedJob: true });
+}
+
 export async function startPmChecklist(formData: FormData) {
   const jobId = String(formData.get("job_id") ?? "");
   const equipmentId = String(formData.get("equipment_id") ?? "");
@@ -31,6 +44,8 @@ export async function startPmChecklist(formData: FormData) {
   if (!isUuid(jobId) || !isUuid(equipmentId) || !isUuid(templateId)) {
     return { error: "Choose a job, the equipment, and a template." };
   }
+  const access = await checkJobAccess(jobId, { allowClosedJob: true });
+  if (access.error !== undefined) return { error: access.error };
   const created = await createChecklist({ jobId, equipmentId, templateId, techName });
   if (created.error || !created.id) return { error: created.error ?? "Could not start the checklist" };
   refresh(created.id);
@@ -39,6 +54,8 @@ export async function startPmChecklist(formData: FormData) {
 
 export async function savePmChecklist(checklistId: string, payload: unknown) {
   if (!isUuid(checklistId)) return { error: "Missing checklist" };
+  const access = await checklistAccess(checklistId);
+  if (access.error !== undefined) return { error: access.error };
   const result = await saveChecklist(checklistId, payload);
   if (!result.error) refresh(checklistId);
   return result;
@@ -46,6 +63,8 @@ export async function savePmChecklist(checklistId: string, payload: unknown) {
 
 export async function filePmReport(checklistId: string, payload: unknown) {
   if (!isUuid(checklistId)) return { error: "Missing checklist" };
+  const access = await checklistAccess(checklistId);
+  if (access.error !== undefined) return { error: access.error };
   const result = await completeChecklist(checklistId, payload);
   if (result.error) return result;
   refresh(checklistId);
@@ -59,6 +78,8 @@ export async function uploadChecklistPhoto(
   formData: FormData
 ): Promise<{ error?: string; path?: string; url?: string | null }> {
   if (!isUuid(checklistId) || !/^[a-z0-9_]+$/.test(itemKey)) return { error: "Missing checklist item" };
+  const access = await checklistAccess(checklistId);
+  if (access.error !== undefined) return { error: access.error };
   const photo = formData.get("photo");
   if (!(photo instanceof File) || photo.size === 0) return { error: "Choose a photo." };
   if (!photo.type.startsWith("image/")) return { error: "That file is not a photo." };
@@ -76,7 +97,11 @@ export async function uploadChecklistPhoto(
 }
 
 export async function savePmTemplate(templateId: string, items: unknown) {
-  await requireOffice();
+  try {
+    await requireOffice();
+  } catch {
+    return { error: "Only the office or owner can change checklist templates." };
+  }
   if (!isUuid(templateId)) return { error: "Missing template" };
   const parsed = parseTemplateItems(items);
   if (!parsed.items) return { error: parsed.error ?? "Template items are not valid" };

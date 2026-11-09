@@ -91,6 +91,29 @@ export function formatEtDateTime(
   return new Date(date).toLocaleString("en-US", { timeZone: BUSINESS_TZ, ...options });
 }
 
+/** Short New York date for report pages, like "11/9/2026". "—" when there is no date. */
+export function formatEtShortDate(date: Date | string | null | undefined): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", { timeZone: BUSINESS_TZ, month: "numeric", day: "numeric", year: "numeric" });
+}
+
+/** Short New York date and time for report pages, like "11/9/2026, 1:20 AM". "—" when there is no date. */
+export function formatEtShortDateTime(date: Date | string | null | undefined): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-US", {
+    timeZone: BUSINESS_TZ,
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /** A datetime-local input value ("2026-10-22T09:30") for an instant, in New York time. */
 export function toEtLocalInput(date: Date | string): string {
   const d = new Date(date);
