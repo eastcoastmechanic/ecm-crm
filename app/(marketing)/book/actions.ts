@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
 import { etDateAtHour, etDateKey } from "@/lib/tz";
 import { COMPANY_PHONE_DISPLAY } from "@/lib/brand";
+import { bookingConsentPlan, smsOptInState, startDoubleOptIn, type SmsOptInState } from "@/lib/sms-consent";
 
 const WINDOW_HOURS: Record<string, number> = {
   morning: 8,
@@ -48,12 +49,25 @@ export async function bookService(_prev: BookState, formData: FormData): Promise
   const description = notes ? `${serviceType} — ${notes}` : serviceType;
   const sorry = `Sorry, we couldn't save your request. Please try again, or call us at ${COMPANY_PHONE_DISPLAY}.`;
 
+  // The text box starts a double opt-in; it never sets consent on its own,
+  // because anyone can type anyone's number here (see bookingConsentPlan).
+  let optInState: SmsOptInState = "none";
+  if (smsConsent) {
+    try {
+      optInState = await smsOptInState(phone);
+    } catch (err) {
+      console.error("bookService: opt-in lookup failed", err instanceof Error ? err.message : err);
+      optInState = "opted_out"; // can't tell, so no consent and no text
+    }
+  }
+  const consentPlan = bookingConsentPlan(smsConsent, optInState);
+
   try {
     const { customerId, propertyId } = await resolveCustomerPropertyEquipment({
       customerName: name,
       phone,
       email,
-      smsConsent,
+      smsConsent: consentPlan.consentNow,
       address,
     });
 
@@ -74,7 +88,16 @@ export async function bookService(_prev: BookState, formData: FormData): Promise
     return { error: sorry };
   }
 
-  // The request is saved; a failed owner email shouldn't make the customer retry.
+  // The request is saved; a failed "Reply YES" text or owner email shouldn't make the customer retry.
+  if (consentPlan.askToConfirm) {
+    try {
+      const sent = await startDoubleOptIn(phone, name);
+      if (sent === "failed") console.error("bookService: opt-in text failed to send");
+    } catch (err) {
+      console.error("bookService: opt-in request failed", err instanceof Error ? err.message : err);
+    }
+  }
+
   try {
     await notifyOwnerOfWebLead({
       source: "web_form",

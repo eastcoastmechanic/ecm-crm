@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { phoneKey, toE164 } from "@/lib/phone";
 import { COMPANY_NAME, COMPANY_PHONE } from "@/lib/brand";
+import { sendSMS } from "@/lib/sms";
 
 // Single place for SMS consent: the outbound gate (canText), the inbound
 // STOP/START/HELP keyword handler, and the double opt-in used by /sms-signup.
@@ -204,6 +205,51 @@ export async function clearPendingOptIn(phone: string): Promise<void> {
 }
 
 export const OPT_IN_CONFIRM_REQUEST = `${COMPANY_NAME}: Reply YES to confirm you want appointment text updates. Msg frequency varies. Msg&data rates may apply. Reply STOP to opt out, HELP for help.`;
+
+/**
+ * Start the double opt-in and send the "Reply YES" text. Used by /sms-signup
+ * and the website booking form. Nothing is consented until the owner of the
+ * number replies YES (handleSmsKeyword). "skipped" = already opted in, or a
+ * request went out in the last 10 minutes. Throws if the database can't be read.
+ */
+export async function startDoubleOptIn(phone: string, name: string | null): Promise<"sent" | "skipped" | "failed"> {
+  const shouldSend = await requestOptIn(phone, name);
+  if (!shouldSend) return "skipped";
+  const sent = await sendSMS(toE164(phone), OPT_IN_CONFIRM_REQUEST);
+  if (!sent.ok) {
+    // Don't let a failed send block the next attempt for 10 minutes.
+    await clearPendingOptIn(phone);
+    return "failed";
+  }
+  return "sent";
+}
+
+export type SmsOptInState = "opted_in" | "opted_out" | "pending" | "none";
+
+/** Where this number stands. A number on the exclusion list counts as opted out. */
+export async function smsOptInState(phone: string): Promise<SmsOptInState> {
+  const key = phoneKey(phone);
+  if ((await excludedRowsForPhone(key)).length > 0) return "opted_out";
+  const optin = await getOptin(key);
+  return optin?.status ?? "none";
+}
+
+/**
+ * Website booking with the "text me" box ticked. Anyone can type any number on
+ * a public form, so the box alone never sets sms_consent. Consent is set only
+ * when the number's owner already confirmed (YES or START on file); otherwise
+ * the customer is saved without consent and gets the "Reply YES" text. A
+ * number that texted STOP gets nothing.
+ */
+export function bookingConsentPlan(
+  ticked: boolean,
+  state: SmsOptInState
+): { consentNow: boolean; askToConfirm: boolean } {
+  if (!ticked) return { consentNow: false, askToConfirm: false };
+  if (state === "opted_in") return { consentNow: true, askToConfirm: false };
+  if (state === "opted_out") return { consentNow: false, askToConfirm: false };
+  return { consentNow: false, askToConfirm: true };
+}
 
 /**
  * Handle STOP/START/HELP/YES for an inbound text. Returns the single reply to

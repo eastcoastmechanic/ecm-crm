@@ -118,3 +118,108 @@ export function emailBody(template: string, customerName: string | null, unsubsc
 export function withinLimit(sendsInWindowIncludingThis: number | null): boolean {
   return sendsInWindowIncludingThis !== null && sendsInWindowIncludingThis <= 1;
 }
+
+// Duplicate customer records (a Square import next to a hand-made record, a
+// second booking) share a phone or an email. One person gets one message per
+// press, and an email unsubscribe or a text STOP on any record covers them all.
+// Texts: canText already refuses a number if any record with it has no consent
+// or the number sent STOP. Emails: optedOutEmailKeys below.
+
+/** Last 10 digits, or null when there aren't 10 (not a usable match key). */
+export function phoneMatchKey(phone: string | null | undefined): string | null {
+  const key = (phone ?? "").replace(/\D/g, "").slice(-10);
+  return key.length === 10 ? key : null;
+}
+
+/** Trimmed, lowercased email, or null when it isn't one. */
+export function emailMatchKey(email: string | null | undefined): string | null {
+  const key = (email ?? "").trim().toLowerCase();
+  return key.includes("@") ? key : null;
+}
+
+export type ContactInfo = { id: string; phone: string | null; email: string | null };
+
+/** "p:" + phone key and "e:" + email key for one record. */
+export function contactKeys(c: Pick<ContactInfo, "phone" | "email">): string[] {
+  const keys: string[] = [];
+  const p = phoneMatchKey(c.phone);
+  const e = emailMatchKey(c.email);
+  if (p) keys.push(`p:${p}`);
+  if (e) keys.push(`e:${e}`);
+  return keys;
+}
+
+/** Emails that any customer record has unsubscribed, so every record with that email counts as unsubscribed. */
+export function optedOutEmailKeys(rows: { email: string | null; email_opt_out_at: string | null }[]): Set<string> {
+  const out = new Set<string>();
+  for (const r of rows) {
+    const key = emailMatchKey(r.email);
+    if (key && r.email_opt_out_at) out.add(key);
+  }
+  return out;
+}
+
+/** For each record, the ids of every record sharing its phone or email (itself included). */
+export function sameContactIds(customers: ContactInfo[]): Map<string, string[]> {
+  const byKey = new Map<string, string[]>();
+  for (const c of customers) {
+    for (const k of contactKeys(c)) {
+      const ids = byKey.get(k);
+      if (ids) ids.push(c.id);
+      else byKey.set(k, [c.id]);
+    }
+  }
+  const out = new Map<string, string[]>();
+  for (const c of customers) {
+    const ids = new Set([c.id]);
+    for (const k of contactKeys(c)) for (const id of byKey.get(k) ?? []) ids.add(id);
+    out.set(c.id, [...ids]);
+  }
+  return out;
+}
+
+/** Latest campaign message to the record or any record sharing its phone or email, so the 30 days covers duplicates. */
+export function lastCampaignForContact(
+  groups: Map<string, string[]>,
+  lastById: Map<string, string>
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [id, ids] of groups) {
+    let last: string | null = null;
+    for (const other of ids) {
+      const t = lastById.get(other);
+      if (t && (!last || t > last)) last = t;
+    }
+    if (last) out.set(id, last);
+  }
+  return out;
+}
+
+export const DUPLICATE_REASON = "same phone or email as another customer getting this one";
+
+/**
+ * One message per person per press. Rows going by text claim first (text is
+ * the preferred channel), then email rows, in list order. Once a row is kept,
+ * its phone and email are taken, and any later row sharing either is dropped
+ * with DUPLICATE_REASON. Rows not going out pass through untouched. Order kept.
+ */
+export function dedupeRecipients<T extends { customerId: string; channel: Channel | null; reason: string | null }>(
+  rows: T[],
+  contactOf: (customerId: string) => Pick<ContactInfo, "phone" | "email"> | undefined
+): T[] {
+  const taken = new Set<string>();
+  const dropped = new Set<number>();
+  for (const channel of ["sms", "email"] as const) {
+    rows.forEach((row, i) => {
+      if (row.channel !== channel) return;
+      const contact = contactOf(row.customerId);
+      const keys = contact ? contactKeys(contact) : [];
+      if (keys.some((k) => taken.has(k))) {
+        dropped.add(i);
+        return;
+      }
+      for (const k of keys) taken.add(k);
+    });
+  }
+  return rows.map((row, i) => (dropped.has(i) ? { ...row, channel: null, reason: DUPLICATE_REASON } : row));
+}
