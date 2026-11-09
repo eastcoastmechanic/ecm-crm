@@ -78,6 +78,11 @@ export function clockWeek(shifts: ClockShift[], now: Date = new Date()): ClockWe
  */
 export function withOpenShift(finished: ClockWeek, shiftStartedAt: string | null, now: Date = new Date()): ClockWeek {
   const todayKey = etDateKey(now);
+  // Page left open past Monday 00:00 ET: the finished totals are last week's. Start the new week
+  // from zero; a running shift that started Sunday stays in the old week, as payroll counts it.
+  if (mondayOfKey(todayKey) !== finished.weekStart) {
+    return clockWeek(shiftStartedAt ? [{ started_at: shiftStartedAt, ended_at: null, break_minutes: 0 }] : [], now);
+  }
   const days = finished.days.map((d) => ({ ...d }));
   let week = finished.weekHours;
   if (shiftStartedAt) {

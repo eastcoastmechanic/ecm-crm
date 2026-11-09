@@ -103,6 +103,15 @@ describe("withOpenShift", () => {
     expect(at("2026-11-03T16:30:00Z")).toEqual(all);
   });
 
+  it("resets at Monday 00:00 ET when the page stays open across it", () => {
+    // Finished totals from Sunday 2026-11-08 (old week), Sunday night shift still running.
+    const finished = clockWeek([s("2026-11-08T13:00:00Z", "2026-11-08T21:00:00Z")], new Date("2026-11-09T03:30:00Z"));
+    expect(finished.weekHours).toBe(8);
+    const monday = withOpenShift(finished, "2026-11-09T03:00:00Z", new Date("2026-11-09T06:00:00Z")); // Mon 1 AM ET
+    expect(monday).toMatchObject({ weekStart: "2026-11-09", todayKey: "2026-11-09", todayHours: 0, weekHours: 0 });
+    expect(withOpenShift(finished, null, new Date("2026-11-09T06:00:00Z")).weekHours).toBe(0);
+  });
+
   it("leaves totals alone when not clocked in", () => {
     const finished = clockWeek([s("2026-11-02T13:00:00Z", "2026-11-02T21:00:00Z")], new Date("2026-11-04T12:00:00Z"));
     expect(withOpenShift(finished, null, new Date("2026-11-04T12:00:00Z"))).toEqual(finished);
