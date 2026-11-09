@@ -22,6 +22,13 @@ export default function PhotoButtons({ jobId, counts }: { jobId: string; counts:
 
   async function upload(phase: keyof PhotoCounts, files: FileList | null) {
     if (!files || files.length === 0) return;
+    // Photos are not saved on the phone for later (too big for the queue): say so plainly.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setError("Photos need signal. Take them with the camera now and add them here when you're back online.");
+      const input = inputs.current[phase];
+      if (input) input.value = "";
+      return;
+    }
     setBusy(phase);
     setError(null);
     try {

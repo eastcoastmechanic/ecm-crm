@@ -3,9 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
-import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
-import { sendSMS } from "@/lib/sms";
-import { canText } from "@/lib/sms-consent";
+import { sendOnWayNotice } from "@/lib/on-way-notice";
 import {
   appendJobPhotos,
   uploadJobPhotoFiles,
@@ -154,14 +152,6 @@ export async function assignJobToStaff(jobId: string, staffId: string | null): P
   return {};
 }
 
-type CustomerContact = {
-  name: string | null;
-  email: string | null;
-  phone: string | null;
-  sms_consent: boolean | null;
-} | null;
-type PropertyInfo = { address: string | null } | null;
-
 /**
  * Change a job's status through job-lifecycle. Returns { error } instead of
  * throwing: production builds hide a thrown server action's message, so the
@@ -302,38 +292,13 @@ export async function addJobPhotos(formData: FormData) {
 
 export async function markOnWay(jobId: string) {
   await requireJobAccess(jobId);
-  const { data: job } = await supabase
-    .from("jobs")
-    .select("customers(name, email, phone, sms_consent), properties(address)")
-    .eq("id", jobId)
-    .single();
-
   const { error } = await supabase
     .from("jobs")
     .update({ on_way_at: new Date().toISOString() })
     .eq("id", jobId);
   if (error) throw new Error(error.message);
 
-  const customer = job?.customers as unknown as CustomerContact;
-  const property = job?.properties as unknown as PropertyInfo;
-  const message = `Hi ${customer?.name ?? ""}, your East Coast Mechanical technician is on the way${
-    property?.address ? ` to ${property.address}` : ""
-  }!`;
-
-  if (customer?.email) {
-    await resend.emails.send({
-      from: `East Coast Mechanical <${RESEND_FROM_EMAIL}>`,
-      replyTo: RESEND_REPLY_TO,
-      to: customer.email,
-      subject: "Your technician is on the way",
-      text: message,
-    });
-  }
-
-  if (customer?.phone && customer?.sms_consent && (await canText(customer.phone))) {
-    const sent = await sendSMS(customer.phone, message);
-    if (!sent.ok) console.error(`On-the-way text failed: ${sent.error}`);
-  }
+  await sendOnWayNotice(jobId);
 
   revalidatePath("/jobs");
 }
