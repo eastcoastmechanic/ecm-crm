@@ -4,7 +4,8 @@ import { stripe } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
 import { markDocumentPaid } from "@/lib/document-paid";
 import { centsToMoney, notifyOwnerOfMoney } from "@/lib/notify-owner";
-import { REPLACE_STRIPE_CUSTOMER } from "@/lib/invoice-checkout";
+import { DEPOSIT_KIND, REPLACE_STRIPE_CUSTOMER } from "@/lib/invoice-checkout";
+import { recordOnlineDeposit } from "@/lib/online-deposit";
 import { formatEtDateTime } from "@/lib/tz";
 
 type DocRow = {
@@ -68,6 +69,20 @@ async function handleCheckoutPaid(session: Stripe.Checkout.Session): Promise<str
   const documentId = session.metadata?.document_id;
   const customerId = session.metadata?.customer_id;
   const paymentIntentId = idOf(session.payment_intent as string | { id: string } | null);
+
+  // A contract deposit is recorded on the contract, never marks it paid.
+  if (session.metadata?.kind === DEPOSIT_KIND) {
+    if (documentId && session.payment_status === "paid") {
+      const result = await recordOnlineDeposit({
+        documentId,
+        paymentIntentId,
+        paidCents: session.amount_total ?? 0,
+        sessionId: session.id,
+      });
+      if (result.status === "error") return result.error;
+    }
+    return saveStripeCustomer(session, customerId);
+  }
 
   // Only money actually received marks an invoice paid. Delayed-payment
   // sessions complete unpaid and arrive again as async_payment_succeeded.
@@ -178,7 +193,7 @@ async function saveStripeCustomer(session: Stripe.Checkout.Session, customerId: 
 }
 
 /** Finds the CRM document (or plan) a Stripe payment belongs to, for alerts. Never throws. */
-async function findPaymentTarget(paymentIntentId: string | null): Promise<{ label: string; path?: string }> {
+async function findPaymentTarget(paymentIntentId: string | null): Promise<{ label: string; path?: string; deposit?: boolean }> {
   if (!paymentIntentId) return { label: "no payment id" };
   try {
     const { data: rows } = await supabase
@@ -199,7 +214,8 @@ async function findPaymentTarget(paymentIntentId: string | null): Promise<{ labe
         .select("id, doc_number, customers(name)")
         .eq("id", documentId)
         .maybeSingle();
-      return { label: docLabel(byId as DocRow | null, documentId), path: `/documents/${documentId}` };
+      const deposit = intent.metadata?.kind === DEPOSIT_KIND;
+      return { label: `${deposit ? "deposit on " : ""}${docLabel(byId as DocRow | null, documentId)}`, path: `/documents/${documentId}`, deposit };
     }
     if (intent.metadata?.service_contract_id) return { label: "plan renewal charge" };
     return { label: intent.description || `payment ${paymentIntentId}` };
@@ -217,7 +233,7 @@ async function handleRefund(charge: Stripe.Charge) {
   const full = charge.amount_refunded >= charge.amount;
   await notifyOwnerOfMoney({
     title: `Stripe refund: ${centsToMoney(charge.amount_refunded)} (${target.label})`,
-    body: `${full ? "Full refund" : "Partial refund"}: ${centsToMoney(charge.amount_refunded)} refunded so far of ${centsToMoney(charge.amount)}. The CRM did not change the invoice. Update it by hand if needed.`,
+    body: `${full ? "Full refund" : "Partial refund"}: ${centsToMoney(charge.amount_refunded)} refunded so far of ${centsToMoney(charge.amount)}. ${target.deposit ? "The CRM did not change the recorded deposit. Update it on the contract by hand if needed." : "The CRM did not change the invoice. Update it by hand if needed."}`,
     path: target.path,
   });
 }
@@ -229,7 +245,7 @@ async function handleDispute(dispute: Stripe.Dispute) {
     : " Respond in the Stripe dashboard.";
   await notifyOwnerOfMoney({
     title: `Card dispute opened: ${centsToMoney(dispute.amount)} (${target.label})`,
-    body: `The customer's bank opened a dispute (reason: ${dispute.reason.replace(/_/g, " ")}). Stripe has pulled the money back while it is open.${dueBy} The CRM did not change the invoice.`,
+    body: `The customer's bank opened a dispute (reason: ${dispute.reason.replace(/_/g, " ")}). Stripe has pulled the money back while it is open.${dueBy} ${target.deposit ? "The CRM did not change the recorded deposit." : "The CRM did not change the invoice."}`,
     path: target.path,
   });
 }

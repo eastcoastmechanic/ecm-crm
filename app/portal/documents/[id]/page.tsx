@@ -9,6 +9,7 @@ import SignaturePad from "./SignaturePad";
 import ContractView from "./ContractView";
 import { headingClass, subTextClass } from "../../../(internal)/ui";
 import { availableTiers, selectedTier, TIER_LABEL } from "@/lib/estimate-tier";
+import { loadDepositContract, offeredDepositCents } from "@/lib/online-deposit";
 
 // Illustrative only — no real lender is wired up yet (see Phase 1 plan notes).
 // Standard amortizing-loan formula at a representative APR.
@@ -35,10 +36,13 @@ function formatPrice(value: number | null) {
 
 export default async function PortalDocumentPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ deposit?: string }>;
 }) {
   const { id } = await params;
+  const { deposit: depositReturn } = await searchParams;
   const user = await requirePortalUser();
   const customer = await portalCustomerFor(user.id);
   if (!customer) notFound();
@@ -60,7 +64,15 @@ export default async function PortalDocumentPage({
   const doc = { ...fields, properties: one(properties as { address: string | null } | { address: string | null }[] | null) };
 
   if (doc.type === "contract") {
-    return <ContractView doc={{ ...doc, line_items: portalContractTerms(rawLineItems) }} />;
+    // Deposit state comes from the server too; the amount is the one in the signed terms.
+    const { doc: depositRow, ready } = await loadDepositContract(doc.id, customer.id);
+    const deposit = {
+      dueCents: depositRow ? offeredDepositCents(depositRow, ready) : null,
+      receivedCents: depositRow?.deposit_received_cents ?? null,
+      // Back from Stripe before the webhook landed: say so instead of offering a second payment.
+      justPaid: depositReturn === "1",
+    };
+    return <ContractView doc={{ ...doc, line_items: portalContractTerms(rawLineItems) }} deposit={deposit} />;
   }
 
   if (doc.type === "pm_report") {

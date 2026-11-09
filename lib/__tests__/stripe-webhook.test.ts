@@ -27,6 +27,8 @@ const h = vi.hoisted(() => ({
   contractError: null as { message: string } | null,
   paidResult: { updated: true } as { updated: boolean; error?: string },
   markPaid: vi.fn(),
+  recordDeposit: vi.fn(),
+  depositResult: { status: "recorded", recordedCents: 300000 } as Record<string, unknown>,
   notify: vi.fn(),
   retrieve: vi.fn(),
   calls: [] as Call[],
@@ -48,6 +50,13 @@ vi.mock("@/lib/document-paid", () => ({
   markDocumentPaid: (...args: unknown[]) => {
     h.markPaid(...args);
     return Promise.resolve(h.paidResult);
+  },
+}));
+
+vi.mock("@/lib/online-deposit", () => ({
+  recordOnlineDeposit: (...args: unknown[]) => {
+    h.recordDeposit(...args);
+    return Promise.resolve(h.depositResult);
   },
 }));
 
@@ -152,6 +161,8 @@ beforeEach(() => {
   h.contractError = null;
   h.paidResult = { updated: true };
   h.markPaid.mockClear();
+  h.recordDeposit.mockClear();
+  h.depositResult = { status: "recorded", recordedCents: 300000 };
   h.notify.mockClear();
   h.retrieve.mockReset();
   h.calls = [];
@@ -412,6 +423,56 @@ describe("stripe webhook", () => {
       expect(alert?.body).toMatch(/Respond in the Stripe dashboard by .+ ET/);
       expect(alert?.path).toBe("/documents/doc1");
       expect(h.calls.filter((c) => c.op === "update")).toEqual([]);
+    });
+  });
+
+  describe("contract deposit (kind=deposit)", () => {
+    const deposit = (over: Record<string, unknown> = {}, type?: string) =>
+      session({ amount_total: 300000, metadata: { document_id: "k1", customer_id: "c1", kind: "deposit" }, ...over }, type);
+
+    it("records it as a deposit and never marks the contract paid", async () => {
+      deposit();
+      expect((await POST(req())).status).toBe(200);
+      expect(h.recordDeposit).toHaveBeenCalledWith({ documentId: "k1", paymentIntentId: "pi_1", paidCents: 300000, sessionId: "cs_1" });
+      expect(h.markPaid).not.toHaveBeenCalled();
+      // The Stripe customer is still saved for later renewals.
+      expect(updates("customers")).toHaveLength(1);
+    });
+
+    it("records on async_payment_succeeded, and skips an unpaid session", async () => {
+      deposit({}, "checkout.session.async_payment_succeeded");
+      await POST(req());
+      expect(h.recordDeposit).toHaveBeenCalledTimes(1);
+      deposit({ payment_status: "unpaid" });
+      await POST(req());
+      expect(h.recordDeposit).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers 500 so Stripe retries when recording fails", async () => {
+      h.depositResult = { status: "error", error: "db down" };
+      deposit();
+      expect((await POST(req())).status).toBe(500);
+    });
+
+    it("answers 200 on a replay or a mismatch (alerting is done when recording)", async () => {
+      h.depositResult = { status: "replay" };
+      deposit();
+      expect((await POST(req())).status).toBe(200);
+      h.depositResult = { status: "mismatch" };
+      expect((await POST(req())).status).toBe(200);
+      expect(h.markPaid).not.toHaveBeenCalled();
+    });
+
+    it("a refund of a deposit says the recorded deposit was not changed", async () => {
+      h.retrieve.mockResolvedValue({ metadata: { document_id: "k1", kind: "deposit" } });
+      h.docById = { id: "k1", doc_number: "CON-7" };
+      h.event = {
+        type: "charge.refunded",
+        data: { object: { id: "ch_1", payment_intent: "pi_9", amount: 300000, amount_refunded: 300000 } },
+      };
+      await POST(req());
+      expect(lastAlert()?.title).toBe("Stripe refund: $3000.00 (deposit on CON-7)");
+      expect(lastAlert()?.body).toContain("did not change the recorded deposit");
     });
   });
 

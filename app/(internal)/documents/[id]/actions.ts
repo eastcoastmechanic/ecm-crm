@@ -450,6 +450,20 @@ export async function getInvoicePaymentLink(
   }
 }
 
+/** Office-only: a Stripe checkout link for a signed contract's deposit (amount from its terms), to text or email. */
+export async function getDepositPaymentLink(
+  documentId: string
+): Promise<{ ok: true; url: string; total: number } | { ok: false; error: string }> {
+  if (await notOffice()) return { ok: false, error: "Only the office or owner can do this." };
+  try {
+    const { createDepositPaymentLink } = await import("@/lib/payment-links");
+    const { url, depositCents } = await createDepositPaymentLink(documentId);
+    return { ok: true, url, total: depositCents / 100 };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Could not create the deposit link" };
+  }
+}
+
 const DEPOSIT_METHODS = ["card", "square", "check", "cash", "other"];
 
 /** Office-only: record (or clear, with an empty amount) the deposit received on a contract. */

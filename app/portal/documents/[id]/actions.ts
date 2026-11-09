@@ -4,13 +4,14 @@ import { redirect } from "next/navigation";
 import { DEFAULT_VISIT_MONTHS } from "@/lib/maintenance-visits";
 import { headers } from "next/headers";
 import { createPortalServerClient } from "@/lib/supabase-portal/server";
-import { createInvoiceCheckoutSession } from "@/lib/invoice-checkout";
+import { createDepositCheckoutSession, createInvoiceCheckoutSession } from "@/lib/invoice-checkout";
+import { loadDepositContract, offeredDepositCents } from "@/lib/online-deposit";
 import { supabase as adminDb } from "@/lib/supabase";
 import type { ContractLineItems } from "@/lib/contract-terms";
 import { etDateKey } from "@/lib/tz";
 import { notifyOwnerOfEvent } from "@/lib/notify-owner";
 import { approvalChoice, type TierTotals } from "@/lib/estimate-tier";
-import { portalCustomerFor } from "@/lib/portal-customer";
+import { portalCustomerFor, requirePortalUser } from "@/lib/portal-customer";
 import { isSignatureImage } from "@/lib/portal-view";
 
 export type PayState = { error?: string } | null;
@@ -50,6 +51,40 @@ export async function createCheckoutSession(_prev: PayState, formData: FormData)
     checkoutUrl = session.url;
   } catch (err) {
     console.error("createCheckoutSession: Stripe failed", err instanceof Error ? err.message : err);
+  }
+  if (!checkoutUrl) return { error: "We couldn't open the payment page. Please try again in a minute, or call us." };
+  redirect(checkoutUrl);
+}
+
+/**
+ * Pay deposit on a signed contract. The amount is the deposit in the signed
+ * terms, read on the server with the service client after checking the
+ * contract is this customer's; nothing about the amount comes from the form.
+ * Returns { error } (production builds hide a thrown message from the customer).
+ */
+export async function createDepositCheckout(_prev: PayState, formData: FormData): Promise<PayState> {
+  const documentId = String(formData.get("document_id") ?? "");
+  const user = await requirePortalUser();
+  const customer = await portalCustomerFor(user.id);
+  if (!customer || !documentId) return { error: "We couldn't find this contract. Refresh the page and try again." };
+
+  const { doc, ready, error } = await loadDepositContract(documentId, customer.id);
+  if (error || !doc) return { error: "We couldn't find this contract. Refresh the page and try again." };
+  if ((doc.deposit_received_cents ?? 0) > 0) return { error: "Your deposit is already recorded. Thank you." };
+  const depositCents = offeredDepositCents(doc, ready);
+  if (depositCents == null) return { error: "This contract can't take a deposit online. Please call us." };
+
+  const origin = (await headers()).get("origin") ?? (process.env.NEXT_PUBLIC_APP_URL ?? "https://ecm-crm.vercel.app").replace(/\/$/, "");
+
+  let checkoutUrl: string | null = null;
+  try {
+    const session = await createDepositCheckoutSession(doc, depositCents, {
+      success: `${origin}/portal/documents/${doc.id}?deposit=1`,
+      cancel: `${origin}/portal/documents/${doc.id}`,
+    });
+    checkoutUrl = session.url;
+  } catch (err) {
+    console.error("createDepositCheckout: Stripe failed", err instanceof Error ? err.message : err);
   }
   if (!checkoutUrl) return { error: "We couldn't open the payment page. Please try again in a minute, or call us." };
   redirect(checkoutUrl);

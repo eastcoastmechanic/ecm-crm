@@ -36,14 +36,26 @@ function money(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
 
-/** 50% when special-order materials cover it; otherwise MA HIC 1/3 cap. */
-export function paymentTermsForPrice(price: number, specialOrderMaterials = 0): string {
+/**
+ * The deposit for a contract price, in dollars: 50% when special-order materials
+ * cover it, otherwise the MA HIC one-third cap. paymentTermsForPrice writes this
+ * amount into the contract's payment terms.
+ */
+export function depositForPrice(
+  price: number,
+  specialOrderMaterials = 0
+): { deposit: number; balance: number; usedHalf: boolean } {
   const third = Math.round((price / 3) * 100) / 100;
   const half = Math.round((price / 2) * 100) / 100;
   const cap = Math.max(third, specialOrderMaterials);
   const deposit = Math.min(half, cap);
   const balance = Math.round((price - deposit) * 100) / 100;
-  const usedHalf = deposit === half;
+  return { deposit, balance, usedHalf: deposit === half };
+}
+
+/** 50% when special-order materials cover it; otherwise MA HIC 1/3 cap. */
+export function paymentTermsForPrice(price: number, specialOrderMaterials = 0): string {
+  const { deposit, balance, usedHalf } = depositForPrice(price, specialOrderMaterials);
 
   if (usedHalf) {
     return `A 50% deposit of ${money(deposit)} is due upon signing, equal to or less than the special-order equipment/materials cost. The remaining ${money(balance)} is due upon completion. Massachusetts law caps deposits on home-improvement contracts at one-third of the contract price, or the cost of special-order materials, whichever is greater.`;
@@ -57,6 +69,43 @@ export const DEFAULT_WARRANTY_TERMS =
 
 export const DEFAULT_PAYMENT_TERMS =
   "A 50% deposit is due upon signing, with the remaining 50% due upon completion. On Massachusetts home-improvement contracts over $1,000, the deposit will not exceed one-third of the contract price or the cost of special-order materials, whichever is greater. Payment methods and any financing terms will be confirmed separately.";
+
+/**
+ * The deposit the customer agreed to on a contract, in cents, read from the
+ * payment terms they signed. Never a client-supplied amount.
+ *
+ * - Terms that name it ("A deposit of $3,000.00", "A 50% deposit of $4,500.00",
+ *   which is what paymentTermsForPrice writes): that amount.
+ * - The stock DEFAULT_PAYMENT_TERMS (no dollar figure): 50%, held to one-third
+ *   of the price on contracts over $1,000, as that text says. Special-order
+ *   materials aren't recorded, so one-third is the amount it allows.
+ * - Anything else (custom wording with no amount): null, so no online deposit.
+ *
+ * Also null when the amount isn't more than $0 and less than the contract total.
+ */
+export function contractDepositCents(contract: {
+  total: number | string | null | undefined;
+  paymentTerms: string | null | undefined;
+}): number | null {
+  if (contract.total == null) return null;
+  const total = Number(contract.total);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const totalCents = Math.round(total * 100);
+  const terms = (contract.paymentTerms ?? "").trim();
+
+  let cents: number | null = null;
+  const named = terms.match(/deposit of \$\s?([\d,]+(?:\.\d{1,2})?)/i);
+  if (named) {
+    const n = Number(named[1].replace(/,/g, ""));
+    if (Number.isFinite(n)) cents = Math.round(n * 100);
+  } else if (terms === DEFAULT_PAYMENT_TERMS) {
+    const half = Math.round(totalCents / 2);
+    cents = total > 1000 ? Math.min(half, Math.round(totalCents / 3)) : half;
+  }
+
+  if (cents == null || cents <= 0 || cents >= totalCents) return null;
+  return cents;
+}
 
 /**
  * MGL c.142A §2(a)(9) / FTC 16 CFR Part 429: the buyer may cancel within 3
