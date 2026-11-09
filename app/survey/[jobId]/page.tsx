@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { submitSurvey } from "./actions";
+import ActionForm from "../../ActionForm";
 
 export const metadata = {
   title: "How did we do? | East Coast Mechanical",
@@ -66,7 +67,7 @@ export default async function SurveyPage({
                   href={REVIEW_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-fit rounded-lg bg-gradient-to-br from-accent to-accent-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90"
+                  className="w-fit rounded-lg bg-gradient-to-br from-accent to-accent-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   Leave us a review
                 </a>
@@ -91,7 +92,7 @@ export default async function SurveyPage({
               How did we do?
             </h1>
             <p>Let us know how your recent service went.</p>
-            <form
+            <ActionForm
               action={submitSurvey}
               className="flex flex-col gap-3 rounded-xl border border-white/8 p-4"
             >
@@ -126,11 +127,11 @@ export default async function SurveyPage({
               </label>
               <button
                 type="submit"
-                className="w-fit rounded-lg bg-gradient-to-br from-accent to-accent-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90"
+                className="w-fit rounded-lg bg-gradient-to-br from-accent to-accent-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_2px_8px_rgba(232,80,42,.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 Submit
               </button>
-            </form>
+            </ActionForm>
           </>
         )}
       </main>
