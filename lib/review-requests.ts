@@ -10,17 +10,26 @@ export const LOOKBACK_DAYS = 14;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type InvoiceRow = { status: string | null; paid_at: string | null };
+export type InvoiceRow = { status: string | null; paid_at: string | null; sent_at?: string | null };
+
+/**
+ * A draft that never went out (Finish makes one on every job). Josh's rule: only a SENT unpaid
+ * invoice holds the review text back, so a draft counts like no invoice at all.
+ */
+export function isUnsentDraft(i: InvoiceRow): boolean {
+  return i.status === "draft" && !i.sent_at;
+}
 
 /**
  * When the clock for the review ask starts.
  *  - A paid invoice on the job: the earliest paid date (no paid date on file: the finish time).
- *  - Invoiced here but not paid yet: null, wait for payment.
- *  - No live invoice here (paid some other way, for example Square): the finish time.
- * Void invoices do not count.
+ *  - Sent here but not paid yet: null, wait for payment.
+ *  - No live invoice here, or only an unsent draft (paid some other way, for example Square,
+ *    or the office hasn't sent it): the finish time.
+ * Void invoices and unsent drafts do not count.
  */
 export function reviewTriggerAt(opts: { completedAt: string | null; invoices: InvoiceRow[] }): string | null {
-  const live = opts.invoices.filter((i) => i.status !== "void");
+  const live = opts.invoices.filter((i) => i.status !== "void" && !isUnsentDraft(i));
   const paid = live.filter((i) => i.status === "paid");
   if (paid.length > 0) {
     const dates = paid.map((i) => i.paid_at).filter((d): d is string => !!d);

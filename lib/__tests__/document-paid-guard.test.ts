@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   calls: [] as Call[],
   markPaid: vi.fn(),
   emailSent: vi.fn(),
+  pdfLines: [{ description: "Work" }] as unknown[],
 }));
 
 vi.mock("@/lib/require-role", () => ({ requireOffice: () => Promise.resolve() }));
@@ -39,7 +40,14 @@ vi.mock("@/lib/documents", () => ({
   dueDateForSend: () => "2026-12-01",
   getDocumentForPdf: () =>
     Promise.resolve({
-      data: { type: "invoice", doc_number: "INV-1", customer_name: "Pat", totals: { better: 100 }, pricing_mode: "flat" },
+      data: {
+        type: "invoice",
+        doc_number: "INV-1",
+        customer_name: "Pat",
+        totals: { better: 100 },
+        pricing_mode: "flat",
+        line_items: h.pdfLines,
+      },
       customerEmail: "pat@example.test",
       dueDate: null,
       error: null,
@@ -108,6 +116,7 @@ beforeEach(() => {
   h.calls = [];
   h.markPaid.mockClear();
   h.emailSent.mockClear();
+  h.pdfLines = [{ description: "Work" }];
 });
 
 describe("updateDocument never un-pays a document", () => {
@@ -158,6 +167,14 @@ describe("sendDocumentEmail never un-pays a document", () => {
     expect(u.values).toMatchObject({ status: "sent" });
     expect(u.filters).toContainEqual(NOT_DONE);
     expect(updates()).toHaveLength(1);
+  });
+
+  it("never emails an invoice with no line items (a Finish draft with no price on file)", async () => {
+    h.pdfLines = [];
+    const res = await sendDocumentEmail(null, sendForm());
+    expect(res).toEqual({ error: "This invoice has no line items yet. Add them and save, then send." });
+    expect(h.emailSent).not.toHaveBeenCalled();
+    expect(updates()).toEqual([]);
   });
 
   for (const kept of ["approved estimate", "signed contract"]) {

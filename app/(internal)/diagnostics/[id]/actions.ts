@@ -7,6 +7,7 @@ import { renderServiceReportPdf } from "@/lib/service-report-pdf";
 import { resend, RESEND_FROM_EMAIL, RESEND_REPLY_TO } from "@/lib/resend";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { createInvoiceDirect, type DirectLineItem } from "@/lib/document-generation";
+import { makeRoomForReportInvoice } from "@/lib/finish-invoice";
 import { requireOffice } from "@/lib/require-role";
 import { checkJobAccess } from "@/lib/job-access";
 import { parsePartsUsed } from "@/lib/parts-used";
@@ -261,10 +262,26 @@ async function createReportInvoice(
     };
   }
 
+  // One live invoice per job: Finish may have made an empty draft already (voided here), or the
+  // job may be invoiced already (refused, so the customer is not billed twice).
+  const room = await makeRoomForReportInvoice(diagnostic.job_id);
+  if (room.error) return { error: room.error };
+
   try {
-    const result = await createInvoiceDirect({ customerId, propertyId, items, jobId: diagnostic.job_id ?? undefined });
+    const result = await createInvoiceDirect({
+      customerId,
+      propertyId,
+      items,
+      jobId: diagnostic.job_id ?? undefined,
+      // Takes the job's one invoice slot (unique index, SQL 0058), so a Finish draft made at the
+      // same moment can't land beside it: whichever is second is refused by the database.
+      extra: diagnostic.job_id ? { balance_for_job_id: diagnostic.job_id } : undefined,
+    });
     return { documentId: result.documentId };
   } catch (err) {
+    if (/documents_one_balance_invoice_per_job_idx/.test(errText(err))) {
+      return { error: "This job got an invoice just now. Refresh, then open it from Documents." };
+    }
     console.error("createReportInvoice failed", errText(err));
     return { error: "Couldn't create the invoice. Try again." };
   }

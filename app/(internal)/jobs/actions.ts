@@ -17,6 +17,8 @@ import { requireOffice, requireRole } from "@/lib/require-role";
 import { notifyTech } from "@/lib/tech-notice-send";
 import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
 import { getFinishBlockers } from "@/lib/job-checklist";
+import { getInvoicePrompt } from "@/lib/finish-invoice";
+import type { InvoicePrompt } from "@/lib/job-invoice-rules";
 import { moveToEtDate, parseEtLocal } from "@/lib/tz";
 
 /** Start a service call and open its report. Problems come back inline instead of an error page. */
@@ -157,7 +159,7 @@ export async function assignJobToStaff(jobId: string, staffId: string | null): P
  * throwing: production builds hide a thrown server action's message, so the
  * Jobs list and the Field Board could only show a generic failure.
  */
-export async function updateJobStatus(formData: FormData): Promise<{ error?: string }> {
+export async function updateJobStatus(formData: FormData): Promise<{ error?: string; invoicePrompt?: InvoicePrompt }> {
   const id = String(formData.get("id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
   if (!id) return { error: "Job is required." };
@@ -184,6 +186,12 @@ export async function updateJobStatus(formData: FormData): Promise<{ error?: str
   }
 
   revalidatePath("/jobs");
+  // Owner/office finishing a job get the invoice to send (made as a draft in applyJobStatus).
+  // A tech gets nothing back: no invoice, no amount.
+  if (status === "complete" && role !== "tech") {
+    const invoicePrompt = await getInvoicePrompt(id);
+    if (invoicePrompt) return { invoicePrompt };
+  }
   return {};
 }
 

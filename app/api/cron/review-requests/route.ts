@@ -53,17 +53,17 @@ export async function GET(request: Request) {
   let skipped = 0;
   if (ids.length === 0) return NextResponse.json({ sent, skipped, errors });
 
-  let invoiceRows: { job_id: string; status: string | null; paid_at: string | null }[];
+  let invoiceRows: { job_id: string; status: string | null; paid_at: string | null; sent_at: string | null }[];
   let answeredRows: { job_id: string }[];
   try {
     invoiceRows = await inChunks(ids, async (chunk) => {
       const { data, error: e } = await supabase
         .from("documents")
-        .select("job_id, status, paid_at")
+        .select("job_id, status, paid_at, sent_at")
         .eq("type", "invoice")
         .in("job_id", chunk);
       if (e) throw new Error(e.message);
-      return (data ?? []) as { job_id: string; status: string | null; paid_at: string | null }[];
+      return (data ?? []) as { job_id: string; status: string | null; paid_at: string | null; sent_at: string | null }[];
     });
     answeredRows = await inChunks(ids, async (chunk) => {
       const { data, error: e } = await supabase.from("satisfaction_surveys").select("job_id").in("job_id", chunk);
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
   const invoicesByJob = new Map<string, InvoiceRow[]>();
   for (const r of invoiceRows) {
     const list = invoicesByJob.get(r.job_id) ?? [];
-    list.push({ status: r.status, paid_at: r.paid_at });
+    list.push({ status: r.status, paid_at: r.paid_at, sent_at: r.sent_at });
     invoicesByJob.set(r.job_id, list);
   }
   const answered = new Set(answeredRows.map((r) => r.job_id));

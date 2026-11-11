@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextReviewText, reviewTextCopy, reviewTriggerAt } from "../review-requests";
+import { isUnsentDraft, nextReviewText, reviewTextCopy, reviewTriggerAt } from "../review-requests";
 
 const day = 24 * 60 * 60 * 1000;
 const now = new Date("2026-11-20T16:00:00Z");
@@ -32,6 +32,38 @@ describe("reviewTriggerAt", () => {
 
   it("uses the finish time when nothing was invoiced here", () => {
     expect(reviewTriggerAt({ completedAt: ago(4), invoices: [] })).toBe(ago(4));
+  });
+
+  it("an unsent draft only (made on Finish) counts like no invoice: due from the finish", () => {
+    expect(reviewTriggerAt({ completedAt: ago(4), invoices: [{ status: "draft", paid_at: null, sent_at: null }] })).toBe(ago(4));
+    expect(isUnsentDraft({ status: "draft", paid_at: null, sent_at: null })).toBe(true);
+  });
+
+  it("a sent, unpaid invoice still waits for payment, even beside a draft", () => {
+    expect(
+      reviewTriggerAt({
+        completedAt: ago(4),
+        invoices: [
+          { status: "sent", paid_at: null, sent_at: ago(3) },
+          { status: "draft", paid_at: null, sent_at: null },
+        ],
+      })
+    ).toBeNull();
+    // Status still draft but already emailed (sent_at stamped): treated as sent.
+    expect(reviewTriggerAt({ completedAt: ago(4), invoices: [{ status: "draft", paid_at: null, sent_at: ago(2) }] })).toBeNull();
+  });
+
+  it("paid counts from paid_at; void and drafts are ignored", () => {
+    expect(
+      reviewTriggerAt({
+        completedAt: ago(6),
+        invoices: [
+          { status: "paid", paid_at: ago(2), sent_at: ago(5) },
+          { status: "void", paid_at: null, sent_at: null },
+          { status: "draft", paid_at: null, sent_at: null },
+        ],
+      })
+    ).toBe(ago(2));
   });
 
   it("has no trigger without a finish time or payment", () => {

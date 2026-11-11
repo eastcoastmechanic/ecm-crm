@@ -13,6 +13,9 @@ import { buttonClass, buttonSecondaryClass, headingClass, itemSubClass, itemTitl
 import FieldNoteForm from "./FieldNoteForm";
 import TruckJobCard, { OnSite, type TruckJob } from "./TruckJobCard";
 import OfflineSync from "./OfflineSync";
+import FinishInvoicePanel from "../jobs/FinishInvoicePanel";
+import { getInvoicePrompt } from "@/lib/finish-invoice";
+import type { InvoicePrompt } from "@/lib/job-invoice-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -240,6 +243,13 @@ export default async function FieldBoardPage() {
     .filter((job) => !isToday(job) && job.status !== "complete")
     .sort((a, b) => Number(!!b.assignedToMe) - Number(!!a.assignedToMe));
   const noteJobs = [...open, ...otherJobs];
+  // Owner/office who finish a job here see its draft invoice to send. Fetched only for those
+  // roles (getInvoicePrompt checks the role again), so a tech's page never carries money.
+  const invoicePrompts = isTech
+    ? []
+    : (await Promise.all(done.map(async (job) => ({ job, prompt: await getInvoicePrompt(job.id) })))).filter(
+        (p): p is { job: (typeof done)[number]; prompt: InvoicePrompt } => p.prompt !== null
+      );
 
   return (
     <div className="flex flex-col gap-6">
@@ -283,6 +293,20 @@ export default async function FieldBoardPage() {
 
       {tableMissing && (
         <p className="text-sm text-accent">This part isn&apos;t set up yet — tell the office.</p>
+      )}
+
+      {invoicePrompts.length > 0 && (
+        <div>
+          <h2 className="mb-3 font-display text-lg font-bold">Invoices to send</h2>
+          <div className="grid gap-3">
+            {invoicePrompts.map(({ job, prompt }) => (
+              <div key={job.id} className="flex flex-col gap-1">
+                <div className={itemTitleClass}>{job.customer ?? "Job"}</div>
+                <FinishInvoicePanel prompt={prompt} />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {next ? (
