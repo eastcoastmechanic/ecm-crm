@@ -107,6 +107,7 @@ Plans and audits live in `docs/ecm/`. Read them when planning, but trust the cod
 @docs/ecm/ecm-crm-phase2-plan-2026-10-23.md
 @docs/ecm/ecm-crm-phase3-plan-2026-10-23.md
 @docs/ecm/ecm-crm-feature-gaps-2026-10-22.md
+@docs/ecm/ecm-microsoft-claude-crm-plan-2026-11-10.md
 
 ## Keeping this current
 After each merged PR, update the "Where things stand" section. When Josh answers a decision, move it out of "Open decisions" and record the answer here.
