@@ -32,7 +32,7 @@ export type DailyBrief = {
   outstanding: { total: number; count: number } | null;
   leadsDueToday: number | null;
   leadsOverdue: number | null;
-  /** Estimates sent FIRST_FOLLOW_UP_DAY or more days ago and not approved. */
+  /** Estimates sent (sent_at, not drafted) FIRST_FOLLOW_UP_DAY or more New York days ago and not approved. */
   staleEstimates: number | null;
 };
 
@@ -69,7 +69,7 @@ export async function loadDailyBrief(now: Date = new Date()): Promise<DailyBrief
       .select("id", { count: "exact", head: true })
       .eq("type", "estimate")
       .eq("status", "sent")
-      .lte("created_at", staleCutoff),
+      .lte("sent_at", staleCutoff),
   ]);
 
   const staffNames = new Map<string, string>();
