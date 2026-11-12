@@ -1,4 +1,4 @@
-import { stripe } from "@/lib/stripe";
+import type Stripe from "stripe";
 import { supabase } from "@/lib/supabase";
 import { fetchAllRows } from "@/lib/fetch-all";
 import {
@@ -48,7 +48,7 @@ const CONCURRENCY = 4;
 
 type Outcome = { kind: "created" | "reused" } | { kind: "failed"; code: string };
 
-async function ensureStripeCustomer(c: StripeCrmCust, propertyAddress: string | null): Promise<Outcome> {
+async function ensureStripeCustomer(stripe: Stripe, c: StripeCrmCust, propertyAddress: string | null): Promise<Outcome> {
   try {
     let stripeId: string | null = null;
     let kind: "created" | "reused" = "reused";
@@ -112,6 +112,10 @@ export async function createStripeCustomers(dryRun: boolean): Promise<StripeCust
   out.willCreate = plan.toCreate.length;
   if (dryRun) return out;
 
+  // Loaded here, not at the top: lib/stripe builds its client on import and throws with no key,
+  // which would take down the whole /payments page instead of returning the panel error.
+  const { stripe } = await import("@/lib/stripe");
+
   const firstProperty = new Map<string, string>();
   for (const p of properties) {
     if (p.customer_id && p.address && !firstProperty.has(p.customer_id)) firstProperty.set(p.customer_id, p.address);
@@ -124,7 +128,7 @@ export async function createStripeCustomers(dryRun: boolean): Promise<StripeCust
   const worker = async () => {
     while (next < batch.length) {
       const c = batch[next++];
-      const r = await ensureStripeCustomer(c, firstProperty.get(c.id) ?? null);
+      const r = await ensureStripeCustomer(stripe, c, firstProperty.get(c.id) ?? null);
       if (r.kind === "failed") {
         out.failed += 1;
         codes.add(r.code);
