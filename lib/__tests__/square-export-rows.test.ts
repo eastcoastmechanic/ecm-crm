@@ -40,6 +40,12 @@ describe("csvCell / toCsv", () => {
     expect(csvCell("-0.40")).toBe("-0.40");
   });
 
+  it("keeps ZIPs, phones and card digits as text in Excel without making them live formulas", () => {
+    expect(csvCell({ text: "02360" })).toBe(`"=""02360"""`);
+    expect(csvCell({ text: "+15085550100" })).toBe(`"=""+15085550100"""`);
+    expect(csvCell({ text: `a"b` })).toBe(`"=""a""""b"""`);
+  });
+
   it("starts with a byte-order mark and uses Windows line ends", () => {
     const csv = toCsv({ header: ["A", "B"], rows: [["1", "x,y"]] });
     expect(csv).toBe('﻿A,B\r\n1,"x,y"\r\n');
@@ -53,7 +59,7 @@ describe("row builders", () => {
     ]);
     expect(s.rows).toHaveLength(1);
     const row = Object.fromEntries(s.header.map((h, i) => [h, s.rows[0][i]]));
-    expect(row).toMatchObject({ "Square customer ID": "C1", "First name": "Pat", Town: "Plymouth", ZIP: "02360", "Created (ET)": "2024-05-01 08:00" });
+    expect(row).toMatchObject({ "Square customer ID": "C1", "First name": "Pat", Town: "Plymouth", ZIP: { text: "02360" }, "Created (ET)": "2024-05-01 08:00" });
   });
 
   it("invoices: totals from payment requests and the location name", () => {
@@ -83,7 +89,7 @@ describe("row builders", () => {
       loc
     );
     const prow = Object.fromEntries(p.header.map((h, i) => [h, p.rows[0][i]]));
-    expect(prow).toMatchObject({ Amount: "100.00", Tip: "5.00", Total: "105.00", Refunded: "25.00", "Square fees": "3.20", "Card last 4": "4242" });
+    expect(prow).toMatchObject({ Amount: "100.00", Tip: "5.00", Total: "105.00", Refunded: "25.00", "Square fees": "3.20", "Card last 4": { text: "4242" } });
 
     const r = refundSheet([{ id: "R1", status: "COMPLETED", amount_money: { amount: 2500 }, reason: "Duplicate", payment_id: "P1" }], loc);
     const rrow = Object.fromEntries(r.header.map((h, i) => [h, r.rows[0][i]]));

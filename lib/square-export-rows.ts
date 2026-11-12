@@ -108,7 +108,15 @@ export type ExportCatalogObject = {
   };
 };
 
-export type Sheet = { header: string[]; rows: (string | number)[][] };
+/** A cell Excel must keep as typed text (leading zeros, a leading +). */
+export type TextCell = { text: string };
+export type Cell = string | number | TextCell;
+export type Sheet = { header: string[]; rows: Cell[][] };
+
+/** Keep as text in Excel; blank stays blank. */
+export function asText(value: string | null | undefined): Cell {
+  return value ? { text: value } : "";
+}
 
 /** Cents to "125.00". Blank when Square gave no amount. */
 export function dollars(money: Money | number | null | undefined): string {
@@ -144,12 +152,12 @@ export function customerSheet(customers: ExportCustomer[]): Sheet {
       c.company_name ?? "",
       c.nickname ?? "",
       c.email_address ?? "",
-      c.phone_number ?? "",
+      asText(c.phone_number),
       c.address?.address_line_1 ?? "",
       c.address?.address_line_2 ?? "",
       c.address?.locality ?? "",
       c.address?.administrative_district_level_1 ?? "",
-      c.address?.postal_code ?? "",
+      asText(c.address?.postal_code),
       c.reference_id ?? "",
       c.note ?? "",
       c.creation_source ?? "",
@@ -171,13 +179,13 @@ export function invoiceSheet(invoices: ExportInvoice[], locationName: (id?: stri
       const dueDates = req.map((x) => x.due_date).filter(Boolean);
       return [
         inv.id ?? "",
-        inv.invoice_number ?? "",
+        asText(inv.invoice_number),
         locationName(inv.location_id),
         inv.status ?? "",
         inv.title ?? "",
         join(r.given_name, r.family_name) || r.company_name || "",
         r.email_address ?? "",
-        r.phone_number ?? "",
+        asText(r.phone_number),
         r.customer_id ?? "",
         dollars(total),
         dollars(paid),
@@ -209,10 +217,10 @@ export function paymentSheet(payments: ExportPayment[], locationName: (id?: stri
       p.total_money?.currency ?? p.amount_money?.currency ?? "USD",
       p.source_type ?? "",
       p.card_details?.card?.card_brand ?? "",
-      p.card_details?.card?.last_4 ?? "",
+      asText(p.card_details?.card?.last_4),
       p.customer_id ?? "",
       p.order_id ?? "",
-      p.receipt_number ?? "",
+      asText(p.receipt_number),
       p.receipt_url ?? "",
       p.note ?? "",
     ]),
@@ -243,7 +251,7 @@ export function catalogSheet(objects: ExportCatalogObject[]): Sheet {
   const categoryName = new Map<string, string>();
   for (const o of objects) if (o.type === "CATEGORY" && o.id) categoryName.set(o.id, o.category_data?.name ?? "");
 
-  const rows: (string | number)[][] = [];
+  const rows: Cell[][] = [];
   for (const o of objects) {
     if (o.type !== "ITEM" || o.is_deleted) continue;
     const item = o.item_data ?? {};
@@ -260,7 +268,7 @@ export function catalogSheet(objects: ExportCatalogObject[]): Sheet {
         item.description ?? "",
         v?.id ?? "",
         vd.name ?? "",
-        vd.sku ?? "",
+        asText(vd.sku),
         vd.pricing_type ?? "",
         dollars(vd.price_money),
         vd.price_money?.currency ?? "",
@@ -277,8 +285,15 @@ export function catalogSheet(objects: ExportCatalogObject[]): Sheet {
  * One CSV cell. Quotes when needed, and puts a ' in front of anything Excel
  * would run as a formula (=, +, -, @, tab, return), so a name or note typed into
  * Square can never become a live formula in the spreadsheet. Plain numbers stay numbers.
+ * A TextCell (ZIP, phone, invoice number, card last 4, SKU) is written as ="..." so
+ * Excel keeps leading zeros and a leading +. Inside ="..." the value is a plain string
+ * (its quotes doubled), so it can't run as a formula either.
  */
-export function csvCell(value: string | number): string {
+export function csvCell(value: Cell): string {
+  if (typeof value === "object") {
+    const formula = `="${value.text.replace(/[\r\n]+/g, " ").replaceAll('"', '""')}"`;
+    return `"${formula.replaceAll('"', '""')}"`;
+  }
   let text = String(value);
   if (typeof value === "string" && /^[=+\-@\t\r]/.test(text) && !/^-?\d+(\.\d+)?$/.test(text)) text = `'${text}`;
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
