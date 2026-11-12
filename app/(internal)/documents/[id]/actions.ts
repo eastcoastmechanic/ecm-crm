@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { getDocumentForPdf, dueDateForSend } from "@/lib/documents";
-import { renderDocumentPdf } from "@/lib/pdf";
+import { renderDocumentPdf, type PdfDocumentData } from "@/lib/pdf";
+import { invoiceForSend, type InvoiceExtras } from "@/lib/invoice-view";
+import { invoiceEmailHtml, invoiceEmailSubject, invoiceEmailText } from "@/lib/invoice-email";
+import { EMAIL_LOGO_URL } from "@/lib/brand";
 import { getAssessmentReportForPdf } from "@/lib/assessment-reports";
 import { renderAssessmentReportPdf } from "@/lib/assessment-report-pdf";
 import { getWarrantyReportForPdf } from "@/lib/warranty-reports";
@@ -291,6 +294,7 @@ type OutgoingEmail = {
   to: string;
   subject: string;
   text: string;
+  html?: string;
   filename: string;
   pdf: Buffer;
   extraUpdate?: Record<string, unknown>;
@@ -346,6 +350,7 @@ async function buildDocumentEmail(id: string, type: string | undefined): Promise
   if (data.type === "invoice" && Array.isArray(data.line_items) && data.line_items.length === 0) {
     return { error: "This invoice has no line items yet. Add them and save, then send." };
   }
+  if (data.type === "invoice" && data.invoice) return buildInvoiceEmail(id, { ...data, invoice: data.invoice }, customerEmail, dueDate);
   const label = typeLabel[data.type] ?? "Document";
   return {
     to: customerEmail,
@@ -356,6 +361,56 @@ async function buildDocumentEmail(id: string, type: string | undefined): Promise
     filename: `${data.doc_number ?? label}.pdf`,
     pdf: await renderDocumentPdf(data),
     extraUpdate: { due_date: dueDateForSend(data.type, dueDate) },
+  };
+}
+
+/**
+ * The invoice email: branded HTML with a Pay invoice button, the plain-text
+ * copy, and the PDF attached. The button opens a Stripe Checkout link made the
+ * same way as the office's payment link (lib/payment-links.ts), so the webhook
+ * marks the invoice paid as it always has. If Stripe can't make one, the button
+ * goes to the customer portal's Pay Now instead; the email still goes out.
+ */
+async function buildInvoiceEmail(
+  id: string,
+  data: PdfDocumentData & { invoice: InvoiceExtras },
+  to: string,
+  storedDueDate: string | null
+): Promise<OutgoingEmail> {
+  const now = new Date();
+  const newDue = dueDateForSend("invoice", storedDueDate, now);
+  const invoice = invoiceForSend(data.invoice, newDue, now);
+  const { view } = invoice;
+
+  let checkoutUrl: string | null = null;
+  if (!view.paid && view.balanceDueCents > 0) {
+    try {
+      const { createInvoicePaymentLink } = await import("@/lib/payment-links");
+      checkoutUrl = (await createInvoicePaymentLink(id))?.url ?? null;
+    } catch (err) {
+      console.error("sendDocumentEmail: pay link failed, using the portal link", err instanceof Error ? err.message : err);
+    }
+  }
+
+  const emailInput = {
+    customerName: data.customer_name,
+    docNumber: data.doc_number,
+    serviceAddress: data.property_address,
+    view,
+    dueDate: invoice.dueDate,
+    todayKey: invoice.todayKey,
+    checkoutUrl,
+    portalUrl: invoice.portalUrl,
+    logoUrl: EMAIL_LOGO_URL,
+  };
+  return {
+    to,
+    subject: invoiceEmailSubject(emailInput),
+    text: invoiceEmailText(emailInput),
+    html: invoiceEmailHtml(emailInput),
+    filename: `${data.doc_number ?? "Invoice"}.pdf`,
+    pdf: await renderDocumentPdf({ ...data, invoice }),
+    extraUpdate: { due_date: newDue },
   };
 }
 
@@ -410,6 +465,7 @@ export async function sendDocumentEmail(_prev: SendDocumentState, formData: Form
       to: email.to,
       subject: email.subject,
       text: email.text,
+      ...(email.html ? { html: email.html } : {}),
       attachments: [{ filename: email.filename, content: email.pdf }],
     });
     if (sendError) {
