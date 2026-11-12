@@ -1,4 +1,6 @@
-const SQUARE_BASE_URL = "https://connect.squareup.com";
+import type { SquareCatalogObject } from "@/lib/square-catalog-rules";
+
+const SQUARE_BASE_URL ="https://connect.squareup.com";
 const SQUARE_VERSION = "2026-08-19";
 
 function squareHeaders() {
@@ -241,6 +243,32 @@ export async function listSquareCustomers(): Promise<SquareCustomer[]> {
   } while (cursor && pages < 200);
   if (cursor) throw new Error("Square has more than 20,000 customers; stopped before importing a partial list.");
   return customers;
+}
+
+/**
+ * Every catalog ITEM (with its variations) and CATEGORY on the Square account (read only).
+ * Follows all pages, up to 200 pages; stops with an error rather than return a partial catalog.
+ */
+export async function listSquareCatalog(): Promise<SquareCatalogObject[]> {
+  const headers = squareHeaders();
+  if (!headers) throw new Error("SQUARE_ACCESS_TOKEN is not set.");
+
+  const objects: SquareCatalogObject[] = [];
+  let cursor: string | undefined;
+  let pages = 0;
+  do {
+    const url = new URL(`${SQUARE_BASE_URL}/v2/catalog/list`);
+    url.searchParams.set("types", "ITEM,CATEGORY");
+    if (cursor) url.searchParams.set("cursor", cursor);
+    const res = await fetch(url.toString(), { headers, cache: "no-store" });
+    if (!res.ok) throw new Error(`Square catalog list failed (${res.status}): ${await res.text()}`);
+    const json = (await res.json()) as { objects?: SquareCatalogObject[]; cursor?: string };
+    objects.push(...(json.objects ?? []));
+    cursor = json.cursor;
+    pages += 1;
+  } while (cursor && pages < 200);
+  if (cursor) throw new Error("The Square catalog has more than 200 pages; stopped before importing a partial list.");
+  return objects;
 }
 
 export async function bulkRetrieveSquareCustomers(customerIds: string[]): Promise<Map<string, SquareCustomer>> {
