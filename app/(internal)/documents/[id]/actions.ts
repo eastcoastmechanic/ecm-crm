@@ -379,7 +379,7 @@ async function buildInvoiceEmail(
 ): Promise<OutgoingEmail> {
   const now = new Date();
   const newDue = dueDateForSend("invoice", storedDueDate, now);
-  const invoice = invoiceForSend(data.invoice, newDue, now);
+  const invoice = invoiceForSend(data.invoice, newDue);
   const { view } = invoice;
 
   let checkoutUrl: string | null = null;

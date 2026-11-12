@@ -4,7 +4,6 @@ import {
   depositNote,
   depositSentence,
   invoiceForSend,
-  invoiceIssueDate,
   isPastDue,
   jobReference,
   type InvoiceExtras,
@@ -118,12 +117,6 @@ describe("dates", () => {
     expect(isPastDue({ paid: true, balanceDueCents: 0 }, "2026-11-01", "2026-11-11")).toBe(false);
   });
 
-  it("issue date: first send, else now when sending, else created", () => {
-    const now = new Date("2026-11-11T15:00:00Z");
-    expect(invoiceIssueDate("2026-11-01T12:00:00Z", "2026-10-30T12:00:00Z", now)).toBe("2026-11-01T12:00:00Z");
-    expect(invoiceIssueDate(null, "2026-10-30T12:00:00Z", now)).toBe(now.toISOString());
-    expect(invoiceIssueDate(null, "2026-10-30T12:00:00Z")).toBe("2026-10-30T12:00:00Z");
-  });
 
   it("net 30 counts from the New York date, so a 10 PM ET send isn't a day late", () => {
     // 10 PM ET on Nov 10 is already Nov 11 in UTC.
@@ -132,11 +125,10 @@ describe("dates", () => {
     expect(dueDateForSend("estimate", null)).toBeUndefined();
   });
 
-  it("invoiceForSend keeps a stored due date and fills a new one on first send", () => {
-    const base = { sentAt: null, createdAt: "2026-11-01T12:00:00Z", dueDate: null } as unknown as InvoiceExtras;
-    const now = new Date("2026-11-11T15:00:00Z");
-    expect(invoiceForSend(base, "2026-12-11", now)).toMatchObject({ dueDate: "2026-12-11", issueDate: now.toISOString() });
-    expect(invoiceForSend({ ...base, dueDate: "2026-12-01" }, undefined, now).dueDate).toBe("2026-12-01");
+  it("invoiceForSend keeps a stored due date, fills a new one on first send, never moves the issue date", () => {
+    const base = { issueDate: "2026-11-01T12:00:00Z", dueDate: null } as unknown as InvoiceExtras;
+    expect(invoiceForSend(base, "2026-12-11")).toMatchObject({ dueDate: "2026-12-11", issueDate: "2026-11-01T12:00:00Z" });
+    expect(invoiceForSend({ ...base, dueDate: "2026-12-01" }, undefined).dueDate).toBe("2026-12-01");
   });
 
   it("job reference reads plainly", () => {

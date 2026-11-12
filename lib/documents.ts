@@ -4,7 +4,7 @@ import type { PdfDocumentData } from "@/lib/pdf";
 import type { LinkedDoc } from "@/lib/job-invoice-rules";
 import { customerFacingJobPhotos, jobIdForDocument } from "@/lib/job-photos";
 import { collapseToTier, selectedTier } from "@/lib/estimate-tier";
-import { buildInvoiceView, invoiceIssueDate, jobReference, type InvoiceExtras } from "@/lib/invoice-view";
+import { buildInvoiceView, jobReference, type InvoiceExtras } from "@/lib/invoice-view";
 import { CUSTOMER_PORTAL_URL } from "@/lib/brand";
 import { addDaysToDateKey, etDateKey, formatEtDate } from "@/lib/tz";
 
@@ -85,7 +85,6 @@ export async function getDocumentForPdf(id: string): Promise<{
 
 type InvoiceRow = {
   created_at: string;
-  sent_at?: string | null;
   paid_at?: string | null;
   due_date?: string | null;
   status: string | null;
@@ -131,11 +130,9 @@ async function invoiceExtras(id: string, doc: InvoiceRow, lineItems: PdfDocument
   const c = doc.customers ?? {};
   return {
     view: buildInvoiceView({ lines: lineItems, total: doc.total, tax: doc.tax, status: doc.status, linked }),
-    issueDate: invoiceIssueDate(doc.sent_at ?? null, doc.created_at),
+    issueDate: doc.created_at,
     dueDate: doc.due_date ?? null,
     todayKey: etDateKey(),
-    sentAt: doc.sent_at ?? null,
-    createdAt: doc.created_at,
     paidAt: doc.paid_at ?? null,
     jobRef: jobReference(job, (iso) => formatEtDate(iso)),
     billTo: {

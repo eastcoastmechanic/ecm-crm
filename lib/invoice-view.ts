@@ -121,15 +121,12 @@ export function depositNote(doc: LinkedDoc | null, invoiceTotalCents: number): I
 /** Everything the invoice PDF and email need beyond the plain document. */
 export type InvoiceExtras = {
   view: InvoiceView;
-  /** ISO time or YYYY-MM-DD; printed as a New York date. */
+  /** documents.created_at (never changes); printed as a New York date. */
   issueDate: string;
   /** YYYY-MM-DD, or null before the first send (net 30 is set then). */
   dueDate: string | null;
   /** Today's New York date (YYYY-MM-DD), for the past-due flag. */
   todayKey: string;
-  /** documents.sent_at: set once the invoice has been emailed. */
-  sentAt: string | null;
-  createdAt: string;
   paidAt: string | null;
   jobRef: string | null;
   billTo: {
@@ -144,16 +141,13 @@ export type InvoiceExtras = {
 };
 
 /**
- * The invoice as it goes out in an email: the issue date becomes the first send
- * (now, unless it was sent before) and the due date the one this send stores
- * (net 30 on a first send), so the attached PDF matches the saved row.
+ * The invoice as it goes out in an email: the due date is the one this send
+ * stores (net 30 on a first send), so the attached PDF matches the saved row.
+ * The issue date stays the day the invoice was made (documents.created_at):
+ * sent_at is restamped on every re-send, so it can't be the issue date.
  */
-export function invoiceForSend(extras: InvoiceExtras, newDueDate: string | undefined, now: Date): InvoiceExtras {
-  return {
-    ...extras,
-    issueDate: invoiceIssueDate(extras.sentAt, extras.createdAt, now),
-    dueDate: extras.dueDate ?? newDueDate ?? null,
-  };
+export function invoiceForSend(extras: InvoiceExtras, newDueDate: string | undefined): InvoiceExtras {
+  return { ...extras, dueDate: extras.dueDate ?? newDueDate ?? null };
 }
 
 /** One sentence about the deposit, for the PDF and the email. */
@@ -167,16 +161,6 @@ export function depositSentence(d: InvoiceDepositNote): string {
 export function isPastDue(view: Pick<InvoiceView, "paid" | "balanceDueCents">, dueDate: string | null, todayKey: string): boolean {
   if (view.paid || view.balanceDueCents <= 0 || !dueDate) return false;
   return dueDate < todayKey;
-}
-
-/**
- * The date printed as "Issued": the first send, or now when this is the first
- * send, else (a draft downloaded before sending) the day it was created.
- */
-export function invoiceIssueDate(sentAt: string | null, createdAt: string, sendingAt?: Date): string {
-  if (sentAt) return sentAt;
-  if (sendingAt) return sendingAt.toISOString();
-  return createdAt;
 }
 
 const JOB_TYPE_LABEL: Record<string, string> = {
