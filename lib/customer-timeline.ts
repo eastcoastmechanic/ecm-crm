@@ -86,6 +86,13 @@ export type SquarePaymentRow = {
   source_type: string | null;
   square_created_at: string | null;
 };
+export type SquareRefundRow = {
+  id: string;
+  status: string | null;
+  amount_cents: number | null;
+  reason: string | null;
+  square_created_at: string | null;
+};
 
 export type TimelineSources = {
   conversations?: ConversationRow[];
@@ -96,6 +103,7 @@ export type TimelineSources = {
   surveys?: SurveyRow[];
   campaignSends?: CampaignSendRow[];
   squarePayments?: SquarePaymentRow[];
+  squareRefunds?: SquareRefundRow[];
 };
 
 export type TimelineOptions = {
@@ -401,6 +409,20 @@ export function buildCustomerTimeline(sources: TimelineSources, options: Timelin
         options.showMoney ? centsToDollars(p.total_cents) : null,
         humanize(p.source_type).toLowerCase(),
         p.status ? p.status.toLowerCase() : null,
+      ]),
+      href: "/payments",
+    });
+  }
+
+  for (const r of sources.squareRefunds ?? []) {
+    push(out, r.square_created_at, {
+      key: `square-refund-${r.id}`,
+      category: "money",
+      label: "Square refund",
+      summary: joinParts([
+        options.showMoney ? centsToDollars(r.amount_cents) : null,
+        firstLine(r.reason, 60),
+        r.status ? r.status.toLowerCase() : null,
       ]),
       href: "/payments",
     });
