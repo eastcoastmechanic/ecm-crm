@@ -76,6 +76,16 @@ export type SquareCustomer = {
   company_name?: string;
   email_address?: string;
   phone_number?: string;
+  address?: SquareAddress;
+  note?: string;
+};
+
+export type SquareAddress = {
+  address_line_1?: string;
+  address_line_2?: string;
+  locality?: string;
+  administrative_district_level_1?: string;
+  postal_code?: string;
 };
 
 type SquarePaymentList = { payments?: SquarePayment[]; cursor?: string };

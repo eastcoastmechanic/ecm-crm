@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireOwner } from "@/lib/require-role";
 import { isSquareConfigured } from "@/lib/square";
-import { importSquareCustomers, type SquareImportResult } from "@/lib/square-import";
+import { emptyImportResult, importSquareCustomers, type SquareImportResult } from "@/lib/square-import";
 
 /** Owner only. dry_run=1 only counts; anything else imports. */
 export async function runSquareCustomerImport(
@@ -13,11 +13,12 @@ export async function runSquareCustomerImport(
   await requireOwner();
   const dryRun = formData.get("dry_run") === "1";
   if (!isSquareConfigured()) {
-    return { dryRun, error: "SQUARE_ACCESS_TOKEN is not set on Vercel.", squareTotal: 0, willCreate: 0, willLink: 0, alreadyLinked: 0, skipped: 0, created: 0, linked: 0, failed: 0 };
+    return { ...emptyImportResult(dryRun), error: "SQUARE_ACCESS_TOKEN is not set on Vercel." };
   }
   const result = await importSquareCustomers(dryRun);
-  if (!dryRun && !result.error) {
+  if (!dryRun && (result.created || result.linked || result.filled || result.notesAdded || result.propertiesAdded)) {
     revalidatePath("/customers");
+    revalidatePath("/properties");
     revalidatePath("/payments");
   }
   return result;
