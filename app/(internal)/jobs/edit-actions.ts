@@ -17,7 +17,8 @@ import {
   isDoneStatus,
   type JobEditChanges,
 } from "@/lib/job-edit-rules";
-import { assignJobToStaff, rescheduleJobAt } from "./actions";
+import { moveJobToTime } from "@/lib/job-reschedule";
+import { assignJobToStaff } from "./actions";
 
 /** What the editor typed, echoed back so the form keeps it after an error (React 19 clears forms). */
 export type JobEditValues = {
@@ -212,7 +213,10 @@ export async function saveJobEdit(_prev: JobEditState, formData: FormData): Prom
   };
   const applyTime = async (): Promise<string | null> => {
     if (!changes.scheduledAt) return null;
-    const moved = await rescheduleJobAt(jobId, changes.scheduledAt);
+    // Moving an open job to Scheduled in the same save: that status change sends the customer
+    // the schedule notice (with the new time), so the time move doesn't send one too.
+    const skipCustomerNotice = changes.status === "scheduled" && job.status !== "requested";
+    const moved = await moveJobToTime(jobId, changes.scheduledAt, { skipCustomerNotice });
     if (moved.error) return moved.error;
     savedSomething = true;
     return null;

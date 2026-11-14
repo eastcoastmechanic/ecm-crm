@@ -344,6 +344,21 @@ export default function JobsView({
 
       {actionError && <p className={errorClass}>{actionError}</p>}
 
+      {/* Shown above the list, not in the row: a job marked done moves to Completed, and its
+          draft invoice to send must not disappear with it. */}
+      {Object.entries(invoicePrompts).map(([jobId, prompt]) => {
+        const done = jobs.find((j) => j.id === jobId);
+        return (
+          <div key={jobId} className="flex flex-col gap-1">
+            <div className="text-xs text-g300">
+              {done?.customers?.name ?? "Job"}
+              {done?.properties?.address ? ` — ${done.properties.address}` : ""}
+            </div>
+            <FinishInvoicePanel prompt={prompt} onClose={() => setInvoicePrompt(jobId, undefined)} />
+          </div>
+        );
+      })}
+
       {view === "calendar" ? (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
@@ -591,10 +606,6 @@ export default function JobsView({
                   onInvoicePrompt={(prompt) => setInvoicePrompt(job.id, prompt)}
                   onDone={() => setEditingId(null)}
                 />
-              )}
-
-              {invoicePrompts[job.id] && (
-                <FinishInvoicePanel prompt={invoicePrompts[job.id]} onClose={() => setInvoicePrompt(job.id, undefined)} />
               )}
 
               <AssignJobForm jobId={job.id} assignedStaffId={job.assigned_staff_id ?? null} staff={staff} />
