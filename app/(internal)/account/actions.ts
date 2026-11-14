@@ -43,6 +43,7 @@ const TEAMS_TEST_CHANNELS: { channel: TeamsChannel; label: string }[] = [
   { channel: "parts", label: "Parts & Inventory" },
   { channel: "reviews", label: "Reviews" },
   { channel: "general", label: "General" },
+  { channel: "brief", label: "Morning Brief (owner only)" },
 ];
 
 /**
