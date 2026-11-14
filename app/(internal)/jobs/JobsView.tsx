@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { addJobPhotos, markOnWay, rescheduleJob, updateJobStatus } from "./actions";
+import { addJobPhotos, markOnWay, rescheduleJob } from "./actions";
 import { addTask, completeTask } from "../tasks/actions";
 import SubmitButton from "../SubmitButton";
 import CreateInvoiceForm from "./CreateInvoiceForm";
@@ -13,17 +13,12 @@ import AssignJobForm from "./AssignJobForm";
 import JobNotebook from "./JobNotebook";
 import JobTimers, { type JobTimerView } from "./JobTimers";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
-import { formatEtShortDateTime, formatEtTime } from "@/lib/tz";
+import { formatEtShortDate, formatEtShortDateTime, formatEtTime } from "@/lib/tz";
+import JobStatusForm from "./JobStatusForm";
+import EditJobForm from "./EditJobForm";
+import { isDoneStatus, jobTab, normalizeJobStatus, splitJobsByTab, type JobTab } from "@/lib/job-edit-rules";
 
-const statusOptions = ["requested", "scheduled", "in_progress", "complete", "cancelled"];
-
-const statusLabel: Record<string, string> = {
-  requested: "Requested",
-  scheduled: "Scheduled",
-  in_progress: "In progress",
-  complete: "Complete",
-  cancelled: "Cancelled",
-};
+const tabLabel: Record<JobTab, string> = { active: "Active", completed: "Completed", cancelled: "Cancelled" };
 
 const statusDotClass: Record<string, string> = {
   requested: "bg-g500",
@@ -50,6 +45,9 @@ type Job = {
   job_type?: string | null;
   scheduled_at: string | null;
   status: string;
+  completed_at?: string | null;
+  customer_id?: string | null;
+  property_id?: string | null;
   notes: string | null;
   on_way_at: string | null;
   tracked_hours: number | null;
@@ -101,7 +99,7 @@ function BillingLine({
   hint?: Job["invoiceHint"];
 }) {
   if (invoices.length === 0) {
-    if (status !== "complete") return null;
+    if (!isDoneStatus(status)) return null;
     return (
       <div className="mt-1">
         <div className="text-xs font-semibold text-amber-400">Finished — no invoice linked yet</div>
@@ -134,6 +132,7 @@ export default function JobsView({
   staff,
   hourlyRate,
   initialView = "calendar",
+  initialTab = "active",
 }: {
   jobs: Job[];
   tasks: Task[];
@@ -141,6 +140,8 @@ export default function JobsView({
   hourlyRate: number | null;
   /** "list" when a link points at one job (/jobs?view=list#job-<id>, from the Log). */
   initialView?: "calendar" | "list";
+  /** Active (default), Completed or Cancelled, from ?tab=. */
+  initialTab?: JobTab;
 }) {
   const router = useRouter();
   const [view, setView] = useState<"calendar" | "list">(initialView);
@@ -166,6 +167,8 @@ export default function JobsView({
   const [optimizeMessage, setOptimizeMessage] = useState<string | null>(null);
   const [addingTaskFor, setAddingTaskFor] = useState<string | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [tab, setTab] = useState<JobTab>(initialTab);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const days = useMemo(() => monthGrid(monthCursor), [monthCursor]);
   const today = new Date();
@@ -180,8 +183,28 @@ export default function JobsView({
     );
   }, [jobs, search]);
 
+  // Finished jobs leave the active list; they live under Completed (newest first), still editable.
+  const jobsByTab = useMemo(() => splitJobsByTab(filteredJobs), [filteredJobs]);
+  const tabJobs = jobsByTab[tab];
+
+  // A link to one job (/jobs?view=list#job-<id>, from the Log) opens the tab that job is in.
+  useEffect(() => {
+    const id = window.location.hash.startsWith("#job-") ? window.location.hash.slice(5) : "";
+    const target = id ? jobs.find((j) => j.id === id) : undefined;
+    if (!target) return;
+    const t = jobTab(target.status);
+    if (t === "active") return;
+    const frame = requestAnimationFrame(() => {
+      setTab(t);
+      requestAnimationFrame(() => document.getElementById(`job-${id}`)?.scrollIntoView());
+    });
+    return () => cancelAnimationFrame(frame);
+    // Only on first load: later tab clicks are the person's choice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function jobsOn(day: Date) {
-    return filteredJobs.filter((j) => j.scheduled_at && sameDate(new Date(j.scheduled_at), day));
+    return tabJobs.filter((j) => j.scheduled_at && sameDate(new Date(j.scheduled_at), day));
   }
 
   function tasksOn(day: Date) {
@@ -209,21 +232,6 @@ export default function JobsView({
       router.refresh();
     } catch {
       setActionError("Couldn't reschedule the job. Check your connection and try again.");
-    }
-  }
-
-  async function handleStatusSave(formData: FormData) {
-    setActionError(null);
-    try {
-      const result = await updateJobStatus(formData);
-      if (result.error) {
-        setActionError(result.error);
-        return;
-      }
-      setInvoicePrompt(String(formData.get("id") ?? ""), result.invoicePrompt);
-      router.refresh();
-    } catch {
-      setActionError("Couldn't save the status. Check your connection and try again.");
     }
   }
 
@@ -310,6 +318,21 @@ export default function JobsView({
       </div>
       {optimizeMessage && <p className={subTextClass}>{optimizeMessage}</p>}
 
+      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Which jobs">
+        {(["active", "completed", "cancelled"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => setTab(t)}
+            className={tab === t ? buttonClass : buttonSecondaryClass}
+          >
+            {tabLabel[t]} ({jobsByTab[t].length})
+          </button>
+        ))}
+      </div>
+
       <input
         type="text"
         placeholder="Search jobs…"
@@ -320,6 +343,21 @@ export default function JobsView({
       />
 
       {actionError && <p className={errorClass}>{actionError}</p>}
+
+      {/* Shown above the list, not in the row: a job marked done moves to Completed, and its
+          draft invoice to send must not disappear with it. */}
+      {Object.entries(invoicePrompts).map(([jobId, prompt]) => {
+        const done = jobs.find((j) => j.id === jobId);
+        return (
+          <div key={jobId} className="flex flex-col gap-1">
+            <div className="text-xs text-g300">
+              {done?.customers?.name ?? "Job"}
+              {done?.properties?.address ? ` — ${done.properties.address}` : ""}
+            </div>
+            <FinishInvoicePanel prompt={prompt} onClose={() => setInvoicePrompt(jobId, undefined)} />
+          </div>
+        );
+      })}
 
       {view === "calendar" ? (
         <div className="flex flex-col gap-3">
@@ -387,7 +425,7 @@ export default function JobsView({
                         .filter(Boolean)
                         .join(" · ")}
                     >
-                      <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${statusDotClass[job.status] ?? "bg-g500"}`} />
+                      <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${statusDotClass[normalizeJobStatus(job.status)] ?? "bg-g500"}`} />
                       {job.customers?.name ?? "Unknown"}
                       {job.customers?.no_followups ? " · no follow-ups" : ""}
                     </div>
@@ -450,14 +488,12 @@ export default function JobsView({
         </div>
       ) : (
         <div className="flex flex-col divide-y divide-white/8">
-          {filteredJobs.length === 0 && <p className={subTextClass}>No jobs match.</p>}
-          {filteredJobs.map((job) => (
+          {tabJobs.length === 0 && (
+            <p className={subTextClass}>{search.trim() ? "No jobs match." : `No ${tabLabel[tab].toLowerCase()} jobs.`}</p>
+          )}
+          {tabJobs.map((job) => (
             <div key={job.id} id={`job-${job.id}`} className="flex scroll-mt-20 flex-col gap-2 py-3">
-            <form
-              action={handleStatusSave}
-              className="flex flex-wrap items-center justify-between gap-3"
-            >
-              <input type="hidden" name="id" value={job.id} />
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className={itemTitleClass}>
                   {job.customers?.id ? (
@@ -488,6 +524,7 @@ export default function JobsView({
                   )}
                 </div>
                 <div className={itemSubClass}>
+                  {isDoneStatus(job.status) && job.completed_at ? `Done ${formatEtShortDate(job.completed_at)} · ` : ""}
                   {job.scheduled_at ? formatEtShortDateTime(job.scheduled_at) : "No date"}
                   {job.notes ? ` · ${job.notes}` : ""}
                   {job.on_way_at ? ` · On the way at ${formatEtTime(job.on_way_at)}` : ""}
@@ -546,19 +583,29 @@ export default function JobsView({
                     className={inputClass}
                   />
                 </label>
-                <select name="status" defaultValue={job.status} className={inputClass} aria-label="Job status">
-                  {statusOptions.map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabel[s] ?? s}
-                    </option>
-                  ))}
-                </select>
-                <SubmitButton className={buttonClass}>Save</SubmitButton>
+                <button
+                  type="button"
+                  onClick={() => setEditingId(editingId === job.id ? null : job.id)}
+                  className={buttonSecondaryClass}
+                  aria-expanded={editingId === job.id}
+                >
+                  Edit
+                </button>
+                <JobStatusForm
+                  jobId={job.id}
+                  status={job.status}
+                  onInvoicePrompt={(prompt) => setInvoicePrompt(job.id, prompt)}
+                />
               </div>
-            </form>
+            </div>
 
-              {invoicePrompts[job.id] && (
-                <FinishInvoicePanel prompt={invoicePrompts[job.id]} onClose={() => setInvoicePrompt(job.id, undefined)} />
+              {editingId === job.id && (
+                <EditJobForm
+                  job={job}
+                  staff={staff}
+                  onInvoicePrompt={(prompt) => setInvoicePrompt(job.id, prompt)}
+                  onDone={() => setEditingId(null)}
+                />
               )}
 
               <AssignJobForm jobId={job.id} assignedStaffId={job.assigned_staff_id ?? null} staff={staff} />
