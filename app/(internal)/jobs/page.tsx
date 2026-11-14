@@ -7,6 +7,7 @@ import { listOpenPlannerTasksSafe } from "@/lib/planner-connector";
 import NewServiceCallForm from "./NewServiceCallForm";
 import { balanceLineFor, formatMoney, type LinkedDoc } from "@/lib/job-invoice-rules";
 import JobsView from "./JobsView";
+import { parseJobTab } from "@/lib/job-edit-rules";
 import { listJobTimers } from "@/lib/time-edit";
 import { errorClass, headingClass, subTextClass } from "../ui";
 
@@ -30,7 +31,7 @@ function byScheduledDesc(a: JobRow, b: JobRow) {
 export default async function JobsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ finished?: string; view?: string }>;
+  searchParams: Promise<{ finished?: string; view?: string; tab?: string }>;
 }) {
   const params = await searchParams;
   const finishedLimit = pageLimit(params.finished, FINISHED_STEP, FINISHED_MAX);
@@ -177,13 +178,14 @@ export default async function JobsPage({
         staff={staff}
         hourlyRate={Number(process.env.HOURLY_LABOR_RATE) || null}
         initialView={params.view === "list" ? "list" : "calendar"}
+        initialTab={parseJobTab(params.tab)}
       />
 
       {finishedTotal > finishedJobs.length && (
         <p className={subTextClass}>
           Showing all open jobs and the newest {finishedJobs.length} of {finishedTotal} finished or cancelled jobs.{" "}
           {finishedLimit < FINISHED_MAX && (
-            <Link href={`/jobs?finished=${finishedLimit + FINISHED_STEP}`} className="font-semibold text-accent">
+            <Link href={`/jobs?finished=${finishedLimit + FINISHED_STEP}&view=list&tab=completed`} className="font-semibold text-accent">
               Show older
             </Link>
           )}

@@ -20,6 +20,7 @@ import { getFinishBlockers } from "@/lib/job-checklist";
 import { getInvoicePrompt } from "@/lib/finish-invoice";
 import type { InvoicePrompt } from "@/lib/job-invoice-rules";
 import { moveToEtDate, parseEtLocal } from "@/lib/tz";
+import { jobTab } from "@/lib/job-edit-rules";
 
 /** Start a service call and open its report. Problems come back inline instead of an error page. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- useActionState passes the previous state first
@@ -227,6 +228,12 @@ export async function rescheduleJobAt(jobId: string, localDateTime: string): Pro
  * just gets the usual "you're scheduled" notice for its new time.
  */
 async function afterTimeSet(jobId: string, previousStatus: string | null, moved: boolean): Promise<{ error?: string }> {
+  // A finished or cancelled job whose date is corrected for the records: no "you're
+  // scheduled" notice to the customer and no reschedule notice to the tech.
+  if (jobTab(previousStatus) !== "active") {
+    await syncJobToGraph(jobId);
+    return {};
+  }
   let result: { error?: string } = {};
   let notified = false;
   if (previousStatus === "requested") {
