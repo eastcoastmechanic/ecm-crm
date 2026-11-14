@@ -1,4 +1,5 @@
 import PhotoButtons, { type PhotoCounts } from "./PhotoButtons";
+import ReceiptButton from "./ReceiptButton";
 import ChecklistPanel, { type TruckChecklistItem } from "./ChecklistPanel";
 import TruckStep from "./TruckStep";
 import { formatEtTime } from "@/lib/tz";
@@ -48,6 +49,8 @@ export type TruckJob = {
   unlocked?: boolean;
   /** Total photos on the job, any phase. */
   photoTotal?: number;
+  /** How many receipts the job has. A count only: techs never see receipt amounts. */
+  receiptCount?: number;
 };
 
 function SiteInfo({ job }: { job: TruckJob }) {
@@ -210,6 +213,9 @@ export default function TruckJobCard({
       {(primary || job.status === "in_progress") && (
         <div className="mt-3">
           <PhotoButtons jobId={job.id} counts={job.photoCounts} />
+          <div className="mt-2">
+            <ReceiptButton jobId={job.id} buttonClassName={linkButton} initialCount={job.receiptCount ?? 0} />
+          </div>
         </div>
       )}
 

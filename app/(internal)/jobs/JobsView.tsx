@@ -11,6 +11,7 @@ import FinishInvoicePanel from "./FinishInvoicePanel";
 import type { InvoicePrompt } from "@/lib/job-invoice-rules";
 import AssignJobForm from "./AssignJobForm";
 import JobNotebook from "./JobNotebook";
+import JobFilesPanel from "./JobFilesPanel";
 import JobTimers, { type JobTimerView } from "./JobTimers";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass, itemSubClass, itemTitleClass, subTextClass } from "../ui";
 import { formatEtShortDateTime, formatEtTime } from "@/lib/tz";
@@ -566,6 +567,8 @@ export default function JobsView({
               {job.timers && job.timers.length > 0 && <JobTimers jobId={job.id} timers={job.timers} />}
 
               <JobNotebook jobId={job.id} />
+
+              <JobFilesPanel jobId={job.id} />
 
               {job.photos && job.photos.length > 0 && (
                 <div className="flex flex-wrap gap-2">
