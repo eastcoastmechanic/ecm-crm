@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { signStoredPhotos } from "@/lib/photo-urls";
+import { copyFor, recordJobFiles, scheduleJobFileSync } from "@/lib/job-file-copies";
+import { deleteFromJobsDrive } from "@/lib/job-folders";
 
 /**
  * Job documentation photos.
@@ -126,6 +128,15 @@ export async function appendJobPhotos(jobId: string, additions: JobPhoto[]): Pro
     .eq("id", jobId);
   if (error) throw new Error(error.message);
 
+  // Copy each new photo to the job's SharePoint folder after the response (never fails this).
+  const copies = additions
+    .filter((p) => p.path)
+    .map((p) => ({ kind: "photo" as const, bucket: JOB_PHOTO_BUCKET, path: p.path!, label: p.phase ?? null }));
+  if (copies.length > 0) {
+    await recordJobFiles(jobId, copies);
+    scheduleJobFileSync(jobId);
+  }
+
   return additions.length;
 }
 
@@ -180,4 +191,28 @@ export async function jobPhotoPhases(jobId: string): Promise<Set<JobPhotoPhase>>
     if (p?.phase && JOB_PHOTO_PHASES.includes(p.phase)) phases.add(p.phase);
   }
   return phases;
+}
+
+/**
+ * Office: take one photo off a job (by its stored path), delete the stored file, and remove its
+ * copy from the SharePoint folder if one was made. Legacy entries with no path can't be removed
+ * here. Returns false when the photo isn't on the job.
+ */
+export async function removeJobPhoto(jobId: string, path: string): Promise<boolean> {
+  const { data: job, error } = await supabase.from("jobs").select("photos").eq("id", jobId).maybeSingle();
+  if (error) throw new Error(error.message);
+  const existing = isJobPhotoArray(job?.photos) ? job.photos : [];
+  const kept = existing.filter((p) => p?.path !== path);
+  if (kept.length === existing.length) return false;
+
+  const { error: updateError } = await supabase.from("jobs").update({ photos: kept }).eq("id", jobId);
+  if (updateError) throw new Error(updateError.message);
+
+  await supabase.storage.from(JOB_PHOTO_BUCKET).remove([path]);
+  const copy = await copyFor(JOB_PHOTO_BUCKET, path).catch(() => null);
+  if (copy) {
+    await deleteFromJobsDrive(copy.sharepoint_item_id);
+    await supabase.from("job_file_copies").delete().eq("id", copy.id);
+  }
+  return true;
 }
