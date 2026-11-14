@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import ChangePasswordForm from "./ChangePasswordForm";
 import TeamsTestButton from "./TeamsTestButton";
 import OneNoteCard from "./OneNoteCard";
+import RebuildJobLogsButton from "./RebuildJobLogsButton";
 import BotKeysCard, { type BotKeyRow } from "./BotKeysCard";
 import { supabase as db } from "@/lib/supabase";
 import { connectionStatus } from "@/lib/microsoft-delegated";
@@ -92,6 +93,18 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         <div className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
           <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Bot keys</h2>
           <BotKeysCard keys={botKeys.keys} tableMissing={botKeys.tableMissing} />
+        </div>
+      )}
+
+      {isOwner && (
+        <div className="flex flex-col gap-3 rounded-xl border border-white/8 p-4">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-g300">Job logs</h2>
+          <p className={subTextClass}>
+            Each job keeps a log file in its address folder (Teams Job Notes, Files), rewritten whenever
+            something happens on the job. This writes the file for older jobs, 10 per press. No money
+            amounts go in it, since techs can open those folders.
+          </p>
+          <RebuildJobLogsButton />
         </div>
       )}
 

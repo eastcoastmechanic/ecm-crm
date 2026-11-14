@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { uploadToJobFolder } from "@/lib/job-folders";
+import { syncJobLog } from "@/lib/job-log";
 import {
   sharePointPathFor,
   shouldTryCopy,
@@ -146,7 +147,11 @@ export async function syncJobFiles(jobId: string, opts: { force?: boolean; limit
 
 /** Run the copy after the response so the upload never waits on Microsoft. */
 export function scheduleJobFileSync(jobId: string): void {
-  const run = () => syncJobFiles(jobId);
+  // Copy the files first, then rewrite the job log so it links to them.
+  const run = async () => {
+    await syncJobFiles(jobId);
+    await syncJobLog(jobId);
+  };
   try {
     after(run);
   } catch {
