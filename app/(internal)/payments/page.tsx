@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SquareExportPanel from "./SquareExportPanel";
 import { supabase } from "@/lib/supabase";
 import { pageLimit } from "@/lib/fetch-all";
 import { isSquareConfigured, getSquareLocationId } from "@/lib/square";
@@ -11,6 +12,8 @@ import { getStaffRole } from "@/lib/require-role";
 import { errorClass, headingClass, subTextClass } from "../ui";
 
 export const dynamic = "force-dynamic";
+// The owner-only Square export reads every year of Square in one press.
+export const maxDuration = 300;
 
 type RelatedCustomer = { name: string | null } | { name: string | null }[] | null;
 
@@ -135,6 +138,7 @@ export default async function PaymentsPage({
           )}
         </p>
       )}
+      {isOwner && configured && <SquareExportPanel />}
     </div>
   );
 }

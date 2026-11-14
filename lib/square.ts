@@ -1,9 +1,9 @@
 import type { SquareCatalogObject } from "@/lib/square-catalog-rules";
 
-const SQUARE_BASE_URL ="https://connect.squareup.com";
+export const SQUARE_BASE_URL = "https://connect.squareup.com";
 const SQUARE_VERSION = "2026-08-19";
 
-function squareHeaders() {
+export function squareHeaders() {
   const token = process.env.SQUARE_ACCESS_TOKEN;
   if (!token) return null;
   return {
