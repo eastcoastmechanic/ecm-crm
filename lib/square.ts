@@ -310,6 +310,94 @@ export async function bulkRetrieveSquareCustomers(customerIds: string[]): Promis
 }
 
 // ---------------------------------------------------------------------------
+// Read-only page helpers for the full-history import (lib/square-history.ts).
+// Each call fetches ONE page and hands back Square's cursor, so the import can
+// stop between pages and pick up where it left off.
+// ---------------------------------------------------------------------------
+
+export type SquareLocation = { id?: string; name?: string; status?: string; created_at?: string };
+
+export type SquareRefund = {
+  id?: string;
+  status?: string;
+  location_id?: string;
+  payment_id?: string;
+  order_id?: string;
+  reason?: string;
+  destination_type?: string;
+  created_at?: string;
+  updated_at?: string;
+  amount_money?: SquareMoney;
+  processing_fee?: Array<{ amount_money?: SquareMoney }>;
+};
+
+export type SquarePage<T> = { items: T[]; cursor: string | null };
+
+async function squareGetJson<T>(url: URL, what: string): Promise<T> {
+  const headers = squareHeaders();
+  if (!headers) throw new Error("SQUARE_ACCESS_TOKEN is not set.");
+  const res = await fetch(url.toString(), { headers, cache: "no-store" });
+  if (!res.ok) throw new Error(`Square ${what} failed (${res.status}): ${await res.text()}`);
+  return (await res.json()) as T;
+}
+
+/** Every location on the account, active or not. */
+export async function listSquareLocations(): Promise<SquareLocation[]> {
+  const json = await squareGetJson<{ locations?: SquareLocation[] }>(
+    new URL(`${SQUARE_BASE_URL}/v2/locations`),
+    "locations list"
+  );
+  return json.locations ?? [];
+}
+
+/** One page of invoices for one location (Square only searches one location at a time). */
+export async function searchSquareInvoicesPage(locationId: string, cursor: string | null): Promise<SquarePage<SquareInvoice>> {
+  const headers = squareHeaders();
+  if (!headers) throw new Error("SQUARE_ACCESS_TOKEN is not set.");
+  const res = await fetch(`${SQUARE_BASE_URL}/v2/invoices/search`, {
+    method: "POST",
+    headers,
+    cache: "no-store",
+    body: JSON.stringify({
+      query: { filter: { location_ids: [locationId] } },
+      limit: 200,
+      ...(cursor ? { cursor } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`Square invoices search failed (${res.status}): ${await res.text()}`);
+  const json = (await res.json()) as SquareInvoiceSearch;
+  return { items: json.invoices ?? [], cursor: json.cursor ?? null };
+}
+
+type TimeWindowPage = { locationId: string; beginTime: string; endTime: string; cursor: string | null };
+
+/** One page of payments for one location and time window. */
+export async function listSquarePaymentsPage(opts: TimeWindowPage): Promise<SquarePage<SquarePayment>> {
+  const url = new URL(`${SQUARE_BASE_URL}/v2/payments`);
+  url.searchParams.set("location_id", opts.locationId);
+  url.searchParams.set("begin_time", opts.beginTime);
+  url.searchParams.set("end_time", opts.endTime);
+  url.searchParams.set("sort_order", "ASC");
+  url.searchParams.set("limit", "100");
+  if (opts.cursor) url.searchParams.set("cursor", opts.cursor);
+  const json = await squareGetJson<SquarePaymentList>(url, "payments list");
+  return { items: json.payments ?? [], cursor: json.cursor ?? null };
+}
+
+/** One page of refunds for one location and time window. */
+export async function listSquareRefundsPage(opts: TimeWindowPage): Promise<SquarePage<SquareRefund>> {
+  const url = new URL(`${SQUARE_BASE_URL}/v2/refunds`);
+  url.searchParams.set("location_id", opts.locationId);
+  url.searchParams.set("begin_time", opts.beginTime);
+  url.searchParams.set("end_time", opts.endTime);
+  url.searchParams.set("sort_order", "ASC");
+  url.searchParams.set("limit", "100");
+  if (opts.cursor) url.searchParams.set("cursor", opts.cursor);
+  const json = await squareGetJson<{ refunds?: SquareRefund[]; cursor?: string }>(url, "refunds list");
+  return { items: json.refunds ?? [], cursor: json.cursor ?? null };
+}
+
+// ---------------------------------------------------------------------------
 // Write helpers (estimate inbox). Everything here creates DRAFT records only;
 // nothing is published or sent to the customer. Needs a token with
 // CUSTOMERS_READ/WRITE, ORDERS_WRITE and INVOICES_WRITE.

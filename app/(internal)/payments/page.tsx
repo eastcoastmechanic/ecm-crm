@@ -5,6 +5,7 @@ import { isSquareConfigured, getSquareLocationId } from "@/lib/square";
 import PaymentsList, { type SquareInvoiceRow, type SquarePaymentRow } from "./PaymentsList";
 import SyncSquareButton from "./SyncSquareButton";
 import ImportCustomersPanel from "./ImportCustomersPanel";
+import SquareHistoryPanel from "./SquareHistoryPanel";
 import StripeCustomersPanel from "./StripeCustomersPanel";
 import { getStaffRole } from "@/lib/require-role";
 import { errorClass, headingClass, subTextClass } from "../ui";
@@ -100,6 +101,7 @@ export default async function PaymentsPage({
       </div>
 
       {isOwner && isSquareConfigured() && <ImportCustomersPanel />}
+      {isOwner && configured && <SquareHistoryPanel />}
       {isOwner && <StripeCustomersPanel />}
 
       {!configured && (

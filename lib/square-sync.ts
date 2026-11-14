@@ -5,10 +5,10 @@ import {
   isSquareConfigured,
   listSquareInvoices,
   listSquarePayments,
-  type SquareCustomer,
   type SquareInvoice,
 } from "@/lib/square";
 import { markDocumentPaid } from "@/lib/document-paid";
+import { invoiceTotals, paidAtFromInvoice, squareCustomerName } from "@/lib/square-history-map";
 import { fetchAllRows } from "@/lib/fetch-all";
 
 export type SquareSyncResult = {
@@ -53,26 +53,6 @@ function normalizeEmail(raw: string | null | undefined) {
 
 function normalizeName(raw: string | null | undefined) {
   return (raw ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function squareCustomerName(customer: SquareCustomer | undefined, fallback?: string | null) {
-  if (!customer) return fallback ?? null;
-  const person = [customer.given_name, customer.family_name].filter(Boolean).join(" ").trim();
-  return person || customer.company_name || fallback || null;
-}
-
-function invoiceTotals(invoice: SquareInvoice) {
-  const requests = invoice.payment_requests ?? [];
-  const total = requests.reduce((sum, req) => sum + (req.computed_amount_money?.amount ?? 0), 0);
-  const paid = requests.reduce((sum, req) => sum + (req.total_completed_amount_money?.amount ?? 0), 0);
-  const due = invoice.next_payment_amount_money?.amount ?? Math.max(total - paid, 0);
-  const currency = requests[0]?.computed_amount_money?.currency ?? "USD";
-  return { total, paid, due, currency };
-}
-
-function paidAtFromInvoice(invoice: SquareInvoice, paidCents: number) {
-  if ((invoice.status ?? "") !== "PAID" || paidCents <= 0) return null;
-  return invoice.updated_at ?? invoice.created_at ?? new Date().toISOString();
 }
 
 function matchCustomer(
