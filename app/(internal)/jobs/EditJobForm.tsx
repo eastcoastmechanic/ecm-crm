@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, buttonSecondaryClass, errorClass, inputClass } from "../ui";
 import { loadJobEditOptions, saveJobEdit, type JobEditOptions, type JobEditState } from "./edit-actions";
@@ -42,7 +42,14 @@ export default function EditJobForm({
   onInvoicePrompt: (prompt: InvoicePrompt) => void;
   onDone: () => void;
 }) {
-  const [state, action] = useActionState<JobEditState, FormData>(saveJobEdit, null);
+  // Results go up as soon as the action returns, not from an effect: a job marked done leaves
+  // the Active tab, so this editor can unmount before an effect would run.
+  const [state, action] = useActionState<JobEditState, FormData>(async (prev, formData) => {
+    const result = await saveJobEdit(prev, formData);
+    if (result?.invoicePrompt) onInvoicePrompt(result.invoicePrompt);
+    if (result?.saved) onDone();
+    return result;
+  }, null);
   const [options, setOptions] = useState<JobEditOptions | null>(null);
 
   const original = {
@@ -66,15 +73,6 @@ export default function EditJobForm({
       live = false;
     };
   }, []);
-
-  // Handle each result once, even if the parent re-renders with new callbacks.
-  const handled = useRef<JobEditState>(null);
-  useEffect(() => {
-    if (state === handled.current) return;
-    handled.current = state;
-    if (state?.invoicePrompt) onInvoicePrompt(state.invoicePrompt);
-    if (state?.saved) onDone();
-  }, [state, onInvoicePrompt, onDone]);
 
   const customerProperties = useMemo(
     () => (options?.properties ?? []).filter((p) => customerId && p.customer_id === customerId),

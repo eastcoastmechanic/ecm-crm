@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState } from "react";
 import SubmitButton from "../SubmitButton";
 import { buttonClass, errorClass, inputClass } from "../ui";
 import { saveJobEdit, type JobEditState } from "./edit-actions";
@@ -29,14 +29,13 @@ export default function JobStatusForm({
   status: string;
   onInvoicePrompt: (prompt: InvoicePrompt) => void;
 }) {
-  const [state, action] = useActionState<JobEditState, FormData>(saveJobEdit, null);
-  // Handle each result once, even if the parent re-renders with a new callback.
-  const handled = useRef<JobEditState>(null);
-  useEffect(() => {
-    if (state === handled.current) return;
-    handled.current = state;
-    if (state?.invoicePrompt) onInvoicePrompt(state.invoicePrompt);
-  }, [state, onInvoicePrompt]);
+  // The invoice prompt goes up as soon as the action returns, not from an effect: a job marked
+  // done leaves the Active tab, so this row can unmount before an effect would run.
+  const [state, action] = useActionState<JobEditState, FormData>(async (prev, formData) => {
+    const result = await saveJobEdit(prev, formData);
+    if (result?.invoicePrompt) onInvoicePrompt(result.invoicePrompt);
+    return result;
+  }, null);
   const current = normalizeJobStatus(status);
 
   return (
