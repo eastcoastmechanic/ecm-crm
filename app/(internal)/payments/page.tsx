@@ -6,6 +6,7 @@ import PaymentsList, { type SquareInvoiceRow, type SquarePaymentRow } from "./Pa
 import SyncSquareButton from "./SyncSquareButton";
 import ImportCustomersPanel from "./ImportCustomersPanel";
 import SquareHistoryPanel from "./SquareHistoryPanel";
+import StripeCustomersPanel from "./StripeCustomersPanel";
 import { getStaffRole } from "@/lib/require-role";
 import { errorClass, headingClass, subTextClass } from "../ui";
 
@@ -101,6 +102,7 @@ export default async function PaymentsPage({
 
       {isOwner && isSquareConfigured() && <ImportCustomersPanel />}
       {isOwner && configured && <SquareHistoryPanel />}
+      {isOwner && <StripeCustomersPanel />}
 
       {!configured && (
         <p className={errorClass}>SQUARE_ACCESS_TOKEN is missing on Vercel — nothing to sync yet.</p>
