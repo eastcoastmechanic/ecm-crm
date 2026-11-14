@@ -7,6 +7,7 @@ import { startJobEntry } from "@/lib/time-clock";
 import { sendOnWayNotice } from "@/lib/on-way-notice";
 import { noteJobStep } from "@/lib/planner-connector";
 import { syncJobNotesToOneNote } from "@/lib/onenote-sync";
+import { scheduleJobLogSync } from "@/lib/job-log";
 import {
   clampTapTime,
   isMissingClientActionColumn,
@@ -191,5 +192,6 @@ async function saveNote(req: SyncRequest, now: Date): Promise<SyncResult> {
     return RETRY;
   }
   after(() => syncJobNotesToOneNote(req.jobId));
+  scheduleJobLogSync(req.jobId);
   return { ok: true };
 }

@@ -20,6 +20,7 @@ import { getFinishBlockers } from "@/lib/job-checklist";
 import { getInvoicePrompt } from "@/lib/finish-invoice";
 import type { InvoicePrompt } from "@/lib/job-invoice-rules";
 import { moveToEtDate, parseEtLocal } from "@/lib/tz";
+import { scheduleJobLogSync } from "@/lib/job-log";
 
 /** Start a service call and open its report. Problems come back inline instead of an error page. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- useActionState passes the previous state first
@@ -141,6 +142,7 @@ export async function assignJobToStaff(jobId: string, staffId: string | null): P
 
   const { error } = await supabase.from("jobs").update({ assigned_staff_id: staffId }).eq("id", jobId);
   if (error) return { error: "Couldn't save the assignment. Try again." };
+  scheduleJobLogSync(jobId);
 
   // Tell the tech who got the job, and the one who lost it. Best effort, never blocks.
   if (staffId !== previousStaffId) {

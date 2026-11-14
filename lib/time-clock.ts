@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { noteJobStep } from "@/lib/planner-connector";
+import { scheduleJobLogSync } from "@/lib/job-log";
 import { clockWeek, countableShifts, etWeekRange, type ClockWeek } from "@/lib/clock-week";
 import {
   ENTRY_CAP_HOURS,
@@ -129,6 +130,8 @@ export async function startJobEntry(jobId: string, staffId: string, kind: "work"
     .from("job_time_entries")
     .insert({ job_id: jobId, staff_id: staffId, shift_id: shiftId, kind, started_at: now.toISOString() });
   if (error && error.code !== UNIQUE_VIOLATION) return { error: "Could not start the job timer." };
+  // Start or Resume shows in the job log (pause already does, through its Planner step).
+  scheduleJobLogSync(jobId);
   return {};
 }
 
