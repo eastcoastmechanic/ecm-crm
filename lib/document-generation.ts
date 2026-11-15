@@ -332,6 +332,39 @@ export type DirectLineItem = {
   cost?: number | null;
 };
 
+/**
+ * The stored line_items and total for a flat invoice made from confirmed lines. Shared by
+ * createInvoiceDirect and the office's Recalculate draft (lib/finish-invoice.ts), so a rebuilt
+ * draft is stored exactly like a new one.
+ */
+export function directInvoiceContent(items: DirectLineItem[]) {
+  const total = Math.round(items.reduce((sum, item) => sum + item.unit_price * item.qty, 0) * 100) / 100;
+  const itemsForStorage = items.map((item) => ({
+    category: item.category,
+    description: item.description,
+    price_book_item_name: item.price_book_item_name,
+    qty: item.qty,
+    unit: item.unit,
+    good: item.unit_price,
+    better: item.unit_price,
+    best: item.unit_price,
+    notes: item.notes,
+    cost: item.cost ?? null,
+  }));
+  return {
+    total,
+    line_items: {
+      items: itemsForStorage,
+      brand: { good: null, better: null, best: null },
+      mass_save_eligible: false,
+      mass_save_note: null,
+      totals: { good: total, better: total, best: total },
+      option_label: null,
+      pricing_mode: "flat",
+    },
+  };
+}
+
 export type CreateInvoiceDirectResult = { documentId: string; docNumber: string; total: number };
 
 /**
@@ -354,20 +387,7 @@ export async function createInvoiceDirect(input: {
 }): Promise<CreateInvoiceDirectResult> {
   if (input.items.length === 0 && !input.allowNoItems) throw new Error("Add at least one line item before creating an invoice");
 
-  const total = Math.round(input.items.reduce((sum, item) => sum + item.unit_price * item.qty, 0) * 100) / 100;
-
-  const itemsForStorage = input.items.map((item) => ({
-    category: item.category,
-    description: item.description,
-    price_book_item_name: item.price_book_item_name,
-    qty: item.qty,
-    unit: item.unit,
-    good: item.unit_price,
-    better: item.unit_price,
-    best: item.unit_price,
-    notes: item.notes,
-    cost: item.cost ?? null,
-  }));
+  const { line_items, total } = directInvoiceContent(input.items);
 
   const docNumber = await nextDocNumberOrThrow("invoice");
 
@@ -381,15 +401,7 @@ export async function createInvoiceDirect(input: {
       job_id: input.jobId ?? null,
       status: "draft",
       ...(input.extra ?? {}),
-      line_items: {
-        items: itemsForStorage,
-        brand: { good: null, better: null, best: null },
-        mass_save_eligible: false,
-        mass_save_note: null,
-        totals: { good: total, better: total, best: total },
-        option_label: null,
-        pricing_mode: "flat",
-      },
+      line_items,
       subtotal: total,
       tax: 0,
       total,

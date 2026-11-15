@@ -313,7 +313,7 @@ export default async function FieldBoardPage() {
             {invoicePrompts.map(({ job, prompt }) => (
               <div key={job.id} className="flex flex-col gap-1">
                 <div className={itemTitleClass}>{job.customer ?? "Job"}</div>
-                <FinishInvoicePanel prompt={prompt} />
+                <FinishInvoicePanel prompt={prompt} jobId={job.id} />
               </div>
             ))}
           </div>

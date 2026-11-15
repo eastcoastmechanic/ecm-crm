@@ -8,6 +8,7 @@ import { addTask, completeTask } from "../tasks/actions";
 import SubmitButton from "../SubmitButton";
 import CreateInvoiceForm from "./CreateInvoiceForm";
 import FinishInvoicePanel from "./FinishInvoicePanel";
+import RecalcDraftButton from "./RecalcDraftButton";
 import type { InvoicePrompt } from "@/lib/job-invoice-rules";
 import AssignJobForm from "./AssignJobForm";
 import JobNotebook from "./JobNotebook";
@@ -125,6 +126,12 @@ function BillingLine({
           ({i.status})
         </span>
       ))}
+      {owed.some((i) => i.status === "draft") && (
+        <>
+          {" · "}
+          <RecalcDraftButton jobId={jobId} compact />
+        </>
+      )}
     </div>
   );
 }
@@ -559,7 +566,7 @@ export default function JobsView({
             </form>
 
               {invoicePrompts[job.id] && (
-                <FinishInvoicePanel prompt={invoicePrompts[job.id]} onClose={() => setInvoicePrompt(job.id, undefined)} />
+                <FinishInvoicePanel prompt={invoicePrompts[job.id]} jobId={job.id} onClose={() => setInvoicePrompt(job.id, undefined)} />
               )}
 
               <AssignJobForm jobId={job.id} assignedStaffId={job.assigned_staff_id ?? null} staff={staff} />
