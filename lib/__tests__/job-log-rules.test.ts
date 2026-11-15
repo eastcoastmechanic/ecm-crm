@@ -40,11 +40,11 @@ function input(over: Partial<JobLogInput> = {}): JobLogInput {
 }
 
 describe("jobLogFileName", () => {
-  it("uses the New York day the job was made, its type and short id, so rebuilds replace the same file", () => {
+  it("uses the New York day the job was made and its short id (not its editable type), so rebuilds replace the same file", () => {
     expect(jobLogFileName({ id: JOB_ID, job_type: "service", created_at: "2026-11-13T03:00:00Z" })).toBe(
-      "2026-11-12 Service 1a2b3c4d - Job log.txt"
+      "2026-11-12 job 1a2b3c4d - Job log.txt"
     );
-    expect(jobLogFileName({ id: JOB_ID, job_type: null, created_at: null })).toBe("undated Job 1a2b3c4d - Job log.txt");
+    expect(jobLogFileName({ id: JOB_ID, job_type: null, created_at: null })).toBe("undated job 1a2b3c4d - Job log.txt");
   });
   it("labels odd job types readably", () => {
     expect(jobTypeLabel("service_call")).toBe("Service call");

@@ -56,12 +56,13 @@ export function jobTypeLabel(type: string | null | undefined): string {
 
 /**
  * The log's file name, at the top of the property folder. Built from things that never change
- * (the day the job was made, its type and id), so every rebuild replaces the same file.
+ * (the day the job was made and its id; not its type, which the office can edit), so every rebuild
+ * replaces the same file. The type is in the file itself.
  */
 export function jobLogFileName(job: { id: string; job_type: string | null; created_at: string | null }): string {
   const created = job.created_at ? new Date(job.created_at) : null;
   const date = created && !Number.isNaN(created.getTime()) ? etDateKey(created) : "undated";
-  return `${date} ${jobTypeLabel(job.job_type)} ${jobShortId(job.id)} - Job log.txt`;
+  return `${date} job ${jobShortId(job.id)} - Job log.txt`;
 }
 
 /** "Thu, Nov 13, 2026, 2:05 PM" in New York. */

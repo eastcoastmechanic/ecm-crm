@@ -6,7 +6,7 @@ import { buildJobLogText, jobLogFileName, type JobLogInput } from "@/lib/job-log
 
 /**
  * A running job log in the property's SharePoint folder (Job Notes / "<street> <town>" /
- * "<date> <type> <id> - Job log.txt"), rebuilt from CRM data every time something happens on the
+ * "<date> job <id> - Job log.txt"), rebuilt from CRM data every time something happens on the
  * job: created, scheduled, rescheduled, assigned, on my way, on site, timers, done, notes, photos,
  * receipts, invoices. Always the whole file from scratch, so it is idempotent and a missed event
  * is fixed by the next one.
