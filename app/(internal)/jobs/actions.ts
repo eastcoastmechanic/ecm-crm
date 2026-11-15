@@ -12,7 +12,7 @@ import {
 } from "@/lib/job-photos";
 import { syncJobToGraph } from "@/lib/graph-connector";
 import { noteJobStep, syncJobToPlanner } from "@/lib/planner-connector";
-import { applyJobStatus, sendScheduleNotifications } from "@/lib/job-lifecycle";
+import { applyJobStatus } from "@/lib/job-lifecycle";
 import { requireOffice, requireRole } from "@/lib/require-role";
 import { notifyTech } from "@/lib/tech-notice-send";
 import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
@@ -20,6 +20,7 @@ import { getFinishBlockers } from "@/lib/job-checklist";
 import { getInvoicePrompt } from "@/lib/finish-invoice";
 import type { InvoicePrompt } from "@/lib/job-invoice-rules";
 import { moveToEtDate, parseEtLocal } from "@/lib/tz";
+import { afterTimeSet, moveJobToTime, timeMoved } from "@/lib/job-reschedule";
 
 /** Start a service call and open its report. Problems come back inline instead of an error page. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- useActionState passes the previous state first
@@ -96,17 +97,6 @@ export async function scheduleJobFromContract(_prev: ScheduleJobState, formData:
   revalidatePath("/jobs");
   revalidatePath(`/documents/${documentId}`);
   redirect("/jobs");
-}
-
-/** Tell whoever the job is assigned to (if anyone) that it moved. Best effort. */
-async function notifyAssignedTech(jobId: string, kind: "rescheduled" | "cancelled") {
-  const { data } = await supabase.from("jobs").select("assigned_staff_id").eq("id", jobId).maybeSingle();
-  await notifyTech({
-    jobId,
-    staffId: (data?.assigned_staff_id as string | null | undefined) ?? null,
-    kind,
-    actorStaffId: await getMyStaffId(),
-  });
 }
 
 /** `staffId` echoes the pick so the select keeps it after an error (React resets uncontrolled fields). */
@@ -202,54 +192,10 @@ export async function updateJobStatus(formData: FormData): Promise<{ error?: str
 /** Move a job to a New York date and time ("2026-10-22T09:30"). Used by dispatch. */
 export async function rescheduleJobAt(jobId: string, localDateTime: string): Promise<{ error?: string }> {
   await requireOffice();
-  const next = parseEtLocal(localDateTime);
-  if (!next) return { error: "Pick a valid date and time." };
-
-  const { data: job, error: readError } = await supabase.from("jobs").select("id, status, scheduled_at").eq("id", jobId).maybeSingle();
-  if (readError) return { error: "Couldn't load the job. Try again." };
-  if (!job) return { error: "Job not found." };
-
-  const { error } = await supabase.from("jobs").update({ scheduled_at: next.toISOString() }).eq("id", jobId);
-  if (error) return { error: "Couldn't save the new time. Try again." };
-
-  const after = await afterTimeSet(jobId, (job.status as string | null) ?? null, timeMoved(job.scheduled_at, next));
-
+  const after = await moveJobToTime(jobId, localDateTime);
   revalidatePath("/jobs");
   revalidatePath("/dispatch");
   return after;
-}
-
-/**
- * After the office saves a job's time: a "requested" job (web, portal or phone
- * booking, plan visit) now has a time, so it becomes "scheduled" through the
- * lifecycle. That status change sends the customer's schedule notice and syncs
- * Graph and Planner, so the notice is not sent a second time here. Any other job
- * just gets the usual "you're scheduled" notice for its new time.
- */
-async function afterTimeSet(jobId: string, previousStatus: string | null, moved: boolean): Promise<{ error?: string }> {
-  let result: { error?: string } = {};
-  let notified = false;
-  if (previousStatus === "requested") {
-    try {
-      // Only from requested: a job finished or cancelled since the read above stays as it is.
-      notified = (await applyJobStatus(jobId, "scheduled", { onlyFrom: "requested" })).changed;
-    } catch {
-      result = { error: "Saved the new time, but couldn't mark the job Scheduled. Set the status on the Jobs list." };
-    }
-  }
-  if (!notified) {
-    await sendScheduleNotifications(jobId);
-    await syncJobToGraph(jobId);
-    // The Planner card gets the new time as a dated line (and due date) when the time really moved.
-    if (moved) await noteJobStep(jobId, "rescheduled");
-  }
-  await notifyAssignedTech(jobId, "rescheduled");
-  return result;
-}
-
-/** True when the saved time is not the time the job already had. */
-function timeMoved(before: unknown, next: Date): boolean {
-  return typeof before !== "string" || new Date(before).getTime() !== next.getTime();
 }
 
 /**
