@@ -198,21 +198,26 @@ export async function jobPhotoPhases(jobId: string): Promise<Set<JobPhotoPhase>>
  * copy from the SharePoint folder if one was made. Legacy entries with no path can't be removed
  * here. Returns false when the photo isn't on the job.
  */
-export async function removeJobPhoto(jobId: string, path: string): Promise<boolean> {
+export async function removeJobPhoto(
+  jobId: string,
+  path: string
+): Promise<{ removed: false } | { removed: true; sharePointLeftOver: boolean }> {
   const { data: job, error } = await supabase.from("jobs").select("photos").eq("id", jobId).maybeSingle();
   if (error) throw new Error(error.message);
   const existing = isJobPhotoArray(job?.photos) ? job.photos : [];
   const kept = existing.filter((p) => p?.path !== path);
-  if (kept.length === existing.length) return false;
+  if (kept.length === existing.length) return { removed: false };
 
   const { error: updateError } = await supabase.from("jobs").update({ photos: kept }).eq("id", jobId);
   if (updateError) throw new Error(updateError.message);
 
   await supabase.storage.from(JOB_PHOTO_BUCKET).remove([path]);
   const copy = await copyFor(JOB_PHOTO_BUCKET, path).catch(() => null);
+  let sharePointLeftOver = false;
   if (copy) {
-    await deleteFromJobsDrive(copy.sharepoint_item_id);
+    // A copy SharePoint wouldn't delete is reported, so the office can remove it from the folder.
+    if (copy.sharepoint_item_id) sharePointLeftOver = !(await deleteFromJobsDrive(copy.sharepoint_item_id));
     await supabase.from("job_file_copies").delete().eq("id", copy.id);
   }
-  return true;
+  return { removed: true, sharePointLeftOver };
 }
