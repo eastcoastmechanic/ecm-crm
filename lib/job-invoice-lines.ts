@@ -145,9 +145,23 @@ export function buildJobInvoiceLines(input: {
   return { items, laborHours, totalCents: items.reduce((s, l) => s + lineCents(l), 0), warnings };
 }
 
-/** True when every line is one the build makes: the draft is Finish's own, safe to rebuild or replace. */
+/**
+ * True when the draft is Finish's own build: it has the "Work performed" line (a service-report
+ * invoice never does, even a labor-only one) and every line is one the build makes.
+ */
 export function isBuiltDraft(items: { category?: string | null }[] | null | undefined): boolean {
   if (!Array.isArray(items) || items.length === 0) return false;
   const built = new Set<string>(Object.values(BUILT_CATEGORY));
-  return items.every((i) => built.has(i?.category ?? ""));
+  return items.some((i) => i?.category === BUILT_CATEGORY.work) && items.every((i) => built.has(i?.category ?? ""));
+}
+
+/**
+ * Drafts Recalculate may rebuild: Finish's labor-and-receipts build, the contract balance line
+ * (Finish or Create invoice), or a draft with no lines. A service-report invoice (Parts / Labor,
+ * which also carries balance_for_job_id) is none of these, so its lines are never overwritten.
+ */
+export function isRebuildableDraft(items: { category?: string | null }[] | null | undefined): boolean {
+  if (!Array.isArray(items) || items.length === 0) return true;
+  if (isBuiltDraft(items)) return true;
+  return items.every((i) => i?.category === "Contract balance");
 }

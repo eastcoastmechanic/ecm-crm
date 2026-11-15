@@ -5,6 +5,7 @@ import {
   buildJobInvoiceLines,
   hourlyLaborRate,
   isBuiltDraft,
+  isRebuildableDraft,
   markedUpCents,
   materialsMarkupPercent,
   roundToQuarterHour,
@@ -147,5 +148,15 @@ describe("helpers", () => {
     expect(isBuiltDraft([{ category: "Contract balance" }])).toBe(false);
     expect(isBuiltDraft([])).toBe(false);
     expect(isBuiltDraft(null)).toBe(false);
+    // A labor-only service-report invoice is not a build (no work line).
+    expect(isBuiltDraft([{ category: "Labor" }])).toBe(false);
+  });
+
+  it("isRebuildableDraft: build, contract balance or empty; never a service-report invoice", () => {
+    expect(isRebuildableDraft([{ category: "Work performed" }, { category: "Labor" }])).toBe(true);
+    expect(isRebuildableDraft([{ category: "Contract balance" }])).toBe(true);
+    expect(isRebuildableDraft([])).toBe(true);
+    expect(isRebuildableDraft([{ category: "Parts" }, { category: "Labor" }])).toBe(false);
+    expect(isRebuildableDraft([{ category: "Labor" }])).toBe(false);
   });
 });

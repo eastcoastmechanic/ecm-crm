@@ -341,6 +341,24 @@ describe("recalculateJobDraft (office Recalculate draft)", () => {
     expect(await recalculateJobDraft("j1")).toMatchObject({ error: expect.stringMatching(/service report/) });
   });
 
+  it("refuses a service-report invoice even though it carries balance_for_job_id", async () => {
+    db({ job: { ...JOB, document_id: null }, invoices: [{ ...BUILT, total: 250, line_items: { items: [{ category: "Parts" }, { category: "Labor" }] } }] });
+    expect(await recalculateJobDraft("j1")).toMatchObject({ error: expect.stringMatching(/service report/) });
+    expect(h.calls.some((c) => payload(c, "update"))).toBe(false);
+  });
+
+  it("a failed receipts read stops the rebuild instead of dropping the materials", async () => {
+    h.handler = (call) => {
+      if (call.table === "jobs") return { data: { ...JOB, document_id: null } };
+      if (call.table === "job_time_entries") return { data: [] };
+      if (call.table === "job_receipts") return { error: { message: "canceling statement due to statement timeout" } };
+      if (call.table === "documents" && has(call, "or")) return { data: [BUILT] };
+      return { data: null };
+    };
+    expect(await recalculateJobDraft("j1")).toMatchObject({ error: expect.stringMatching(/time or receipts/) });
+    expect(h.calls.some((c) => payload(c, "update"))).toBe(false);
+  });
+
   it("a job with a contract gets the balance line again (deposit math kept)", async () => {
     db({ linked: CONTRACT, invoices: [BUILT], updated: true });
     expect(await recalculateJobDraft("j1")).toEqual({ total: 5000, warnings: [] });

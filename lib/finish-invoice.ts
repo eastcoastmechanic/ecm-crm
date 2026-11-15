@@ -4,6 +4,7 @@ import {
   buildJobInvoiceLines,
   hourlyLaborRate,
   isBuiltDraft,
+  isRebuildableDraft,
   materialsMarkupPercent,
   type BuiltLine,
   type JobInvoiceBuild,
@@ -128,6 +129,11 @@ export async function buildLinesForJob(jobId: string): Promise<JobInvoiceBuild> 
   ]);
   if (jobRes.error) throw new Error(jobRes.error.message);
   if (entriesRes.error) throw new Error(entriesRes.error.message);
+  // Only a missing table (before SQL 0083) means "no receipts". Any other failure stops the build,
+  // so a database hiccup never drops the materials off a draft.
+  if (receiptsRes.error && !/does not exist|schema cache/i.test(receiptsRes.error.message ?? "")) {
+    throw new Error(receiptsRes.error.message);
+  }
   return buildJobInvoiceLines({
     jobType: (jobRes.data?.job_type as string | null) ?? null,
     jobNotes: (jobRes.data?.notes as string | null) ?? null,
@@ -319,7 +325,7 @@ export async function recalculateJobDraft(jobId: string): Promise<RecalculateRes
   if (!invoiceNeedsSending(inv)) {
     return { error: `Invoice ${inv.doc_number ?? ""} is already ${inv.status ?? "sent"}, so it can't be recalculated.`.replace("  ", " ") };
   }
-  if (inv.balance_for_job_id !== jobId) {
+  if (inv.balance_for_job_id !== jobId || !isRebuildableDraft(inv.line_items?.items)) {
     return { error: "This draft came from a service report or was made by hand, so it isn't rebuilt here. Edit it on the invoice page." };
   }
 
