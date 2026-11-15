@@ -55,6 +55,17 @@ async function loadJobLogInput(jobId: string): Promise<JobLogInput | null> {
     supabase.from("diagnostics").select("doc_number, created_at").eq("job_id", jobId).order("created_at"),
   ]);
 
+  // A failed read must not overwrite a good log with a thin one: give up and let the next event
+  // rebuild it. The receipts and copies tables are allowed to be missing (before SQL 0083).
+  const missingTable = (e: { message?: string } | null) => Boolean(e && /does not exist|schema cache/i.test(e.message ?? ""));
+  for (const res of [entriesRes, notesRes, invoicesRes, reportsRes]) {
+    if (res.error) throw new Error(res.error.message);
+  }
+  for (const res of [copiesRes, receiptsRes]) {
+    if (res.error && !missingTable(res.error)) throw new Error(res.error.message);
+  }
+  if ("error" in linkedRes && linkedRes.error) throw new Error(linkedRes.error.message);
+
   const entries = (entriesRes.data ?? []) as { staff_id: string; kind: string; started_at: string; ended_at: string | null; note: string | null; voided_at?: string | null }[];
   const staffIds = [...new Set([...entries.map((e) => e.staff_id), row.assigned_staff_id].filter((v): v is string => Boolean(v)))];
   const { data: staffRows } = staffIds.length

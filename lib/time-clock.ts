@@ -58,11 +58,13 @@ async function ensureShift(staffId: string): Promise<string | null> {
 async function closeOpenEntry(staffId: string, endedAt: Date, flagReason?: string, note?: string, pauseIfWork = false) {
   const { data: open } = await supabase
     .from("job_time_entries")
-    .select("id, kind")
+    .select("id, kind, job_id")
     .eq("staff_id", staffId)
     .is("ended_at", null)
     .maybeSingle();
   if (!open) return;
+  // That job's log shows the stop (switching jobs, clocking out) and its new hours.
+  scheduleJobLogSync(open.job_id as string | null);
   await supabase
     .from("job_time_entries")
     .update({
