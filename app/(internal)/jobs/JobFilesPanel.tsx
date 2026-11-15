@@ -60,13 +60,17 @@ export default function JobFilesPanel({ jobId }: { jobId: string }) {
     if (next) load();
   }
 
-  function run(fn: () => Promise<{ error?: string }>, confirmText?: string) {
+  function run(fn: () => Promise<{ error?: string; warning?: string }>, confirmText?: string) {
     if (confirmText && !window.confirm(confirmText)) return;
     setActionError(null);
     startBusy(async () => {
       const result = await fn();
-      if (result.error) setActionError(result.error);
-      else load();
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+      if (result.warning) setActionError(result.warning);
+      load();
     });
   }
 

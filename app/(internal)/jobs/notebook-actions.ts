@@ -5,6 +5,7 @@ import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
 import { after } from "next/server";
 import { ensureJobFolder, type FolderResult } from "@/lib/job-folders";
 import { syncJobNotesToOneNote } from "@/lib/onenote-sync";
+import { scheduleJobLogSync } from "@/lib/job-log";
 
 // Notebook for one job: dated notes plus the SharePoint folder for the job's address.
 // Open to a tech only for their own job (requireJobAccess). Nothing here touches money.
@@ -110,5 +111,6 @@ export async function addJobNote(
     return { error: /job_notes/i.test(error?.message ?? "") ? MIGRATION_MESSAGE : "Could not save the note." };
   }
   after(() => syncJobNotesToOneNote(jobId));
+  scheduleJobLogSync(jobId);
   return { note: data as NotebookNote };
 }

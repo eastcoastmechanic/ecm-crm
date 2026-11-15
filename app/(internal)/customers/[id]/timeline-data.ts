@@ -8,6 +8,7 @@ import type {
   JobRow,
   LogEntryRow,
   SquarePaymentRow,
+  SquareRefundRow,
   SurveyRow,
   TimelineSources,
 } from "@/lib/customer-timeline";
@@ -36,7 +37,7 @@ async function safe<T>(load: () => Promise<Loaded<T>>): Promise<Loaded<T>> {
 }
 
 export async function loadCustomerTimeline(customerId: string): Promise<{ sources: TimelineSources; failed: string[] }> {
-  const [conversations, documents, jobs, campaignSends, squarePayments, customerLog] = await Promise.all([
+  const [conversations, documents, jobs, campaignSends, squarePayments, squareRefunds, customerLog] = await Promise.all([
     safe(() =>
       fetchAllRows<ConversationRow>((from, to) =>
         supabase
@@ -91,6 +92,18 @@ export async function loadCustomerTimeline(customerId: string): Promise<{ source
           .range(from, to)
       )
     ),
+    // square_refunds comes with SQL 0081. Until it is run there are simply no refunds to show.
+    safe(async () => {
+      const result = await fetchAllRows<SquareRefundRow>((from, to) =>
+        supabase
+          .from("square_refunds")
+          .select("id, status, amount_cents, reason, square_created_at")
+          .eq("customer_id", customerId)
+          .order("id")
+          .range(from, to)
+      );
+      return result.error?.includes("square_refunds") ? { data: [], error: null } : result;
+    }),
     safe(() =>
       fetchAllRows<LogEntryRow>((from, to) =>
         supabase
@@ -143,6 +156,7 @@ export async function loadCustomerTimeline(customerId: string): Promise<{ source
   note("jobs", jobs);
   note("campaign messages", campaignSends);
   note("Square payments", squarePayments);
+  note("Square refunds", squareRefunds);
   note("log entries", customerLog.error ? customerLog : jobLog);
   note("job notes", jobNotes);
   note("survey answers", surveys);
@@ -158,6 +172,7 @@ export async function loadCustomerTimeline(customerId: string): Promise<{ source
       surveys: surveys?.data ?? [],
       campaignSends: campaignSends.data,
       squarePayments: squarePayments.data,
+      squareRefunds: squareRefunds.data,
     },
     failed,
   };

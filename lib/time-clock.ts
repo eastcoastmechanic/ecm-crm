@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { noteJobStep } from "@/lib/planner-connector";
+import { scheduleJobLogSync } from "@/lib/job-log";
 import { clockWeek, countableShifts, etWeekRange, type ClockWeek } from "@/lib/clock-week";
 import {
   ENTRY_CAP_HOURS,
@@ -57,11 +58,13 @@ async function ensureShift(staffId: string): Promise<string | null> {
 async function closeOpenEntry(staffId: string, endedAt: Date, flagReason?: string, note?: string, pauseIfWork = false) {
   const { data: open } = await supabase
     .from("job_time_entries")
-    .select("id, kind")
+    .select("id, kind, job_id")
     .eq("staff_id", staffId)
     .is("ended_at", null)
     .maybeSingle();
   if (!open) return;
+  // That job's log shows the stop (switching jobs, clocking out) and its new hours.
+  scheduleJobLogSync(open.job_id as string | null);
   await supabase
     .from("job_time_entries")
     .update({
@@ -129,6 +132,8 @@ export async function startJobEntry(jobId: string, staffId: string, kind: "work"
     .from("job_time_entries")
     .insert({ job_id: jobId, staff_id: staffId, shift_id: shiftId, kind, started_at: now.toISOString() });
   if (error && error.code !== UNIQUE_VIOLATION) return { error: "Could not start the job timer." };
+  // Start or Resume shows in the job log (pause already does, through its Planner step).
+  scheduleJobLogSync(jobId);
   return {};
 }
 

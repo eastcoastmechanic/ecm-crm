@@ -109,7 +109,9 @@ export async function countReceipts(jobId: string): Promise<number | null> {
 }
 
 /** Office: delete a receipt, its stored file and its SharePoint copy. */
-export async function deleteJobReceipt(receiptId: string): Promise<{ jobId: string } | { error: string }> {
+export async function deleteJobReceipt(
+  receiptId: string
+): Promise<{ jobId: string; sharePointLeftOver: boolean } | { error: string }> {
   const { data: row, error } = await supabase.from("job_receipts").select("id, job_id, file_path").eq("id", receiptId).maybeSingle();
   if (error) return { error: isMissingReceiptsTable(error.message) ? RECEIPTS_MIGRATION_MESSAGE : "Couldn't find the receipt." };
   if (!row) return { error: "That receipt is already gone." };
@@ -119,6 +121,7 @@ export async function deleteJobReceipt(receiptId: string): Promise<{ jobId: stri
   if (delError) return { error: "Couldn't delete the receipt. Try again." };
 
   await supabase.storage.from(JOB_RECEIPT_BUCKET).remove([row.file_path as string]);
-  if (copy) await deleteFromJobsDrive(copy.sharepoint_item_id);
-  return { jobId: row.job_id as string };
+  // A copy SharePoint wouldn't delete is reported, so the office can remove it from the folder.
+  const sharePointLeftOver = Boolean(copy?.sharepoint_item_id) && !(await deleteFromJobsDrive(copy?.sharepoint_item_id));
+  return { jobId: row.job_id as string, sharePointLeftOver };
 }

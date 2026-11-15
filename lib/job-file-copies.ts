@@ -1,7 +1,9 @@
 import { after } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { uploadToJobFolder } from "@/lib/job-folders";
+import { syncJobLog } from "@/lib/job-log";
 import {
+  MAX_COPY_ATTEMPTS,
   sharePointPathFor,
   shouldTryCopy,
   summarizeCopies,
@@ -122,13 +124,15 @@ async function copyOne(row: CopyRow): Promise<CopyStatus> {
  */
 export async function syncJobFiles(jobId: string, opts: { force?: boolean; limit?: number } = {}): Promise<void> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("job_file_copies")
       .select("id, job_id, kind, bucket, path, label, status, attempts, created_at")
       .eq("job_id", jobId)
-      .neq("status", "copied")
-      .order("created_at", { ascending: true })
-      .limit(opts.limit ?? 25);
+      .neq("status", "copied");
+    // Filter used-up rows in the query, so a pile of files that keep failing can't take up the
+    // whole batch and stop newer files from being copied.
+    if (!opts.force) query = query.or(`status.eq.pending,attempts.lt.${MAX_COPY_ATTEMPTS}`);
+    const { data, error } = await query.order("created_at", { ascending: true }).limit(opts.limit ?? 25);
     if (error || !data) return;
     const rows = (data as CopyRow[]).filter((r) => opts.force || shouldTryCopy(r));
     // One at a time: the folder is made on the first, and SharePoint is not hammered.
@@ -146,7 +150,11 @@ export async function syncJobFiles(jobId: string, opts: { force?: boolean; limit
 
 /** Run the copy after the response so the upload never waits on Microsoft. */
 export function scheduleJobFileSync(jobId: string): void {
-  const run = () => syncJobFiles(jobId);
+  // Copy the files first, then rewrite the job log so it links to them.
+  const run = async () => {
+    await syncJobFiles(jobId);
+    await syncJobLog(jobId);
+  };
   try {
     after(run);
   } catch {

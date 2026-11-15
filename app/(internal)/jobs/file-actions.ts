@@ -10,6 +10,7 @@ import { copySummaryLine, receiptDate, RECEIPT_MAX_BYTES, RECEIPT_TYPES } from "
 import { jobCopySummary, syncJobFiles } from "@/lib/job-file-copies";
 import { countReceipts, deleteJobReceipt, listReceiptsForOffice, saveJobReceipt, type OfficeReceipt } from "@/lib/job-receipts";
 import { removeJobPhoto, resolveJobPhotos } from "@/lib/job-photos";
+import { scheduleJobLogSync } from "@/lib/job-log";
 
 // Receipts and folder copies for one job. A tech may add a receipt to a job that is theirs, and
 // gets back only a count: amounts, the receipt list and money never go to a tech's screen.
@@ -109,7 +110,7 @@ async function saveReceiptFromForm(formData: FormData): Promise<NonNullable<AddR
   return { saved: true, count: await countReceipts(jobId) };
 }
 
-export async function removeReceipt(receiptId: string): Promise<{ error?: string }> {
+export async function removeReceipt(receiptId: string): Promise<{ error?: string; warning?: string }> {
   try {
     await requireOffice();
   } catch {
@@ -117,26 +118,30 @@ export async function removeReceipt(receiptId: string): Promise<{ error?: string
   }
   const result = await deleteJobReceipt(receiptId);
   if ("error" in result) return { error: result.error };
+  scheduleJobLogSync(result.jobId);
   revalidatePath("/jobs");
-  return {};
+  return result.sharePointLeftOver ? { warning: "Deleted in the CRM, but SharePoint wouldn't delete its copy. Remove it from the job folder (Photos or Receipts) by hand." } : {};
 }
 
-export async function removePhoto(jobId: string, path: string): Promise<{ error?: string }> {
+export async function removePhoto(jobId: string, path: string): Promise<{ error?: string; warning?: string }> {
   try {
     await requireOffice();
   } catch {
     return { error: "Only the office can delete photos." };
   }
   if (!jobId || !path) return { error: "Missing photo." };
+  let leftOver = false;
   try {
-    const removed = await removeJobPhoto(jobId, path);
-    if (!removed) return { error: "That photo is already gone." };
+    const result = await removeJobPhoto(jobId, path);
+    if (!result.removed) return { error: "That photo is already gone." };
+    leftOver = result.sharePointLeftOver;
   } catch {
     return { error: "Couldn't delete the photo. Try again." };
   }
+  scheduleJobLogSync(jobId);
   revalidatePath("/jobs");
   revalidatePath("/field-board");
-  return {};
+  return leftOver ? { warning: "Deleted in the CRM, but SharePoint wouldn't delete its copy. Remove it from the job folder (Photos or Receipts) by hand." } : {};
 }
 
 /** Office Retry: copy every file of the job that isn't in SharePoint yet, now. */
