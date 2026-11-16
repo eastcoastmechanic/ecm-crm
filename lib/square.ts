@@ -1,7 +1,9 @@
-const SQUARE_BASE_URL = "https://connect.squareup.com";
+import type { SquareCatalogObject } from "@/lib/square-catalog-rules";
+
+export const SQUARE_BASE_URL = "https://connect.squareup.com";
 const SQUARE_VERSION = "2026-08-19";
 
-function squareHeaders() {
+export function squareHeaders() {
   const token = process.env.SQUARE_ACCESS_TOKEN;
   if (!token) return null;
   return {
@@ -74,6 +76,16 @@ export type SquareCustomer = {
   company_name?: string;
   email_address?: string;
   phone_number?: string;
+  address?: SquareAddress;
+  note?: string;
+};
+
+export type SquareAddress = {
+  address_line_1?: string;
+  address_line_2?: string;
+  locality?: string;
+  administrative_district_level_1?: string;
+  postal_code?: string;
 };
 
 type SquarePaymentList = { payments?: SquarePayment[]; cursor?: string };
@@ -243,6 +255,32 @@ export async function listSquareCustomers(): Promise<SquareCustomer[]> {
   return customers;
 }
 
+/**
+ * Every catalog ITEM (with its variations) and CATEGORY on the Square account (read only).
+ * Follows all pages, up to 200 pages; stops with an error rather than return a partial catalog.
+ */
+export async function listSquareCatalog(): Promise<SquareCatalogObject[]> {
+  const headers = squareHeaders();
+  if (!headers) throw new Error("SQUARE_ACCESS_TOKEN is not set.");
+
+  const objects: SquareCatalogObject[] = [];
+  let cursor: string | undefined;
+  let pages = 0;
+  do {
+    const url = new URL(`${SQUARE_BASE_URL}/v2/catalog/list`);
+    url.searchParams.set("types", "ITEM,CATEGORY");
+    if (cursor) url.searchParams.set("cursor", cursor);
+    const res = await fetch(url.toString(), { headers, cache: "no-store" });
+    if (!res.ok) throw new Error(`Square catalog list failed (${res.status}): ${await res.text()}`);
+    const json = (await res.json()) as { objects?: SquareCatalogObject[]; cursor?: string };
+    objects.push(...(json.objects ?? []));
+    cursor = json.cursor;
+    pages += 1;
+  } while (cursor && pages < 200);
+  if (cursor) throw new Error("The Square catalog has more than 200 pages; stopped before importing a partial list.");
+  return objects;
+}
+
 export async function bulkRetrieveSquareCustomers(customerIds: string[]): Promise<Map<string, SquareCustomer>> {
   const headers = squareHeaders();
   const found = new Map<string, SquareCustomer>();
@@ -269,6 +307,94 @@ export async function bulkRetrieveSquareCustomers(customerIds: string[]): Promis
   }
 
   return found;
+}
+
+// ---------------------------------------------------------------------------
+// Read-only page helpers for the full-history import (lib/square-history.ts).
+// Each call fetches ONE page and hands back Square's cursor, so the import can
+// stop between pages and pick up where it left off.
+// ---------------------------------------------------------------------------
+
+export type SquareLocation = { id?: string; name?: string; status?: string; created_at?: string };
+
+export type SquareRefund = {
+  id?: string;
+  status?: string;
+  location_id?: string;
+  payment_id?: string;
+  order_id?: string;
+  reason?: string;
+  destination_type?: string;
+  created_at?: string;
+  updated_at?: string;
+  amount_money?: SquareMoney;
+  processing_fee?: Array<{ amount_money?: SquareMoney }>;
+};
+
+export type SquarePage<T> = { items: T[]; cursor: string | null };
+
+async function squareGetJson<T>(url: URL, what: string): Promise<T> {
+  const headers = squareHeaders();
+  if (!headers) throw new Error("SQUARE_ACCESS_TOKEN is not set.");
+  const res = await fetch(url.toString(), { headers, cache: "no-store" });
+  if (!res.ok) throw new Error(`Square ${what} failed (${res.status}): ${await res.text()}`);
+  return (await res.json()) as T;
+}
+
+/** Every location on the account, active or not. */
+export async function listSquareLocations(): Promise<SquareLocation[]> {
+  const json = await squareGetJson<{ locations?: SquareLocation[] }>(
+    new URL(`${SQUARE_BASE_URL}/v2/locations`),
+    "locations list"
+  );
+  return json.locations ?? [];
+}
+
+/** One page of invoices for one location (Square only searches one location at a time). */
+export async function searchSquareInvoicesPage(locationId: string, cursor: string | null): Promise<SquarePage<SquareInvoice>> {
+  const headers = squareHeaders();
+  if (!headers) throw new Error("SQUARE_ACCESS_TOKEN is not set.");
+  const res = await fetch(`${SQUARE_BASE_URL}/v2/invoices/search`, {
+    method: "POST",
+    headers,
+    cache: "no-store",
+    body: JSON.stringify({
+      query: { filter: { location_ids: [locationId] } },
+      limit: 200,
+      ...(cursor ? { cursor } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`Square invoices search failed (${res.status}): ${await res.text()}`);
+  const json = (await res.json()) as SquareInvoiceSearch;
+  return { items: json.invoices ?? [], cursor: json.cursor ?? null };
+}
+
+type TimeWindowPage = { locationId: string; beginTime: string; endTime: string; cursor: string | null };
+
+/** One page of payments for one location and time window. */
+export async function listSquarePaymentsPage(opts: TimeWindowPage): Promise<SquarePage<SquarePayment>> {
+  const url = new URL(`${SQUARE_BASE_URL}/v2/payments`);
+  url.searchParams.set("location_id", opts.locationId);
+  url.searchParams.set("begin_time", opts.beginTime);
+  url.searchParams.set("end_time", opts.endTime);
+  url.searchParams.set("sort_order", "ASC");
+  url.searchParams.set("limit", "100");
+  if (opts.cursor) url.searchParams.set("cursor", opts.cursor);
+  const json = await squareGetJson<SquarePaymentList>(url, "payments list");
+  return { items: json.payments ?? [], cursor: json.cursor ?? null };
+}
+
+/** One page of refunds for one location and time window. */
+export async function listSquareRefundsPage(opts: TimeWindowPage): Promise<SquarePage<SquareRefund>> {
+  const url = new URL(`${SQUARE_BASE_URL}/v2/refunds`);
+  url.searchParams.set("location_id", opts.locationId);
+  url.searchParams.set("begin_time", opts.beginTime);
+  url.searchParams.set("end_time", opts.endTime);
+  url.searchParams.set("sort_order", "ASC");
+  url.searchParams.set("limit", "100");
+  if (opts.cursor) url.searchParams.set("cursor", opts.cursor);
+  const json = await squareGetJson<{ refunds?: SquareRefund[]; cursor?: string }>(url, "refunds list");
+  return { items: json.refunds ?? [], cursor: json.cursor ?? null };
 }
 
 // ---------------------------------------------------------------------------

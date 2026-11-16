@@ -133,6 +133,15 @@ describe("buildCustomerTimeline", () => {
     expect(items.find((i) => i.label === "Square payment")!.summary).toBe("$125.00 · card · completed");
   });
 
+  it("shows a Square refund under Money, with the amount only when money is on", () => {
+    const refunds = [{ id: "r1", status: "COMPLETED", amount_cents: 2500, reason: "Duplicate charge", square_created_at: "2026-08-02T12:00:00Z" }];
+    const withMoney = buildCustomerTimeline({ squareRefunds: refunds }, { showMoney: true });
+    expect(withMoney).toHaveLength(1);
+    expect(withMoney[0]).toMatchObject({ label: "Square refund", category: "money", summary: "$25.00 · Duplicate charge · completed" });
+    const noMoney = buildCustomerTimeline({ squareRefunds: refunds }, { showMoney: false });
+    expect(noMoney[0].summary).toBe("Duplicate charge · completed");
+  });
+
   it("leaves out events with no time rather than dating them 1970", () => {
     const items = buildCustomerTimeline(
       { jobs: [job({ created_at: "2026-10-01T13:00:00Z", scheduled_at: null, completed_at: null })], documents: [doc()] },

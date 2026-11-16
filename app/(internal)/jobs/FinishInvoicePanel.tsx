@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import SendDocumentForm from "../documents/[id]/SendDocumentForm";
+import RecalcDraftButton from "./RecalcDraftButton";
 import { buttonSecondaryClass, subTextClass } from "../ui";
 import { formatMoney, type InvoicePrompt } from "@/lib/job-invoice-rules";
 
@@ -10,7 +11,16 @@ import { formatMoney, type InvoicePrompt } from "@/lib/job-invoice-rules";
  * or open it. Send uses the normal send action (office-only check inside). A tech never gets a
  * prompt from the server, so this never renders for them.
  */
-export default function FinishInvoicePanel({ prompt, onClose }: { prompt: InvoicePrompt; onClose?: () => void }) {
+export default function FinishInvoicePanel({
+  prompt,
+  onClose,
+  jobId,
+}: {
+  prompt: InvoicePrompt;
+  onClose?: () => void;
+  /** Shows Recalculate draft for a draft Finish built from labor and receipts. */
+  jobId?: string;
+}) {
   const num = prompt.docNumber ?? "draft";
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-gold/30 bg-gold/5 p-3">
@@ -23,11 +33,13 @@ export default function FinishInvoicePanel({ prompt, onClose }: { prompt: Invoic
           <>Job finished. Invoice {num} has no price on file. Add line items, then send.</>
         )}
       </p>
+      {prompt.note && <p className={subTextClass}>{prompt.note}</p>}
       <div className="flex flex-wrap items-center gap-2">
         {prompt.priced && <SendDocumentForm id={prompt.id} label="Send now" />}
         <Link href={`/documents/${prompt.id}`} className={buttonSecondaryClass}>
           Open
         </Link>
+        {prompt.built && jobId && <RecalcDraftButton jobId={jobId} />}
         {onClose && (
           <button type="button" onClick={onClose} className={`${subTextClass} underline`}>
             Close

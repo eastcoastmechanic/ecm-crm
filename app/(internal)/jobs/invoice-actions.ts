@@ -4,8 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { requireOffice } from "@/lib/require-role";
-import { balanceLineFor, parseMoneyToCents } from "@/lib/job-invoice-rules";
-import { createJobBalanceInvoice, findLiveJobInvoice, loadLinkedDoc } from "@/lib/finish-invoice";
+import { balanceLineFor, formatMoney, parseMoneyToCents } from "@/lib/job-invoice-rules";
+import { createJobBalanceInvoice, findLiveJobInvoice, loadLinkedDoc, recalculateJobDraft } from "@/lib/finish-invoice";
 
 export type CreateInvoiceState = { error: string } | null;
 
@@ -56,4 +56,24 @@ export async function createBalanceInvoice(_prev: CreateInvoiceState, formData: 
   revalidatePath("/jobs");
   revalidatePath("/documents");
   redirect(`/documents/${result.documentId}`);
+}
+
+export type RecalculateState = { error?: string; message?: string };
+
+/**
+ * Office-only: rebuild the job's draft invoice lines from what is on the job now (clocked labor,
+ * receipts with markup, or the contract balance). Never touches a sent, paid or void invoice.
+ */
+export async function recalculateDraftInvoice(jobId: string): Promise<RecalculateState> {
+  try {
+    await requireOffice();
+  } catch {
+    return { error: "Only the office can recalculate an invoice." };
+  }
+  if (!jobId) return { error: "Missing job." };
+  const result = await recalculateJobDraft(jobId);
+  if ("error" in result) return { error: result.error };
+  revalidatePath("/jobs");
+  revalidatePath("/documents");
+  return { message: [`Draft recalculated: ${formatMoney(Math.round(result.total * 100))}.`, ...result.warnings].join(" ") };
 }

@@ -1,8 +1,11 @@
 import { headers } from "next/headers";
 import { supabase } from "@/lib/supabase";
 import { fetchAllPriceBookItems } from "@/lib/price-book";
+import { getStaffRole } from "@/lib/require-role";
+import { isSquareConfigured } from "@/lib/square";
 import { addPriceBookItem } from "./actions";
 import PriceBookList, { type PriceBookItem } from "./PriceBookList";
+import SquareCatalogImportPanel from "./SquareCatalogImportPanel";
 import SubmitButton from "../SubmitButton";
 import ResultForm from "../ResultForm";
 import { buttonClass, cardClass, headingClass, inputClass, subTextClass } from "../ui";
@@ -12,6 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function PriceBookPage() {
   const canSeeProfit = (await headers()).get("x-staff-role") === "owner";
   const items = await fetchAllPriceBookItems<PriceBookItem>(supabase);
+  const showSquareImport = (await getStaffRole()) === "owner" && isSquareConfigured();
 
   return (
     <div className="flex flex-col gap-8">
@@ -82,6 +86,8 @@ export default async function PriceBookPage() {
         )}
         <SubmitButton className={`${buttonClass} sm:col-span-2 sm:w-fit`}>Add Price Book Item</SubmitButton>
       </ResultForm>
+
+      {showSquareImport && <SquareCatalogImportPanel />}
 
       <PriceBookList items={items} canSeeProfit={canSeeProfit} />
     </div>

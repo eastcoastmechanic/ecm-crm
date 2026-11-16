@@ -1,9 +1,9 @@
-import path from "path";
-import { readFile } from "fs/promises";
 import { Document, Page, View, Text, Image, StyleSheet, Font, renderToBuffer } from "@react-pdf/renderer";
 import { COMPANY_SLOGAN } from "./brand";
 import { registerBrandFonts, BODY_FONT, DISPLAY_FONT } from "./pdf-fonts";
 import { formatEtDate } from "@/lib/tz";
+import { colors, getLogoDataUri } from "./pdf-brand";
+import { InvoicePdf, type InvoicePdfExtras } from "./invoice-pdf";
 
 export type PdfLineItem = {
   category: string;
@@ -34,6 +34,9 @@ export type PdfDocumentData = {
   // that backs up what's being charged for. url is null when an object
   // couldn't be signed. Absent on documents with no job.
   photos?: { url: string | null; caption: string | null }[];
+  // Invoices only: bill-to, dates, job reference and the money summary. When
+  // present the invoice gets its own layout (lib/invoice-pdf.tsx).
+  invoice?: InvoicePdfExtras;
 };
 
 const typeLabel: Record<PdfDocumentData["type"], string> = {
@@ -44,43 +47,6 @@ const typeLabel: Record<PdfDocumentData["type"], string> = {
 
 Font.registerHyphenationCallback((word) => [word]);
 registerBrandFonts();
-
-// Same palette as app/globals.css, so a printed document reads as the same
-// brand as the website/CRM rather than a generic grey PDF.
-const colors = {
-  navy: "#0a1628",
-  navy2: "#0e1f3a",
-  blue: "#1e3a5f",
-  accent: "#e8502a",
-  accent2: "#c43d20",
-  highlight: "#558ae7",
-  // Cyan sampled from the logo gradient (public/logo.png).
-  brand: "#38b7e1",
-  off: "#f4f6fa",
-  g100: "#e2e8f0",
-  g300: "#94a3b8",
-  g500: "#64748b",
-  g700: "#334155",
-  green: "#16a34a",
-  greenL: "#dcfce7",
-  white: "#ffffff",
-};
-
-let logoDataUri: string | null = null;
-async function getLogoDataUri(): Promise<string | null> {
-  if (logoDataUri) return logoDataUri;
-  try {
-    // logo-mark.png is logo.png with its dead margin trimmed off. The source
-    // file is 1280x1024 with the badge occupying only 698x582 of it, so at a
-    // 32pt box the mark rendered around 17pt and the wordmark was unreadable.
-    const buffer = await readFile(path.join(process.cwd(), "public", "logo-mark.png"));
-    logoDataUri = `data:image/png;base64,${buffer.toString("base64")}`;
-    return logoDataUri;
-  } catch {
-    // Missing/unreadable logo shouldn't block PDF generation.
-    return null;
-  }
-}
 
 const styles = StyleSheet.create({
   page: {
@@ -576,5 +542,8 @@ export function DocumentPdf({ doc, logo }: { doc: PdfDocumentData; logo: string 
 
 export async function renderDocumentPdf(doc: PdfDocumentData): Promise<Buffer> {
   const logo = await getLogoDataUri();
+  if (doc.type === "invoice" && doc.invoice) {
+    return renderToBuffer(<InvoicePdf doc={doc} invoice={doc.invoice} logo={logo} />);
+  }
   return renderToBuffer(<DocumentPdf doc={doc} logo={logo} />);
 }
