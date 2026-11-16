@@ -10,6 +10,7 @@ import { copySummaryLine, receiptDate, RECEIPT_MAX_BYTES, RECEIPT_TYPES } from "
 import { jobCopySummary, syncJobFiles } from "@/lib/job-file-copies";
 import { countReceipts, deleteJobReceipt, listReceiptsForOffice, saveJobReceipt, type OfficeReceipt } from "@/lib/job-receipts";
 import { removeJobPhoto, resolveJobPhotos } from "@/lib/job-photos";
+import { scheduleJobLogSync } from "@/lib/job-log";
 
 // Receipts and folder copies for one job. A tech may add a receipt to a job that is theirs, and
 // gets back only a count: amounts, the receipt list and money never go to a tech's screen.
@@ -117,6 +118,7 @@ export async function removeReceipt(receiptId: string): Promise<{ error?: string
   }
   const result = await deleteJobReceipt(receiptId);
   if ("error" in result) return { error: result.error };
+  scheduleJobLogSync(result.jobId);
   revalidatePath("/jobs");
   return result.sharePointLeftOver ? { warning: "Deleted in the CRM, but SharePoint wouldn't delete its copy. Remove it from the job folder (Photos or Receipts) by hand." } : {};
 }
@@ -136,6 +138,7 @@ export async function removePhoto(jobId: string, path: string): Promise<{ error?
   } catch {
     return { error: "Couldn't delete the photo. Try again." };
   }
+  scheduleJobLogSync(jobId);
   revalidatePath("/jobs");
   revalidatePath("/field-board");
   return leftOver ? { warning: "Deleted in the CRM, but SharePoint wouldn't delete its copy. Remove it from the job folder (Photos or Receipts) by hand." } : {};

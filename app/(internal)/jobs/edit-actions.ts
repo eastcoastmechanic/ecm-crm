@@ -18,6 +18,7 @@ import {
   type JobEditChanges,
 } from "@/lib/job-edit-rules";
 import { moveJobToTime } from "@/lib/job-reschedule";
+import { scheduleJobLogSync } from "@/lib/job-log";
 import { assignJobToStaff } from "./actions";
 
 /** What the editor typed, echoed back so the form keeps it after an error (React 19 clears forms). */
@@ -183,6 +184,8 @@ export async function saveJobEdit(_prev: JobEditState, formData: FormData): Prom
     const { error } = await supabase.from("jobs").update(plain).eq("id", jobId);
     if (error) return fail("Couldn't save the job. Try again.");
     savedSomething = true;
+    // Type, notes or property changed: the job log shows the new details.
+    scheduleJobLogSync(jobId);
   }
 
   if (changes.staffId !== undefined) {

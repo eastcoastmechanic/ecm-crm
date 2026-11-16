@@ -24,6 +24,7 @@
  */
 import { GRAPH_BASE, graphConfigured, graphFetch, graphFetchWithRetry } from "@/lib/graph-auth";
 import { supabase } from "@/lib/supabase";
+import { scheduleJobLogSync } from "@/lib/job-log";
 import { etDateAtHour, etDateKey } from "@/lib/tz";
 import {
   appendNoteLine,
@@ -408,6 +409,9 @@ async function runJobStep(
   step: JobStep | null,
   opts: { note: boolean; at?: string | null; staffId?: string | null; docNumber?: string | null }
 ): Promise<boolean> {
+  // Every job step (status change, on my way, paused, rescheduled, invoice made/sent/paid) also
+  // rewrites the job log in the SharePoint folder, Planner or not. After the response, never throws.
+  scheduleJobLogSync(jobId);
   if (!plannerConfigured()) return true;
 
   try {
