@@ -55,7 +55,7 @@ export async function loadDailyBrief(now: Date = new Date()): Promise<DailyBrief
     supabase
       .from("jobs")
       .select("scheduled_at, job_type, assigned_staff_id, customers(name), properties(address)")
-      .not("status", "in", "(complete,completed,cancelled)")
+      .not("status", "in", "(complete,completed,cancelled,canceled)")
       .gte("scheduled_at", day.start.toISOString())
       .lt("scheduled_at", day.end.toISOString())
       .order("scheduled_at", { ascending: true }),
