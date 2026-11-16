@@ -191,14 +191,25 @@ export default async function FieldBoardPage() {
   // Checklists: give each open job its list the first time it shows, then work out what blocks Finish.
   const openJobs = rawJobs.filter((job) => job.status !== "complete");
   await ensureChecklists(openJobs.map((job) => ({ id: job.id, job_type: job.job_type })));
-  const [checklists, unlocks] = await Promise.all([
+  const [checklists, unlocks, receiptRows] = await Promise.all([
     loadChecklists(openJobs.map((job) => job.id)),
     unlockedJobIds(openJobs.map((job) => job.id)),
+    // Receipt counts only (no amounts) for the Add receipt button. Missing before SQL 0083: zero.
+    openJobs.length
+      ? supabase
+          .from("job_receipts")
+          .select("job_id")
+          .in("job_id", openJobs.map((job) => job.id))
+          .then((r) => (r.data ?? []) as { job_id: string }[])
+      : Promise.resolve([] as { job_id: string }[]),
   ]);
+  const receiptCount = new Map<string, number>();
+  for (const r of receiptRows) receiptCount.set(r.job_id, (receiptCount.get(r.job_id) ?? 0) + 1);
   const allJobs = rawJobs.map((job) => ({
     ...job,
     checklist: checklists.get(job.id) ?? [],
     unlocked: unlocks.has(job.id),
+    receiptCount: receiptCount.get(job.id) ?? 0,
     blockers:
       job.status === "complete"
         ? []

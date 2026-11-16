@@ -117,3 +117,76 @@ export async function ensureJobFolder(jobId: string): Promise<FolderResult> {
     return { ok: false, reason: "graph_error" };
   }
 }
+
+export type FolderUploadResult =
+  | { ok: true; itemId: string | null; url: string | null }
+  | { ok: false; reason: Exclude<FolderResult, { ok: true }>["reason"] | "upload_failed"; detail?: string };
+
+type FolderTarget = { ok: true; prefix: string; itemBase: boolean } | Exclude<FolderResult, { ok: true }>;
+
+/**
+ * Where a job's folder is in the drive. By its item id when the CRM has it, so a folder renamed in
+ * SharePoint still works; else by its path under Job Notes.
+ */
+async function jobFolderTarget(jobId: string): Promise<FolderTarget> {
+  const folder = await ensureJobFolder(jobId);
+  if (!folder.ok) return folder;
+  if (!graphConfigured()) return { ok: false, reason: "not_configured" };
+  const { data } = await supabase.from("jobs").select("properties(files_folder_id)").eq("id", jobId).maybeSingle();
+  const prop = one((data?.properties ?? null) as unknown as { files_folder_id: string | null } | { files_folder_id: string | null }[] | null);
+  const id = prop?.files_folder_id ?? null;
+  if (id) return { ok: true, prefix: `/drives/${jobsDriveId()}/items/${encodeURIComponent(id)}:/`, itemBase: true };
+  return { ok: true, prefix: `/drives/${jobsDriveId()}/root:/${encodePath(`${parentFolder()}/${folder.name}`)}/`, itemBase: false };
+}
+
+async function makeSubfolder(target: { prefix: string; itemBase: boolean }, sub: string): Promise<void> {
+  // Parent "children" endpoint: items/{id}/children, or root:/<path>:/children.
+  const parent = target.itemBase ? target.prefix.replace(/:\/$/, "/children") : `${target.prefix.replace(/\/$/, "")}:/children`;
+  await graphFetch(parent, {
+    method: "POST",
+    body: JSON.stringify({ name: sub, folder: {}, "@microsoft.graph.conflictBehavior": "fail" }),
+  }).catch(() => null);
+}
+
+/**
+ * Put one file in the job's property folder, at relativePath ("Photos/<name>.jpg"). The same path
+ * is replaced on a retry, never duplicated. Nothing here throws: a SharePoint problem must never
+ * fail the upload or job action that triggered it; the caller records the result and retries later.
+ */
+export async function uploadToJobFolder(
+  jobId: string,
+  relativePath: string,
+  body: Blob | ArrayBuffer | string,
+  contentType: string
+): Promise<FolderUploadResult> {
+  try {
+    const target = await jobFolderTarget(jobId);
+    if (!target.ok) return { ok: false, reason: target.reason };
+    const url = `${target.prefix}${encodePath(relativePath)}:/content?@microsoft.graph.conflictBehavior=replace`;
+    const put = () => graphFetch(url, { method: "PUT", headers: { "Content-Type": contentType || "application/octet-stream" }, body });
+    let res = await put();
+    // A missing subfolder (Photos, Receipts): make it once and try again.
+    if (res.status === 404 && relativePath.includes("/")) {
+      await makeSubfolder(target, relativePath.split("/")[0]);
+      res = await put();
+    }
+    if (!res.ok) return { ok: false, reason: "upload_failed", detail: `SharePoint said ${res.status}` };
+    const item = (await res.json().catch(() => ({}))) as DriveItem;
+    return { ok: true, itemId: item.id ?? null, url: item.webUrl ?? null };
+  } catch (err) {
+    const detail = err instanceof Error && err.name === "TimeoutError" ? "SharePoint timed out" : "SharePoint error";
+    console.error("[job-folders] upload failed:", detail);
+    return { ok: false, reason: "upload_failed", detail };
+  }
+}
+
+/** Remove a copied file from SharePoint by its item id. Best effort, never throws. */
+export async function deleteFromJobsDrive(itemId: string | null | undefined): Promise<boolean> {
+  if (!itemId || !graphConfigured()) return false;
+  try {
+    const res = await graphFetch(`/drives/${jobsDriveId()}/items/${encodeURIComponent(itemId)}`, { method: "DELETE" });
+    return res.ok || res.status === 404;
+  } catch {
+    return false;
+  }
+}
