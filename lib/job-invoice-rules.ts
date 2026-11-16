@@ -74,6 +74,9 @@ export type JobInvoiceSummary = {
   status: string | null;
   total: number | null;
   sent_at: string | null;
+  /** Set on the draft Finish or Create invoice made for this job (SQL 0058). */
+  balance_for_job_id?: string | null;
+  line_items?: { items?: { category?: string | null }[] } | null;
 };
 
 /** What Finish did about the job's invoice. Never sent to a tech. */
@@ -89,6 +92,10 @@ export type InvoicePrompt = {
   totalCents: number;
   /** False when the draft has no priced lines yet: the office adds them before sending. */
   priced: boolean;
+  /** Finish built it from clocked labor and receipts (no linked price); can be recalculated. */
+  built?: boolean;
+  /** How the built draft was priced (rate, markup). */
+  note?: string;
 };
 
 /** Not emailed yet and still a draft: the office should look at it and send it. */
