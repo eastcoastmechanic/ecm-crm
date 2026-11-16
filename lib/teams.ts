@@ -13,7 +13,8 @@ export type TeamsChannel =
   | "leads"
   | "parts"
   | "reviews"
-  | "general";
+  | "general"
+  | "brief";
 
 const ENV_KEYS: Record<TeamsChannel, string> = {
   dispatch: "TEAMS_WEBHOOK_DISPATCH",
@@ -24,6 +25,7 @@ const ENV_KEYS: Record<TeamsChannel, string> = {
   parts: "TEAMS_WEBHOOK_PARTS",
   reviews: "TEAMS_WEBHOOK_REVIEWS",
   general: "TEAMS_WEBHOOK_GENERAL",
+  brief: "TEAMS_WEBHOOK_BRIEF",
 };
 
 export function teamsConfigured(channel: TeamsChannel): boolean {

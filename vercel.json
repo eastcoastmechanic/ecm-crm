@@ -17,6 +17,10 @@
       "schedule": "0 11,12 * * *"
     },
     {
+      "path": "/api/cron/daily-brief",
+      "schedule": "0 11,12 * * *"
+    },
+    {
       "path": "/api/cron/maintenance-visits",
       "schedule": "30 10 * * *"
     },
