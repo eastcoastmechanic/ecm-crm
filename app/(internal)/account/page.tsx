@@ -18,7 +18,7 @@ export const maxDuration = 60;
 /** Owner only: latest rundown run and open items (they carry money flags). */
 async function loadRundownOverview(): Promise<RundownOverview> {
   const [config, run, open, waiting, errors] = await Promise.all([
-    db.from("rundown_planner").select("group_id, plan_id, buckets, last_pull_at, last_error").eq("id", 1).maybeSingle(),
+    db.from("rundown_planner").select("group_id, plan_id, buckets, labels_set, last_pull_at, last_error").eq("id", 1).maybeSingle(),
     db
       .from("rundown_runs")
       .select("bot, run_date, received_at, item_count")
@@ -34,7 +34,7 @@ async function loadRundownOverview(): Promise<RundownOverview> {
   const buckets = (config.data?.buckets ?? {}) as Record<string, string>;
   return {
     tableMissing: Boolean(config.error || run.error || open.error),
-    planReady: Boolean(config.data?.plan_id) && Object.keys(buckets).length >= 6,
+    planReady: Boolean(config.data?.plan_id) && Object.keys(buckets).length >= 6 && Boolean(config.data?.labels_set),
     groupMade: Boolean(config.data?.group_id),
     lastPullAt: (config.data?.last_pull_at as string | null) ?? null,
     lastError: (config.data?.last_error as string | null) ?? null,

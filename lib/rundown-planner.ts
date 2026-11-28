@@ -298,7 +298,9 @@ async function deleteTask(taskId: string) {
   await graphFetchWithRetry(`/planner/tasks/${taskId}`, { method: "DELETE", headers: { "If-Match": etag } }).catch(() => null);
 }
 
-/** Writes one item's card. Returns an error string, or null when the card matches. */
+const LOST_CLAIM = "__lost_claim__";
+
+/** Writes one item's card. Returns an error string, LOST_CLAIM, or null when the card matches. */
 async function pushOne(
   row: PushRow,
   config: RundownPlannerConfig & { plan_id: string },
@@ -336,7 +338,9 @@ async function pushOne(
     if (error) return `save card id: ${error.message}`;
     if (!claimed || claimed.length === 0) {
       await deleteTask(newId);
-      return null; // the other push writes the card
+      // The other push owns the card. Leave needs_push alone: it may have written an
+      // older version of this item, and the next sync compares and writes the rest.
+      return LOST_CLAIM;
     }
     taskId = newId;
     const desc = await setDescription(taskId, desired.description);
@@ -484,6 +488,7 @@ export async function syncRundownPlanner(): Promise<PushSummary> {
       } catch (err) {
         problem = err instanceof Error ? err.message.slice(0, 300) : "push failed";
       }
+      if (problem === LOST_CLAIM) continue;
       if (problem) {
         summary.failed++;
         await supabase
