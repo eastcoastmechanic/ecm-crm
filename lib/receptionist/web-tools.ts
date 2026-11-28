@@ -6,6 +6,7 @@ import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
 import { checkAvailabilityTool } from "./tools";
 import { parseEtLocal } from "@/lib/tz";
 import { noteJobStep } from "@/lib/planner-connector";
+import { scheduleJobOneNote } from "@/lib/onenote-sync";
 import { bookingConsentPlan, smsOptInState, startDoubleOptIn, type SmsOptInState } from "@/lib/sms-consent";
 import { LIMITS, OPT_IN_TEXTS_KEY, allowAll, rule } from "@/lib/rate-limit-db";
 
@@ -80,6 +81,7 @@ const createWebBookingRequest = betaZodTool({
     if (jobError) return `Failed to create job request: ${jobError.message}`;
     // A card on the Jobs plan, labelled Lead + Chat. Never throws.
     if (newJob?.id) await noteJobStep(newJob.id as string, "requested");
+    scheduleJobOneNote(newJob?.id as string | undefined);
 
     // The request is saved; a failed "Reply YES" text shouldn't fail the booking.
     // Shares the website's hourly cap on confirmation texts with /sms-signup and

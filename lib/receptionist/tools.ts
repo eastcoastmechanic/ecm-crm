@@ -7,6 +7,7 @@ import { applyJobStatus } from "@/lib/job-lifecycle";
 import { notifyOwnerOfReceptionistRequest } from "@/lib/notify-owner";
 import { notifyTech } from "@/lib/tech-notice-send";
 import { noteJobStep } from "@/lib/planner-connector";
+import { scheduleJobOneNote } from "@/lib/onenote-sync";
 import { BUSINESS_HOURS } from "./config";
 import { openHoursFor, weekdayOf } from "./availability";
 
@@ -140,6 +141,7 @@ export function buildReceptionistTools(params: {
       await notifyOwnerOfReceptionistRequest({ kind: "new", jobId: newJob.id as string, channel: createdVia });
       // A card on the Jobs plan, labelled Lead + Phone/Text. Never throws.
       await noteJobStep(newJob.id as string, "requested");
+      scheduleJobOneNote(newJob.id as string);
 
       return `Job request created for ${date} at ${time}, pending confirmation from East Coast Mechanical.`;
     },

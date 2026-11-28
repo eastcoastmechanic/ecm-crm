@@ -5,6 +5,7 @@ import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { supabase } from "@/lib/supabase";
 import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
 import { noteJobStep } from "@/lib/planner-connector";
+import { scheduleJobOneNote } from "@/lib/onenote-sync";
 import { etDateAtHour, etDateKey } from "@/lib/tz";
 import { COMPANY_PHONE_DISPLAY } from "@/lib/brand";
 import { bookingConsentPlan, smsOptInState, startDoubleOptIn, type SmsOptInState } from "@/lib/sms-consent";
@@ -106,6 +107,7 @@ export async function bookService(_prev: BookState, formData: FormData): Promise
       return { error: sorry };
     }
     newJobId = (newJob?.id as string | undefined) ?? null;
+    scheduleJobOneNote(newJobId);
   } catch (err) {
     console.error("bookService failed", err instanceof Error ? err.message : err);
     return { error: sorry };

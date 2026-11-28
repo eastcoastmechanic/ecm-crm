@@ -16,6 +16,7 @@ vi.mock("@/lib/supabase", () => ({ supabase: {} }));
 vi.mock("@/lib/on-way-notice", () => ({ sendOnWayNotice: vi.fn() }));
 vi.mock("@/lib/job-photos", () => ({ appendJobPhotos: vi.fn(), uploadJobPhotoFiles: vi.fn(), JOB_PHOTO_PHASES: [] }));
 vi.mock("@/lib/graph-connector", () => ({ syncJobToGraph: vi.fn() }));
+vi.mock("@/lib/onenote-sync", () => ({ scheduleJobOneNote: vi.fn() }));
 vi.mock("@/lib/planner-connector", () => ({ syncJobToPlanner: vi.fn() }));
 vi.mock("@/lib/job-lifecycle", () => ({
   applyJobStatus: (...a: unknown[]) => (h.applyJobStatus(...a), Promise.resolve({ changed: true })),

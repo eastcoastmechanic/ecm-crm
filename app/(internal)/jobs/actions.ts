@@ -11,6 +11,7 @@ import {
   type JobPhotoPhase,
 } from "@/lib/job-photos";
 import { syncJobToGraph } from "@/lib/graph-connector";
+import { scheduleJobOneNote } from "@/lib/onenote-sync";
 import { noteJobStep, syncJobToPlanner } from "@/lib/planner-connector";
 import { applyJobStatus } from "@/lib/job-lifecycle";
 import { requireOffice, requireRole } from "@/lib/require-role";
@@ -48,6 +49,7 @@ export async function createServiceCall(_prev: { error?: string } | null): Promi
   if (error || !job) return { error: "Couldn't start the service call. Try again." };
 
   await syncJobToPlanner(job.id, "in_progress", { note: true });
+  scheduleJobOneNote(job.id);
 
   revalidatePath("/jobs");
   redirect(`/diagnostics/new?job_id=${job.id}`);
@@ -94,6 +96,7 @@ export async function scheduleJobFromContract(_prev: ScheduleJobState, formData:
 
   await syncJobToPlanner(job.id, "scheduled", { note: true });
   await syncJobToGraph(job.id);
+  scheduleJobOneNote(job.id);
 
   revalidatePath("/jobs");
   revalidatePath(`/documents/${documentId}`);
