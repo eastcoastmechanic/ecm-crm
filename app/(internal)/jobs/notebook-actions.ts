@@ -4,13 +4,14 @@ import { supabase } from "@/lib/supabase";
 import { getMyStaffId, requireJobAccess } from "@/lib/job-access";
 import { after } from "next/server";
 import { ensureJobFolder, type FolderResult } from "@/lib/job-folders";
-import { syncJobNotesToOneNote } from "@/lib/onenote-sync";
+import { ensureJobOneNote } from "@/lib/onenote-sync";
 import { scheduleJobLogSync } from "@/lib/job-log";
 
 // Notebook for one job: dated notes plus the SharePoint folder for the job's address.
 // Open to a tech only for their own job (requireJobAccess). Nothing here touches money.
-// Notes are also copied to the job's OneNote page when the owner has connected OneNote
-// (lib/onenote-sync.ts). That runs after the response, so saving never waits on Microsoft.
+// Notes are also copied to OneNote when the owner has connected it (lib/onenote-sync.ts):
+// new jobs get their own section with a "Job notes" page; older jobs keep their page.
+// That runs after the response, so saving never waits on Microsoft.
 
 export type NotebookNote = { id: string; body: string; author_name: string | null; created_at: string };
 
@@ -20,7 +21,7 @@ export type NotebookState = {
   folderUrl: string | null;
   folderName: string | null;
   folderNote: string | null;
-  /** The job's page in the ECM Jobs OneNote notebook, once a note has been copied there. */
+  /** The job's own section in the ECM Jobs OneNote notebook, else its notes page once one exists. */
   oneNoteUrl: string | null;
 };
 
@@ -50,6 +51,19 @@ const empty = (error: string): NotebookState => ({
   oneNoteUrl: null,
 });
 
+/**
+ * Link for "Open in OneNote": the job's own section (new layout, SQL 0086), else its page.
+ * Before SQL 0086 (or 0066) a missing column just means an older link or none.
+ */
+async function oneNoteLink(jobId: string): Promise<string | null> {
+  const full = await supabase.from("jobs").select("onenote_section_url, onenote_page_url").eq("id", jobId).maybeSingle();
+  if (!full.error) {
+    return ((full.data?.onenote_section_url ?? full.data?.onenote_page_url) as string | null | undefined) ?? null;
+  }
+  const page = await supabase.from("jobs").select("onenote_page_url").eq("id", jobId).maybeSingle();
+  return page.error ? null : ((page.data?.onenote_page_url as string | null | undefined) ?? null);
+}
+
 export async function loadJobNotebook(jobId: string): Promise<NotebookState> {
   try {
     await requireJobAccess(jobId, { allowClosedJob: true });
@@ -57,7 +71,7 @@ export async function loadJobNotebook(jobId: string): Promise<NotebookState> {
     return empty("Not allowed");
   }
 
-  const [notesRes, folder, pageRes] = await Promise.all([
+  const [notesRes, folder, oneNoteUrl] = await Promise.all([
     supabase
       .from("job_notes")
       .select("id, body, author_name, created_at")
@@ -65,12 +79,11 @@ export async function loadJobNotebook(jobId: string): Promise<NotebookState> {
       .order("created_at", { ascending: false })
       .limit(200),
     ensureJobFolder(jobId),
-    // Before SQL 0066 the column is missing; that just means no OneNote link.
-    supabase.from("jobs").select("onenote_page_url").eq("id", jobId).maybeSingle(),
+    oneNoteLink(jobId),
   ]);
-  const oneNoteUrl = pageRes.error ? null : ((pageRes.data?.onenote_page_url as string | null) ?? null);
-  // Catch up any note that did not reach OneNote yet (no-op when there is none).
-  after(() => syncJobNotesToOneNote(jobId));
+  // Catch up: make the job's section if its create path missed it, and copy any note that did
+  // not reach OneNote yet (no-op when both are done).
+  after(() => ensureJobOneNote(jobId));
 
   if (notesRes.error) {
     return {
@@ -110,7 +123,7 @@ export async function addJobNote(
   if (error || !data) {
     return { error: /job_notes/i.test(error?.message ?? "") ? MIGRATION_MESSAGE : "Could not save the note." };
   }
-  after(() => syncJobNotesToOneNote(jobId));
+  after(() => ensureJobOneNote(jobId));
   scheduleJobLogSync(jobId);
   return { note: data as NotebookNote };
 }

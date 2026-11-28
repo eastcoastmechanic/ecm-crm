@@ -3,6 +3,7 @@ import { allocateDocNumber } from "@/lib/doc-number";
 import { resolveCustomerPropertyEquipment } from "@/lib/customer-intake";
 import { findCustomerByPhone } from "@/lib/receptionist/customer-lookup";
 import { syncCustomerToGraph, syncDocumentToGraph, syncJobToGraph } from "@/lib/graph-connector";
+import { scheduleJobOneNote } from "@/lib/onenote-sync";
 
 const DOC_PREFIX: Record<string, string> = {
   estimate: "EST",
@@ -260,6 +261,7 @@ export async function ingestQuote(body: IngestQuoteBody): Promise<IngestQuoteRes
       }
       jobId = job.id;
       await syncJobToGraph(job.id);
+      scheduleJobOneNote(job.id);
     }
 
     const numbered = await allocateDocNumber(type);

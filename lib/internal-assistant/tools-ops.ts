@@ -15,6 +15,7 @@ import {
 } from "@/lib/job-photos";
 import { listOpenPlannerTasks } from "@/lib/planner-connector";
 import { applyJobStatus } from "@/lib/job-lifecycle";
+import { scheduleJobOneNote } from "@/lib/onenote-sync";
 
 /**
  * Jobs, leads, inventory and document sending.
@@ -90,6 +91,7 @@ const scheduleJobTool = betaZodTool({
       .select("id")
       .single();
     if (error) return `Failed to schedule job: ${error.message}`;
+    scheduleJobOneNote(data.id);
 
     try {
       await applyJobStatus(data.id, "scheduled", { onlyFrom: "requested" });

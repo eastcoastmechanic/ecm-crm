@@ -42,6 +42,7 @@ vi.mock("@/lib/job-photos", () => ({
   JOB_PHOTO_PHASES: ["arrival", "completion"],
 }));
 vi.mock("@/lib/planner-connector", () => ({ listOpenPlannerTasks: vi.fn() }));
+vi.mock("@/lib/onenote-sync", () => ({ scheduleJobOneNote: vi.fn() }));
 
 import { opsTools } from "../internal-assistant/tools-ops";
 import { payload } from "./fake-supabase";

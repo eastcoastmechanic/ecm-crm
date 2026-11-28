@@ -7,6 +7,7 @@ import { portalCustomerFor, requirePortalUser } from "@/lib/portal-customer";
 import { validateServiceRequest } from "@/lib/portal-view";
 import { notifyOwnerOfWebLead } from "@/lib/notify-owner";
 import { noteJobStep } from "@/lib/planner-connector";
+import { scheduleJobOneNote } from "@/lib/onenote-sync";
 import { etDateKey } from "@/lib/tz";
 
 export type RequestState = { error?: string } | null;
@@ -63,6 +64,7 @@ export async function requestService(_prev: RequestState, formData: FormData): P
 
   // A card on the Jobs plan, labelled Lead + Portal. Never throws.
   if (newJob?.id) await noteJobStep(newJob.id as string, "requested");
+  scheduleJobOneNote(newJob?.id as string | undefined);
 
   // The request is saved; a failed owner email shouldn't make the customer retry.
   try {

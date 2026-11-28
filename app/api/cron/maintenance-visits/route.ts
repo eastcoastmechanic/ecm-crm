@@ -3,6 +3,7 @@ import { cronAuthorized } from "@/lib/cron-auth";
 import { supabase } from "@/lib/supabase";
 import { etDateKey } from "@/lib/tz";
 import { noteJobStep } from "@/lib/planner-connector";
+import { scheduleJobOneNote } from "@/lib/onenote-sync";
 import { monthName, visitDueNow, visitLabel } from "@/lib/maintenance-visits";
 
 type VisitJobInput = {
@@ -52,6 +53,7 @@ async function createJobForVisit(v: VisitJobInput): Promise<string | null> {
     jobId = job.id as string;
     // The visit's card on the Jobs plan ("Requested from maintenance plan"). Never throws.
     await noteJobStep(jobId, "requested");
+    scheduleJobOneNote(jobId);
   }
 
   const { error: linkError } = await supabase.from("maintenance_visits").update({ job_id: jobId }).eq("id", v.visitId);
