@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/time-clock-cleanup",
       "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/cron/rundown-sync",
+      "schedule": "40 * * * *"
     }
   ]
 }
