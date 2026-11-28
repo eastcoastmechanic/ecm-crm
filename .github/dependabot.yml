@@ -10,6 +10,9 @@ updates:
       # Remove this once typescript-eslint supports TS 7 (typescript-eslint issue 10940).
       - dependency-name: typescript
         versions: [">=7"]
+      # The site runs on Node 22; keep its types on 22 (same call as #152 and #212).
+      - dependency-name: "@types/node"
+        versions: [">=23"]
     groups:
       minor-and-patch:
         update-types: [minor, patch]
