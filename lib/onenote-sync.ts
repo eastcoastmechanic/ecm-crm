@@ -266,7 +266,7 @@ const toPageNote = (n: ClaimedNote) => ({ authorName: n.author_name, createdAt: 
  * false when another run saved a page for this job first: this run's copy is deleted and its
  * notes go onto the saved page next time.
  */
-async function createPageWithNotes(ids: Ids, loaded: LoadedJob, notes: ClaimedNote[]): Promise<boolean> {
+async function createPageWithNotes(ids: Ids, loaded: LoadedJob, notes: ClaimedNote[], retried = false): Promise<boolean> {
   const { job, newLayout } = loaded;
   const property = one(job.properties);
   const sectionId = newLayout
@@ -297,6 +297,10 @@ async function createPageWithNotes(ids: Ids, loaded: LoadedJob, notes: ClaimedNo
         .update({ onenote_section_id: null, onenote_section_url: null })
         .eq("id", job.id)
         .eq("onenote_section_id", sectionId);
+      // The job's own section: make it again right away (once), so the job is not left without one.
+      if (!retried) {
+        return createPageWithNotes(ids, { job: { ...job, onenote_section_id: null, onenote_section_url: null }, newLayout }, notes, true);
+      }
     } else if (job.property_id) {
       await supabase
         .from("properties")
@@ -351,14 +355,29 @@ async function copyJobToOneNote(jobId: string, makeIfMissing: boolean): Promise<
       .or(unclaimed)
       .limit(1);
     const hasPending = !!pending && pending.length > 0;
+    let ids: Ids | null = null;
     if (!hasPending) {
       if (!makeIfMissing) return;
-      // Nothing to copy: only a new-layout job with no page yet needs Microsoft at all.
+      // Nothing to copy: only a new-layout job needs Microsoft at all.
       const first = await loadJob(jobId);
-      if (!first || !first.newLayout || first.job.onenote_page_id) return;
+      if (!first || !first.newLayout) return;
+      const pageId = first.job.onenote_page_id;
+      if (pageId) {
+        // Older-layout page (no job section): leave it alone.
+        if (!first.job.onenote_section_id) return;
+        // New-layout page: if it (or its section) was deleted in OneNote, forget it and make it
+        // again below, so the job never keeps a dead link just because no note is waiting.
+        ids = await notebookIds();
+        if (!(await pageIsGone(ids, pageId))) return;
+        await supabase
+          .from("jobs")
+          .update({ onenote_page_id: null, onenote_page_url: null })
+          .eq("id", jobId)
+          .eq("onenote_page_id", pageId);
+      }
     }
 
-    const ids = await notebookIds();
+    ids = ids ?? (await notebookIds());
 
     if (hasPending) {
       // Claim first: only a run holding notes (or making a new job's page) ever makes a page.
